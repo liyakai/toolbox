@@ -21,14 +21,14 @@ public:
     static ClassType* instance(Args&&...args)
     {
         auto ins = instance_.load(std::memory_order_acquire);   // 限制多线程乱序,其它线程在std::memory_order_release之前的写操作在此之后均可见
-        if(null == ins)
+        if(nullptr == ins)
         {
             std::lock_guard<std::mutex> lock(lock_);
-            ins = instance.load(std::memory_order_relaxed);
-            if(null == ins)
+            ins = instance_.load(std::memory_order_relaxed);
+            if(nullptr == ins)
             {
                 ins = new ClassType(std::forward<Args>(args)...);
-                instance.store(ins, std::memory_order_release);
+                instance_.store(ins, std::memory_order_release);
             }
         }
         return ins;
