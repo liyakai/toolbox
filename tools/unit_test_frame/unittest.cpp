@@ -7,7 +7,7 @@ UnitTest::UnitTest()
 
 UnitTest::~UnitTest()
 {
-    for each (auto fixture in fixture_list_)
+    for (auto fixture : fixture_list_)
     {
         delete fixture;
     }
@@ -24,7 +24,7 @@ bool UnitTest::AddFixture(Fixture* fixture)
 
 Fixture* UnitTest::GetFixture(const std::string& name)
 {
-    for each (auto fixture in fixture_list_)
+    for  (auto fixture : fixture_list_)
     {
         if (fixture && fixture->GetName() == name)
         {
@@ -36,7 +36,7 @@ Fixture* UnitTest::GetFixture(const std::string& name)
 
 void UnitTest::SetFixtureRunable(const std::string name, bool able)
 {
-    for each (auto fixture in fixture_list_)
+    for (auto fixture : fixture_list_)
     {
         if (fixture && fixture->GetName() == name)
         {
@@ -47,7 +47,7 @@ void UnitTest::SetFixtureRunable(const std::string name, bool able)
 
 void UnitTest::RunAllFixture()
 {
-    for each (auto fixture in fixture_list_)
+    for (auto fixture : fixture_list_)
     {
         if (fixture && fixture->IsEnable())
         {
@@ -60,7 +60,7 @@ void UnitTest::RunAllFixture()
 
 void UnitTest::RunFixture(const std::string& name, std::size_t count /*= 1*/)
 {
-    for each (auto fixture in fixture_list_)
+    for (auto fixture : fixture_list_)
     {
         if (fixture && fixture->GetName() == name)
         {

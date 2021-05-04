@@ -1,5 +1,6 @@
 #include "fixture.h"
 #include <stdio.h>
+#include <algorithm>
 
 Fixture::Fixture(const std::string& name)
     : name_(name), run_(true)
