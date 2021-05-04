@@ -5,34 +5,34 @@
 #include <unordered_map>
 
 /*
-*  ÏàÍ¬´óĞ¡ÄÚ´æ¿éµÄ¹ÜÀí
+*  ç›¸åŒå¤§å°å†…å­˜å—çš„ç®¡ç†
 */
 class Chunk
 {
 public:
     /*
-    * ¹¹Ôìº¯Êı
+    * æ„é€ å‡½æ•°
     */
     Chunk();
     /*
-    * Îö¹¹
+    * ææ„
     */
     ~Chunk();
     /*
-    * ÉèÖÃÄÚ´æ¿é´óĞ¡[Ö»ÓĞµÚÒ»´ÎÉèÖÃ·ÇÁãÖµÓĞĞ§]
-    * @param size ÄÚ´æ¿é´óĞ¡
+    * è®¾ç½®å†…å­˜å—å¤§å°[åªæœ‰ç¬¬ä¸€æ¬¡è®¾ç½®éé›¶å€¼æœ‰æ•ˆ]
+    * @param size å†…å­˜å—å¤§å°
     */
     bool SetChunkSize(std::size_t size);
     /*
-    * »ñÈ¡ÄÚ´æ¿é
+    * è·å–å†…å­˜å—
     */
     char* GetMemory();
     /*
-    * ¹é»¹ÄÚ´æ¿é
+    * å½’è¿˜å†…å­˜å—
     */
     void GiveBack(char* pointer);
     /*
-    * Ê£ÓàÄÚ´æ¿é¸öÊı
+    * å‰©ä½™å†…å­˜å—ä¸ªæ•°
     */
     std::size_t Size();
 
@@ -43,37 +43,37 @@ private:
 };
 
 /*
-* ÄÚ´æ³Ø
+* å†…å­˜æ± 
 */
 class MemoryPool
 {
 public:
     /*
-    * ¹¹Ôìº¯Êı
+    * æ„é€ å‡½æ•°
     */
     MemoryPool();
     /*
-    * Îö¹¹
+    * ææ„
     */
     ~MemoryPool();
     /*
-	* ÉêÇëÄÚ´æ
-	* @param ÉêÇëÄÚ´æµÄ´óĞ¡
+	* ç”³è¯·å†…å­˜
+	* @param ç”³è¯·å†…å­˜çš„å¤§å°
 	*/
     char* GetMemory(std::size_t size);
     /*
-    * ¹é»¹ÄÚ´æ
-    * @param ¹é»¹ÄÚ´æµÄÖ¸Õë
+    * å½’è¿˜å†…å­˜
+    * @param å½’è¿˜å†…å­˜çš„æŒ‡é’ˆ
     */
     void GiveBack(char* pointer);
 	/*
-	* µ÷ÊÔ´òÓ¡
+	* è°ƒè¯•æ‰“å°
 	*/
 	void DebugPrint();
 private:
     /*
-    * Çó´óÓÚµÈÓÚ(Ğ¡ÓÚµÈÓÚ)Ò»¸öÕûÊı×îĞ¡2´ÎÃİËã·¨
-    * [Ëã·¨Ô­Àí¼û] https://blog.csdn.net/Kakarotto_/article/details/108958843
+    * æ±‚å¤§äºç­‰äº(å°äºç­‰äº)ä¸€ä¸ªæ•´æ•°æœ€å°2æ¬¡å¹‚ç®—æ³•
+    * [ç®—æ³•åŸç†è§] https://blog.csdn.net/Kakarotto_/article/details/108958843
     */
     int32_t RebuildNum(int32_t num);
 private:

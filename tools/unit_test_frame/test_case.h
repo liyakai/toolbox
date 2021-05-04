@@ -5,57 +5,57 @@
 using ErrorList = std::list<std::string>;
 
 /*
-* ²âÊÔÓÃÀı
+* æµ‹è¯•ç”¨ä¾‹
 */
 class TestCase
 {
 public:
 	/*
-	* ¹¹Ôì
-	* @param name ²âÊÔÓÃÀıÃû³Æ
+	* æ„é€ 
+	* @param name æµ‹è¯•ç”¨ä¾‹åç§°
 	*/
 	TestCase(const std::string& name);
 	/*
-	* Îö¹¹
+	* ææ„
 	*/
 	virtual ~TestCase();
 	/*
-	* ÔËĞĞ²âÊÔÓÃÀı
+	* è¿è¡Œæµ‹è¯•ç”¨ä¾‹
 	*/
 	virtual void Run() = 0;
 	/*
-	* »ñÈ¡ÓÃÀıÃû³Æ
+	* è·å–ç”¨ä¾‹åç§°
 	*/
 	const std::string& GetName() const;
 	/*
-	* ½ûÓÃ²âÊÔÓÃÀı
-	* @param need_run ÊÇ·ñĞèÒªÔËĞĞ
+	* ç¦ç”¨æµ‹è¯•ç”¨ä¾‹
+	* @param need_run æ˜¯å¦éœ€è¦è¿è¡Œ
 	*/
 	void SetNeedRun(bool need_run);
 	/*
-	*  ÊÇ·ñ¿ªÆô
+	*  æ˜¯å¦å¼€å¯
 	*/
 	bool IsEnable();
 	/*
-	*  ÊÇ·ñÈ«²¿³É¹¦ÔËĞĞ
+	*  æ˜¯å¦å…¨éƒ¨æˆåŠŸè¿è¡Œ
 	*/
 	bool IsSuccess();
 	/*
-	*  ÉèÖÃ´íÎóĞÅÏ¢
-	*  @param error ´íÎóĞÅÏ¢
+	*  è®¾ç½®é”™è¯¯ä¿¡æ¯
+	*  @param error é”™è¯¯ä¿¡æ¯
 	*/
 	void SetError(const std::string& error);
 	/*
-	* È¡µÃ´íÎóÁĞ±í
+	* å–å¾—é”™è¯¯åˆ—è¡¨
 	*/
 	const ErrorList& GetErrorList() const;
 	/*
-	* ÇåÀí´íÎó
+	* æ¸…ç†é”™è¯¯
 	*/
 	void ClearError();
 
 private:
-	std::string name_;						// ²âÊÔÓÃÀıÃû³Æ
-	bool run_;								// ÊÇ·ñĞèÒªÔËĞĞ
-	ErrorList error_list_;		// ±¾´Î²âÊÔ´íÎóĞÅÏ¢
+	std::string name_;						// æµ‹è¯•ç”¨ä¾‹åç§°
+	bool run_;								// æ˜¯å¦éœ€è¦è¿è¡Œ
+	ErrorList error_list_;		// æœ¬æ¬¡æµ‹è¯•é”™è¯¯ä¿¡æ¯
 };

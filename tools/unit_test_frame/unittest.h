@@ -5,47 +5,47 @@
 #include "singleton.h"
 
 /*
-* µ¥Ôª²âÊÔ¿ò¼Ü
+* å•å…ƒæµ‹è¯•æ¡†æ¶
 */
 class UnitTest
 {
 public:
     /*
-    * ¹¹Ôì
+    * æ„é€ 
     */
     UnitTest();
     /*
-    * Îö¹¹
+    * ææ„
     */
     ~UnitTest();
     /*
-    * Ìí¼Ó²âÊÔÓÃÀı¼¯ºÏ
-    * @param  fixture ²âÊÔÓÃÀı¼¯ºÏ
+    * æ·»åŠ æµ‹è¯•ç”¨ä¾‹é›†åˆ
+    * @param  fixture æµ‹è¯•ç”¨ä¾‹é›†åˆ
     */
     bool AddFixture(Fixture* fixture);
     /*
-    * »ñÈ¡²âÊÔÓÃÀı¼¯ºÏ
-    * @param name ²âÊÔÓÃÀı¼¯ºÏÃû³Æ
+    * è·å–æµ‹è¯•ç”¨ä¾‹é›†åˆ
+    * @param name æµ‹è¯•ç”¨ä¾‹é›†åˆåç§°
     */
     Fixture* GetFixture(const std::string& name);
     /*
-    * ÉèÖÃ²âÊÔÓÃÀı¼¯ºÏÊÇ·ñÄÜ¹»ÔËĞĞ
-    * @param  name ²âÊÔÓÃÀı¼¯ºÏÃû×Ö
-    * @param  able ÊÇ·ñÔËĞĞ
+    * è®¾ç½®æµ‹è¯•ç”¨ä¾‹é›†åˆæ˜¯å¦èƒ½å¤Ÿè¿è¡Œ
+    * @param  name æµ‹è¯•ç”¨ä¾‹é›†åˆåå­—
+    * @param  able æ˜¯å¦è¿è¡Œ
     */
     void SetFixtureRunable(const std::string name, bool able);
     /*
-    * ÔËĞĞËùÓĞ¼¯ºÏ
+    * è¿è¡Œæ‰€æœ‰é›†åˆ
     */
     void RunAllFixture();
     /*
-    * ÔËĞĞÒ»¸ö²âÊÔ¼¯ºÏ
-    * @param name ²âÊÔ¼¯ºÏÃû×Ö
-    * @param count ²âÊÔ¼¯ºÏÔËĞĞ´ÎÊı
+    * è¿è¡Œä¸€ä¸ªæµ‹è¯•é›†åˆ
+    * @param name æµ‹è¯•é›†åˆåå­—
+    * @param count æµ‹è¯•é›†åˆè¿è¡Œæ¬¡æ•°
     */
     void RunFixture(const std::string& name, std::size_t count = 1);
     /*
-    * °´ÈÎÒâ¼üÍË³ö
+    * æŒ‰ä»»æ„é”®é€€å‡º
     */
     void AnyKeyToQuit();
 private:

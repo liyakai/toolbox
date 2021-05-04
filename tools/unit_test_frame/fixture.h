@@ -13,73 +13,73 @@ class Fixture
 {
 public:
 	/*
-	* ¹¹Ôì
-	* @param name Ãû³Æ
+	* æ„é€ 
+	* @param name åç§°
 	*/
 	Fixture(const std::string& name);
 	/*
-	* Îö¹¹
+	* ææ„
 	*/
 	virtual ~Fixture();
 	/*
-	* ³õÊ¼»¯
+	* åˆå§‹åŒ–
 	*/
 	void Init();
 	/*
-	* Äæ³õÊ¼»¯
+	* é€†åˆå§‹åŒ–
 	*/
 	void UnInit();
 	/*
-	* ÉèÖÃ³õÊ¼»¯º¯Êı
-	* @param method ³õÊ¼»¯º¯Êı
+	* è®¾ç½®åˆå§‹åŒ–å‡½æ•°
+	* @param method åˆå§‹åŒ–å‡½æ•°
 	*/
 	bool SetInitFunc(FixtureInitMethod method);
 	/*
-	* ÉèÖÃÄæ³õÊ¼»¯º¯Êı
-	* @param method Äæ³õÊ¼»¯º¯Êı
+	* è®¾ç½®é€†åˆå§‹åŒ–å‡½æ•°
+	* @param method é€†åˆå§‹åŒ–å‡½æ•°
 	*/
 	bool SetUninitFunc(FixtureUninitMethod method);
 	/*
-	* »ñÈ¡Ãû³Æ
+	* è·å–åç§°
 	*/
 	const std::string& GetName()const;
 	/*
-	* Ìí¼Ó²âÊÔÓÃÀı
-	* @param testcase ²âÊÔÓÃÀıÖ¸Õë 
+	* æ·»åŠ æµ‹è¯•ç”¨ä¾‹
+	* @param testcase æµ‹è¯•ç”¨ä¾‹æŒ‡é’ˆ 
 	*/
 	bool AddTestCase(TestCase* testcase);
 	/*
-	* »ñÈ¡²âÊÔÓÃÀı
-	* @param name ²âÊÔÓÃÀıÃû³Æ
+	* è·å–æµ‹è¯•ç”¨ä¾‹
+	* @param name æµ‹è¯•ç”¨ä¾‹åç§°
 	*/
 	TestCase* GetTestCase(const std::string& name);
 	/*
-	* ¿ªÆô/½ûÓÃ ÓÃÀı
+	* å¼€å¯/ç¦ç”¨ ç”¨ä¾‹
 	* @param const std::string & name 
 	* @param bool able 
 	*/
 	void SetTestCase(const std::string& name, bool able);
 	/*
-	* ÔËĞĞËùÓĞÓÃÀı
+	* è¿è¡Œæ‰€æœ‰ç”¨ä¾‹
 	*/
 	void RunAllTestCase();
 	/*
-	* ÊÇ·ñÔÊĞíÔËĞĞ
+	* æ˜¯å¦å…è®¸è¿è¡Œ
 	*/
 	bool IsEnable();
 	/*
-	* ÉèÖÃÊÇ·ñÔÊĞíÔËĞĞ´ËÓÃÀıºÏ¼¯
+	* è®¾ç½®æ˜¯å¦å…è®¸è¿è¡Œæ­¤ç”¨ä¾‹åˆé›†
 	* @param bool able 
 	*/
 	void SetRunable(bool able);
 private:
 	using TestCaseList = std::list<TestCase*>;
-	TestCaseList case_list_;			// ²âÊÔÓÃÀıÁĞ±í
-	std::string name_;					// ²âÊÔÓÃÀıÃû³Æ
-	bool run_;							// ÊÇ·ñÔËĞĞ
+	TestCaseList case_list_;			// æµ‹è¯•ç”¨ä¾‹åˆ—è¡¨
+	std::string name_;					// æµ‹è¯•ç”¨ä¾‹åç§°
+	bool run_;							// æ˜¯å¦è¿è¡Œ
 
-	FixtureInitMethod init_;			// ³õÊ¼»¯º¯Êı
-	FixtureUninitMethod uninit_;	// ÇåÀíº¯Êı
+	FixtureInitMethod init_;			// åˆå§‹åŒ–å‡½æ•°
+	FixtureUninitMethod uninit_;	// æ¸…ç†å‡½æ•°
 };
 
 #define FIXTURE_BEGIN(name) \

@@ -121,10 +121,10 @@ void MemoryPool::DebugPrint()
 {
     if (is_debug_print_)
     {
-        printf("ÄÚ´æ³ØÖÐÓÐ %zu ÖÖ¿é.\n", pool_.size());
+        printf("å†…å­˜æ± ä¸­æœ‰ %zu ç§å—.\n", pool_.size());
         for (auto iter = pool_.begin(); iter != pool_.end(); iter++)
         {
-            printf("    ÄÚ´æ³ØÖÐ´óÐ¡Îª %zu µÄÄÚ´æ¿é»¹ÓÐ %zu ¸ö.\n", iter->first, iter->second.Size());
+            printf("    å†…å­˜æ± ä¸­å¤§å°ä¸º %zu çš„å†…å­˜å—è¿˜æœ‰ %zu ä¸ª.\n", iter->first, iter->second.Size());
         }
     }
 }
