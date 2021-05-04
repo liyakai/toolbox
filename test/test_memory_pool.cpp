@@ -21,7 +21,7 @@ CASE(TestMemPool1){
     MemPoolMgr->GiveBack(mem);
     MemPoolMgr->DebugPrint();
 
-    //mem = MemPoolMgr->GetMemory(2*1000*1000*1000);    // Windows 上测试不通过
+    //mem = MemPoolMgr->GetMemory(2*1000*1000*1000);    // Windows 涓婃祴璇曚笉閫氳繃
     //MemPoolMgr->DebugPrint();
     //MemPoolMgr->GiveBack(mem);
     //MemPoolMgr->DebugPrint();

@@ -79,7 +79,7 @@ void Fixture::SetTestCase(const std::string& name, bool able)
 
 void Fixture::RunAllTestCase()
 {
-    printf("运行测试集合[ %s ]\n",name_.c_str());
+    printf("杩愯娴嬭瘯闆嗗悎[ %s ]\n",name_.c_str());
     std::size_t pass = 0;
     std::size_t fail = 0;
     std::size_t disable_count = 0;
@@ -88,7 +88,7 @@ void Fixture::RunAllTestCase()
     {
         if (testcase->IsEnable())
         {
-            printf("运行 [ %s ] ", testcase->GetName().c_str());
+            printf("杩愯 [ %s ] ", testcase->GetName().c_str());
             try
             {
                 testcase->Run();
@@ -126,9 +126,9 @@ void Fixture::RunAllTestCase()
         else
         {
             disable_count++;
-            printf("测试用例[ %s ] [DISABLED]\n", testcase->GetName().c_str());
+            printf("娴嬭瘯鐢ㄤ緥[ %s ] [DISABLED]\n", testcase->GetName().c_str());
         }
-        printf("\n结果统计:\n");
+        printf("\n缁撴灉缁熻:\n");
         printf("[ %zu ][ PASS ]\n", pass);
         printf("[ %zu ][ FAIL ]\n", fail);
         printf("[ %zu ][ EXCEPTION ]\n", exception_count);

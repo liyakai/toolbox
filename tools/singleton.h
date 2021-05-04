@@ -5,7 +5,7 @@
 #include <mutex>
 
 /*
-*   ÀÁººÄ£Ê½´´½¨µ¥Àı
+*   æ‡’æ±‰æ¨¡å¼åˆ›å»ºå•ä¾‹
 */
 
 template <typename ClassType>
@@ -13,14 +13,14 @@ class Singleton
 {
 public:
     /*
-    *  »ñÈ¡µ¥Àı
-    *  @ param args ±»ÊµÀı»¯µ¥ÀıµÄ¹¹Ôì²ÎÊı
-    *  @ return µ¥ÀıÖ¸Õë
+    *  è·å–å•ä¾‹
+    *  @ param args è¢«å®ä¾‹åŒ–å•ä¾‹çš„æ„é€ å‚æ•°
+    *  @ return å•ä¾‹æŒ‡é’ˆ
     */
     template<typename ...Args>
     static ClassType* instance(Args&&...args)
     {
-        auto ins = instance_.load(std::memory_order_acquire);   // ÏŞÖÆ¶àÏß³ÌÂÒĞò,ÆäËüÏß³ÌÔÚstd::memory_order_releaseÖ®Ç°µÄĞ´²Ù×÷ÔÚ´ËÖ®ºó¾ù¿É¼û
+        auto ins = instance_.load(std::memory_order_acquire);   // é™åˆ¶å¤šçº¿ç¨‹ä¹±åº,å…¶å®ƒçº¿ç¨‹åœ¨std::memory_order_releaseä¹‹å‰çš„å†™æ“ä½œåœ¨æ­¤ä¹‹åå‡å¯è§
         if(nullptr == ins)
         {
             std::lock_guard<std::mutex> lock(lock_);
@@ -35,7 +35,7 @@ public:
     }
 
     /*
-    *  Ïú»Ùµ¥ÀıÊµÀı
+    *  é”€æ¯å•ä¾‹å®ä¾‹
     */
    static void destroy()
    {
