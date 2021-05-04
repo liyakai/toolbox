@@ -40,7 +40,7 @@ public:
    static void destroy()
    {
        auto ins = instance_.load(std::memory_order_acquire);
-       if(null != ins)
+       if(nullptr != ins)
        {
            std::lock_guard<std::mutex> lock(lock_);
            ins = instance_.load(std::memory_order_relaxed);
