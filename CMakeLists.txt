@@ -16,6 +16,7 @@ endif()
 INCLUDE_DIRECTORIES(
     .
     ./tools
+    ./net_epoll
 )
 
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
@@ -24,6 +25,7 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 AUX_SOURCE_DIRECTORY(./tools DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./test DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./tools/unit_test_frame DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./net_epoll DIR_SRCS)
 
 # set environment variable
 
