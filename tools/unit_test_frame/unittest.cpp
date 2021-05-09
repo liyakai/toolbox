@@ -1,4 +1,5 @@
 #include "unittest.h"
+#include<iostream>
 
 UnitTest::UnitTest()
 {
@@ -75,6 +76,6 @@ void UnitTest::RunFixture(const std::string& name, std::size_t count /*= 1*/)
 void UnitTest::AnyKeyToQuit()
 {
     printf("Press any key to quit.\n");
-    scanf("\t");
+    std::getc(stdin);
 }
 
