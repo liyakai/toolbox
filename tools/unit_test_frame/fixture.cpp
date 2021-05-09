@@ -96,7 +96,7 @@ void Fixture::RunAllTestCase()
                 if (testcase->IsSuccess())
                 {
                     pass++;
-                    printf("[PASS]\n");
+                    printf("[ PASS ]\n");
                 }
                 else
                 {
@@ -129,13 +129,13 @@ void Fixture::RunAllTestCase()
             disable_count++;
             printf("测试用例[ %s ] [DISABLED]\n", testcase->GetName().c_str());
         }
-        printf("\n结果统计:\n");
-        printf("[ %zu ][ PASS ]\n", pass);
-        printf("[ %zu ][ FAIL ]\n", fail);
-        printf("[ %zu ][ EXCEPTION ]\n", exception_count);
-        printf("[ %zu ][ DISABLE ]\n", disable_count);
-        printf("\n\n");
     }
+    printf("\n结果统计:\n");
+    printf("[ %zu ][ PASS ]\n", pass);
+    printf("[ %zu ][ FAIL ]\n", fail);
+    printf("[ %zu ][ EXCEPTION ]\n", exception_count);
+    printf("[ %zu ][ DISABLE ]\n", disable_count);
+    printf("\n\n");
 }
 
 bool Fixture::IsEnable()
