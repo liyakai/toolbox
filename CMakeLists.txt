@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 2.8)
 PROJECT(toolbox)
 
 # flat
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
 
 # Debug
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
@@ -17,6 +17,7 @@ INCLUDE_DIRECTORIES(
     .
     ./tools
     ./net_epoll
+    ./network
 )
 
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
@@ -26,6 +27,7 @@ AUX_SOURCE_DIRECTORY(./tools DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./test DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./tools/unit_test_frame DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./net_epoll DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./network DIR_SRCS)
 
 # set environment variable
 
