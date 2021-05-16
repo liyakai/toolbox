@@ -4,11 +4,14 @@
 #include "tools/ringbuffer.h"
 #include "tools/memory_pool.h"
 
+/// 事件队列
 using Event2Worker = RingBuffer<NetEventWorker*, 1024>;
+/// 事件处理函数
+using EventHandler = std::function<void(Event* event)>;
 /*
-* 网络接口
+* 网络基类
 */
-class INetwork
+class INetwork : public EventBasedObject
 {
 public:
     /*
@@ -18,19 +21,7 @@ public:
     /*
     * 析构
     */
-    virtual ~INetwork()
-    {
-        while (!event2worker_.Empty())
-        {
-            NetEventWorker* event;
-            if(event2worker_.Read<NetEventWorker*>(event))
-            {
-                MemPoolMgr->GiveBack((char*)event);
-            }
-            
-        }
-        
-    }
+    virtual ~INetwork();
     /*
     * 初始化网络
     */
@@ -38,7 +29,7 @@ public:
     /*
     * 运行一次网络循环
     */
-    virtual void Update() = 0;
+    virtual void Update();
 
 protected:
     /*
@@ -90,6 +81,10 @@ private:
     * 通知工作线程发送消息
     */
     void OnMainToWorkerSend_(Event* event);
+    /*
+    * 处理需要在工作线程中处理的事件
+    */
+    void HandleEvents_();
 private:
     Event2Worker event2worker_;
 

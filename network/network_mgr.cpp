@@ -14,7 +14,6 @@ bool NetworkMaster::Start()
     worker_.reset(new std::thread([this](){
         while(!stop_.load())
         {
-            // 处理主线程发来的事件
             // 驱动网络更新
             for(auto& network : networks_)
             {
@@ -29,7 +28,7 @@ bool NetworkMaster::Start()
 }
 void NetworkMaster::Update()
 {
-
+    DispatchMainEvent_();
 }
 
 void NetworkMaster::StopWait()
@@ -61,4 +60,24 @@ void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
 void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size) 
 {
 
+}
+
+void NetworkMaster::DispatchMainEvent_()
+{
+    while(!event2main_.Empty())
+    {
+        NetEventMain* event;
+        if(!event2main_.Read<NetEventMain*>(event))
+        {
+            continue;
+        }
+        switch (event->GetType())
+        {
+        case  WorkerToMainBinded:
+            break;
+        default:
+            break;
+        }
+        MemPoolMgr->GiveBack((char*)event);
+    }
 }

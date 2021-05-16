@@ -8,6 +8,11 @@ Event::Event(uint32_t id)
         
     }
 
+uint32_t Event::GetID()
+{
+    return id_;
+}
+
 
 
 NetEventWorker::NetEventWorker(NetEventWorkerType type)
@@ -116,4 +121,35 @@ const char* NetEventMain::GetData() const
 uint32_t NetEventMain::GetDataSize() const
 {
     return stream_.size_;
+}
+
+EventBasedObject::EventBasedObject()
+{
+}
+
+EventBasedObject:: ~EventBasedObject()
+{
+
+}
+
+void EventBasedObject::HandleEvent(Event* event)
+{
+    auto iter = event_func_map_.find(event->GetID());
+    if(iter == event_func_map_.end())
+    {
+        return;
+    }
+    iter->second(event);
+}
+void EventBasedObject::RegistereventHandler(uint32_t event_id, EventHandle func)
+{
+    event_func_map_[event_id] = func;
+}
+void EventBasedObject::UnregisterEventHandler(uint32_t event_id)
+{
+    auto iter = event_func_map_.find(event_id);
+    if(iter != event_func_map_.end())
+    {
+        event_func_map_.erase(event_id);
+    }
 }

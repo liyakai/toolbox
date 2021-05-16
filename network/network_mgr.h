@@ -47,6 +47,11 @@ public:
     */
     void Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size);
 
+private:
+    /*
+    * 处理需要在主线程处理的事件
+    */
+    void DispatchMainEvent_();
 
 private:
     Event2Main event2main_;     // 主线程网络事件队列

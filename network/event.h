@@ -1,24 +1,30 @@
 #pragma once
 #include <stdint.h>
 #include <string>
+#include <unordered_map>
+#include <functional>
 
 /*
-* ¶¨ÒåÊÂ¼ş
+* å®šä¹‰äº‹ä»¶
 */
 class Event
 {
 public:
     /*
-    * ¹¹Ôì
-    * @param id ÊÂ¼şID
+    * æ„é€ 
+    * @param id äº‹ä»¶ID
     */
     Event(uint32_t id);
     /*
-    * Îö¹¹
+    * ææ„
     */
     ~Event();
+    /*
+    * è·å–äº‹ä»¶ ID
+    */
+    uint32_t GetID();
 private:
-    uint32_t id_ = 0;   // ÊÂ¼şID
+    uint32_t id_ = 0;   // äº‹ä»¶ID
 };
 
 enum NetEventWorkerType
@@ -32,58 +38,58 @@ enum NetEventWorkerType
 };
 
 /*
-* ¶¨Òå¹¤×÷Ïß³ÌÄÚ´¦ÀíµÄÊÂ¼ş
+* å®šä¹‰å·¥ä½œçº¿ç¨‹å†…å¤„ç†çš„äº‹ä»¶
 */
 class NetEventWorker
 {
 public:
     /*
-    * ¹¹Ôì
-    * @param type ÊÂ¼şÀàĞÍ
+    * æ„é€ 
+    * @param type äº‹ä»¶ç±»å‹
     */
     NetEventWorker(NetEventWorkerType type);
     /*
-    * Îö¹¹
+    * ææ„
     */
     virtual ~NetEventWorker();
     /*
-    * »ñÈ¡ÊÂ¼şÀàĞÍ
+    * è·å–äº‹ä»¶ç±»å‹
     */
     NetEventWorkerType GetType(){ return type_; };
     /*
-    * ÉèÖÃ IP 
+    * è®¾ç½® IP 
     */
     void SetIP(const std::string& ip);
     /*
-    * »ñÈ¡ IP
+    * è·å– IP
     */
     std::string GetIP() const;
     /*
-    * ÉèÖÃ Port 
+    * è®¾ç½® Port 
     */
     void SetPort(const uint16_t port);
     /*
-    * »ñÈ¡ Port
+    * è·å– Port
     */
     uint16_t GetPort() const;
     /*
-    * ÉèÖÃ Á¬½ÓID
+    * è®¾ç½® è¿æ¥ID
     */
     void SetConnectID(const uint64_t conn_id);
     /*
-    * »ñÈ¡ Á¬½ÓID
+    * è·å– è¿æ¥ID
     */
     uint64_t GetConnectID() const;
     /*
-    * ÉèÖÃ Êı¾İ
+    * è®¾ç½® æ•°æ®
     */
     void SetData(const char* data, uint32_t size);
     /*
-    * »ñÈ¡ Êı¾İ
+    * è·å– æ•°æ®
     */
     const char* GetData() const;
     /*
-    * »ñÈ¡Êı¾İ´óĞ¡
+    * è·å–æ•°æ®å¤§å°
     */
     uint32_t GetDataSize() const;
 
@@ -105,7 +111,7 @@ private:
         Detail(){}
         ~Detail(){};
     } detail_;
-    NetEventWorkerType type_;   // ÊÂ¼şÀàĞÍ
+    NetEventWorkerType type_;   // äº‹ä»¶ç±»å‹
 };
 
 enum NetEvenMainType
@@ -122,41 +128,41 @@ enum NetEvenMainType
 };
 
 /*
-* ¶¨ÒåÖ÷Ïß³ÌÄÚ´¦ÀíµÄÍøÂçÊÂ¼ş
+* å®šä¹‰ä¸»çº¿ç¨‹å†…å¤„ç†çš„ç½‘ç»œäº‹ä»¶
 */
 class NetEventMain
 {
 public:
     /*
-    * ¹¹Ôì
+    * æ„é€ 
     */
     NetEventMain(NetEvenMainType type);
     /*
-    * Îö¹¹
+    * ææ„
     */
     virtual ~NetEventMain();
     /*
-    * »ñÈ¡ÊÂ¼şÀàĞÍ
+    * è·å–äº‹ä»¶ç±»å‹
     */
     NetEvenMainType GetType(){ return type_; };
     /*
-    * ÉèÖÃ Á¬½ÓID
+    * è®¾ç½® è¿æ¥ID
     */
     void SetConnectID(const uint64_t conn_id);
     /*
-    * »ñÈ¡ Á¬½ÓID
+    * è·å– è¿æ¥ID
     */
     uint64_t GetConnectID() const;
     /*
-    * ÉèÖÃ Êı¾İ
+    * è®¾ç½® æ•°æ®
     */
     void SetData(const char* data, uint32_t size);
     /*
-    * »ñÈ¡ Êı¾İ
+    * è·å– æ•°æ®
     */
     const char* GetData() const;
     /*
-    * »ñÈ¡Êı¾İ´óĞ¡
+    * è·å–æ•°æ®å¤§å°
     */
     uint32_t GetDataSize() const;
 private:
@@ -167,4 +173,40 @@ private:
         char* data_;
         uint32_t size_;
     } stream_;
+};
+
+using EventHandle = std::function<void(Event* event)>;
+/*
+* å¯ä»¥å¤„ç†äº‹ä»¶çš„å¯¹è±¡
+*/
+class EventBasedObject
+{
+public:
+    /*
+    * æ„é€ 
+    */
+    EventBasedObject();
+    /*
+    * ææ„
+    */
+    virtual ~EventBasedObject();
+    /*
+    * å¤„ç†äº‹ä»¶
+    * @param event äº‹ä»¶æŒ‡é’ˆ
+    */
+    void HandleEvent(Event* event);
+    /*
+    * æ³¨å†Œäº‹ä»¶å‡½æ•°
+    * @param event_id äº‹ä»¶ID
+    * @param func äº‹ä»¶å‡½æ•°
+    */
+    void RegistereventHandler(uint32_t event_id, EventHandle func);
+    /*
+    * å–æ¶ˆäº‹ä»¶æ³¨å†Œ
+    * @param event_id
+    */
+   void UnregisterEventHandler(uint32_t event_id);
+private:
+    using EventFuncMap = std::unordered_map<std::uint32_t, EventHandle>;
+    EventFuncMap event_func_map_; // äº‹ä»¶å¤„ç†å‡½æ•°è¡¨
 };
