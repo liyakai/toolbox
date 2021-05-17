@@ -62,6 +62,28 @@ void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, u
 
 }
 
+void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type)
+{
+    auto* event = new NetEventWorker(MainToWorkerNewAccepter);
+    event->SetIP(ip);
+    event->SetPort(port);
+    NotifyWorker(event,type);
+}
+void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type)
+{
+
+}
+void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
+{
+
+}
+void NetworkMaster::NotifyMain(NetEventMain* event)
+{
+
+}
+
+
+
 void NetworkMaster::DispatchMainEvent_()
 {
     while(!event2main_.Empty())
@@ -73,11 +95,22 @@ void NetworkMaster::DispatchMainEvent_()
         }
         switch (event->GetType())
         {
-        case  WorkerToMainBinded:
+        case WorkerToMainBinded:
+            break;
+        case WorkerToMainAccepted:
+            OnAccepted(event->GetConnectID());
+            break;
+        case WorkerToMainClose:
+            OnClose(event->GetConnectID());
+            break;
+        case WorkerToMainConnected:
+            OnConnected(event->GetConnectID());
+            break;
+        case WorkerToMainRecv:
+            OnReceived(event->GetConnectID(), event->GetData(), event->GetDataSize());
             break;
         default:
             break;
         }
-        MemPoolMgr->GiveBack((char*)event);
     }
 }
