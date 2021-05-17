@@ -35,7 +35,7 @@ public:
     */
     virtual void Update();
     /*
-    * 结束并等待工作线程结束,在祝县城内调用
+    * 结束并等待工作线程结束,在主线程内调用
     */
     virtual void StopWait();
     /*
@@ -46,6 +46,55 @@ public:
     * 通知工作线程发送数据
     */
     void Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size);
+protected:
+    /*
+    * 主线程内处理接受新连接事件
+    * @param conn_id 连接ID
+    */
+    virtual void OnAccepted(uint64_t conn_id){};
+    /*
+    * 主线程内处理主动连接事件
+    * @param conn_id 连接ID
+    */
+    virtual void OnConnected(uint64_t conn_id){};
+    /*
+    * 主线程内处理连接关闭事件
+    * @param conn_id 连接ID
+    */
+    virtual void OnClose(uint64_t conn_id){};
+    /*
+    * 主线程内处理数据可读事件
+    * @param conn_id 连接ID
+    * @param data 内存指针
+    * @param size 数据长度
+    */
+    virtual void OnReceived(uint64_t conn_id, const char* data, size_t size){};
+protected:
+    /*
+    * 通知工作线程建立一个监听器
+    * @param ip 监听ip
+    * @param port 监听端口
+    * @param type 网络类型
+    */
+    void Accept(const std::string& ip, uint16_t port, NetworkType type);
+    /*
+    * 通知工作线程建立一个主动连接
+    * @param ip 连接ip
+    * @param port 连接端口
+    * @param type 网络类型
+    */
+    void Connect(const std::string& ip, uint16_t port, NetworkType type);
+    /*
+    * 主线程投递事件到工作线程
+    * @param event 事件
+    * @param type 网络类型
+    */
+    void NotifyWorker(NetEventWorker* event, NetworkType type);
+    /*
+    * 工作线程投递事件到主线程
+    * @param event 事件
+    */
+   void NotifyMain(NetEventMain* event);
 
 private:
     /*
