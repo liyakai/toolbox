@@ -30,6 +30,10 @@ public:
     * 运行一次网络循环
     */
     virtual void Update();
+    /*
+    * 加入事件
+    */
+    void PushEvent(NetEventWorker* event);
 
 protected:
     /*

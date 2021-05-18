@@ -101,6 +101,11 @@ private:
     * 处理需要在主线程处理的事件
     */
     void DispatchMainEvent_();
+    /*
+    * 根据类型获取网络实例
+    * @param type 网络类型
+    */
+    INetwork* GetNetwork_(NetworkType type);
 
 private:
     Event2Main event2main_;     // 主线程网络事件队列
