@@ -55,11 +55,16 @@ void NetworkMaster::StopWait()
 }
 void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
 {
-
+    auto* event = new NetEventWorker(MainToWorkerClose);
+    event->SetConnectID(conn_id);
+    NotifyWorker(event,type);
 }
 void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size) 
 {
-
+    auto* event = new NetEventWorker(MainToWorkerSend);
+    event->SetConnectID(conn_id);
+    event->SetData(data, size);
+    NotifyWorker(event, type);
 }
 
 void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type)
@@ -71,15 +76,24 @@ void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType typ
 }
 void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type)
 {
-
+    auto* event = new NetEventWorker(MainToWorkerNewConnecter);
+    event->SetIP(ip);
+    event->SetPort(port);
+    NotifyWorker(event, type);
 }
 void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
 {
-
+    auto index = static_cast<size_t>(type);
+    if(nullptr == networks_[index])
+    {
+        networks_[index].reset(GetNetwork_(type));
+        networks_[index]->Init();
+    }
+    networks_[index]->PushEvent(std::move(event));
 }
 void NetworkMaster::NotifyMain(NetEventMain* event)
 {
-
+    event2main_.Write<NetEventMain*>(event);
 }
 
 
@@ -113,4 +127,18 @@ void NetworkMaster::DispatchMainEvent_()
             break;
         }
     }
+}
+
+INetwork* NetworkMaster::GetNetwork_(NetworkType type)
+{
+    switch (type)
+    {
+    case NT_TCP:
+        // return new INetwork(new TcpNetwork());
+        break;
+    
+    default:
+        break;
+    }
+    return nullptr;
 }

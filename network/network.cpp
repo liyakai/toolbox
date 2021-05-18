@@ -21,12 +21,21 @@ INetwork::~INetwork()
         }
         
     }
-    
+}
+
+void INetwork::Init()
+{
+
 }
 void INetwork::Update()
 {
-    // 处理主线程发来的事件
+    // 澶勭悊涓荤嚎绋嬪彂鏉ョ殑浜嬩欢
     HandleEvents_();
+}
+
+void INetwork::PushEvent(NetEventWorker* event)
+{
+    event2worker_.Write<NetEventWorker*>(event);
 }
 
 
