@@ -3,6 +3,7 @@
 #include <atomic>
 #include <mutex>
 #include <cstdlib>
+#include "tools/singleton.h"
 /*
 * 定义对象池
 */
@@ -18,6 +19,7 @@ public:
     * 构造
     */
     ObjectPool()
+    : allocated_count_(0)
     {
         Expand();
     };
@@ -63,6 +65,27 @@ public:
        std::lock_guard<std::mutex> lock(lock_);
        free_objects_.push_back(object);
    }
+    /*
+    * 开关 DebugPrint
+    * @param enable 是否开启
+    */
+    void SetDebugPrint(bool enable)
+    {
+        debug_print_ = enable;
+    }
+        /*
+    * 测试打印
+    */
+    void DebugPrint()
+    {
+        if(!debug_print_)
+        {
+            return;
+        }
+        printf("\n ========== ObjectPool ========== \n");
+        printf("FreeObjects 个数:%zu,using_memory_ 个数:%zu\n", free_objects_.size(), using_memory_.size());
+        printf("\n ---------- ObjectPool ---------- \n");
+    }
 private:
     /*
     * 扩容
@@ -82,6 +105,37 @@ private:
     using UsingMemory = std::list<char*>;
     FreeObjects free_objects_;  // 可用对象
     UsingMemory using_memory_;  // 正在使用的内存
-    std::atomic<size_t> allocated_count_ = 0;   // 已分配对象的数量
+    std::atomic<size_t> allocated_count_;   // 已分配对象的数量
     std::mutex lock_;
+    bool debug_print_ = false;
 };
+
+/*
+* 对象池单例
+*/
+template<typename ObjectType>
+static ObjectPool<ObjectType>& GetObjectPoolMgrRef()
+{
+    return *(Singleton<ObjectPool<ObjectType>>::Instance());
+}
+
+/*
+* 从对象池单例中构造一个对象
+* @param ObjectType 对象类型
+* @param Args 参数
+*/
+template <typename ObjectType, typename...Args>
+static ObjectType* GetObject(Args...args)
+{
+    return GetObjectPoolMgrRef<ObjectType>().GetObject(args...);
+}
+
+/*
+* 归还对象
+*/
+template<typename ObjectType>
+static void GiveBackObject(ObjectType* object)
+{
+    GetObjectPoolMgrRef<ObjectType>().GiveBack(object);
+}
+

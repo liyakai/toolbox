@@ -65,7 +65,7 @@ int EpollCtrl::EpollWait(int msec)
 
 epoll_event* EpollCtrl::GetEvent(int index)
 {
-    if(index < 0 || index >= max_events_)
+    if(index < 0 || index >= int(max_events_))
     {
         return nullptr;
     }

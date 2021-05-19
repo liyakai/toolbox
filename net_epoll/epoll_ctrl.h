@@ -63,4 +63,4 @@ private:
     epoll_event* events_;       // epoll 事件数组
 };
 
-#define EpollCtrlMgr Singleton<EpollCtrl>::instance(10240)
+#define EpollCtrlMgr Singleton<EpollCtrl>::Instance(10240)

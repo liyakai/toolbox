@@ -18,7 +18,7 @@ public:
     *  @ return 单例指针
     */
     template<typename ...Args>
-    static ClassType* instance(Args&&...args)
+    static ClassType* Instance(Args&&...args)
     {
         auto ins = instance_.load(std::memory_order_acquire);   // 限制多线程乱序,其它线程在std::memory_order_release之前的写操作在此之后均可见
         if(nullptr == ins)

@@ -21,6 +21,7 @@ bool UnitTest::AddFixture(Fixture* fixture)
         return false;
     }
     fixture_list_.push_back(fixture);
+    return true;
 }
 
 Fixture* UnitTest::GetFixture(const std::string& name)

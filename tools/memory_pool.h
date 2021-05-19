@@ -81,4 +81,4 @@ private:
     bool is_debug_print_ = false;
 };
 
-#define MemPoolMgr Singleton<MemoryPool>::instance()
+#define MemPoolMgr Singleton<MemoryPool>::Instance()
