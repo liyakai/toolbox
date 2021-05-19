@@ -195,7 +195,7 @@ public:
         return true;
     }
     /*
-    * 调试打印
+    * 测试打印
     */
     void DebugPrint()
     {

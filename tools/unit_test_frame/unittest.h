@@ -53,4 +53,4 @@ private:
     std::list<Fixture*> fixture_list_;
 };
 
-#define UnitTestMgr (*Singleton<UnitTest>::instance())
+#define UnitTestMgr (*Singleton<UnitTest>::Instance())
