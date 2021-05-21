@@ -17,23 +17,23 @@ class Base
 {
 public:
     // virtual ~Base(){};
-    virtual void func1(){ printf("Base::func1"); };
-    virtual void func2(){ printf("Base::func2"); };
+    virtual void func1(){ printf("Base::func1\n"); };
+    virtual void func2(){ printf("Base::func2\n"); };
 };
 // 定义 派生类
 class Derive : public Base
 {
 public:
-    virtual void func1(){ printf("Derive::func1"); };
-    virtual void func3(){ printf("Derive::func3"); };
-    virtual void func4(){ printf("Derive::func4"); };
+    virtual void func1(){ printf("Derive::func1\n"); };
+    virtual void func3(){ printf("Derive::func3\n"); };
+    virtual void func4(){ printf("Derive::func4\n"); };
 };
 // 打印 Base 类型的虚函数.
 CASE(PrintBase)
 {
     Base obj;
     Virtual<Base> v_obj(obj);
-    v_obj.SetDebugPrint(true);
+    v_obj.SetDebugPrint(false);
     v_obj.PrintVirtFunc(); 
 }
 // 打印 Derive 类型的虚函数.
@@ -41,7 +41,7 @@ CASE(PrintDerive)
 {
     Derive obj;
     Virtual<Derive> v_obj(obj);
-    v_obj.SetDebugPrint(true);
+    v_obj.SetDebugPrint(false);
     v_obj.PrintVirtFunc(); 
 }
 
