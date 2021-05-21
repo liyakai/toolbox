@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <typeinfo>
+#include <stdint.h>
 
 
 typedef void(*FUNC)(void);
@@ -26,33 +27,30 @@ public:
     */
     void PrintVirtFunc()
     {
-        int* vtable = (int*)(*(int*)&object);
+        int32_t* vtable = (int32_t*)(*(int32_t*)&object);
         Print("\n虚表地址:%p\n", vtable);
         if (nullptr != vtable)
         {
             int i = 0;
-            while(nullptr != vtable)
+            while(nullptr != (FUNC)*vtable)
             {
-                Print("\n第 %d 个虚函数地址: 0X%x,->", i + 1, vtable);
-                FUNC f = (FUNC)vtable[i];
-                Print(" FUNC:%x f:%x ",*vtable, f);
-                if(nullptr != f)
+                Print("第 %d 个虚函数地址: 0X%x ->", ++i, vtable);
+                FUNC f = (FUNC)*vtable;
+                //Print(" FUNC:%x f:%x ",*vtable, f);
+                if(nullptr != f && true == debug_print_)
                 {
                     f();
                 }
-
-                i++;
-                Print(" ^^^\n ");
-                // vtable = (int*)(*((int*)&object + i));
-                vtable = vtable + 1;
+                vtable = vtable + 2;
                 
             }
         } 
         else
         {
+            Print("没有虚函数\n ");
             Print("%s 没有虚函数.",typeid(object).name());
         }
-        Print("End.\n");
+        Print("\n");
 
     }
     void Print(const char* format, ...)
