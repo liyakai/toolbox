@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <string.h>
+#include <debug_print.h>
 /*
 * 非线程安全的环形队列
 * Type 数据类型
@@ -9,7 +10,8 @@
 * Ratio 警戒值,超过此容量,队列长度会自动增长一倍
 */
 template <typename Type, size_t Size, size_t Ratio = 75>
-class RingBuffer{
+class RingBuffer : public DebugPrint
+{
 public:
     /*
     * 构造函数
@@ -199,29 +201,21 @@ public:
     */
     void DebugPrint()
     {
-        if(!debug_print_)
+        if(!GetDebugStatus())
         {
             return;
         }
-        printf("\n ========== RingBuffer ========== \n");
-        printf("缓冲区大小:%zu,读位置:%zu,写位置:%zu,警戒值:%f\n", buffer_size_, read_pos_, write_pos_, ratio_);
+        Print("\n ========== RingBuffer ========== \n");
+        Print("缓冲区大小:%zu,读位置:%zu,写位置:%zu,警戒值:%f\n", buffer_size_, read_pos_, write_pos_, ratio_);
         for(size_t i = 0; i < buffer_size_; i++)
         {
             // if(0 != i && 0 == (i % 10))
             // {
             //     printf("\n");
             // }
-            printf("0x%02X ",buffer_[i]);
+            Print("0x%02X ",buffer_[i]);
         }
-        printf("\n ---------- RingBuffer ---------- \n");
-    }
-    /*
-    * 开关 DebugPrint
-    * @param enable 是否开启
-    */
-    void SetDebugPrint(bool enable)
-    {
-        debug_print_ = enable;
+        Print("\n ---------- RingBuffer ---------- \n");
     }
 private:
     /*
@@ -244,5 +238,4 @@ private:
     size_t read_pos_ = 0;       // 可读取位置
     char* buffer_ = nullptr;    // 缓冲区
     double ratio_ = 0;          // 警戒值
-    bool debug_print_ = false;  // 是否打印调试信息
 };

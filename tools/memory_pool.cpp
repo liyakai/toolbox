@@ -119,12 +119,12 @@ void MemoryPool::GiveBack(char* pointer)
 
 void MemoryPool::DebugPrint()
 {
-    if (is_debug_print_)
+    if (GetDebugStatus())
     {
-        printf("内存池中有 %zu 种块.\n", pool_.size());
+        Print("内存池中有 %zu 种块.\n", pool_.size());
         for (auto iter = pool_.begin(); iter != pool_.end(); iter++)
         {
-            printf("    内存池中大小为 %zu 的内存块还有 %zu 个.\n", iter->first, iter->second.Size());
+            Print("    内存池中大小为 %zu 的内存块还有 %zu 个.\n", iter->first, iter->second.Size());
         }
     }
 }
