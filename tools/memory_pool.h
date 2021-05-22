@@ -3,7 +3,7 @@
 #include "singleton.h"
 #include <list>
 #include <unordered_map>
-
+#include "debug_print.h"
 /*
 *  相同大小内存块的管理
 */
@@ -45,7 +45,7 @@ private:
 /*
 * 内存池
 */
-class MemoryPool
+class MemoryPool : public DebugPrint
 {
 public:
     /*
@@ -78,7 +78,6 @@ private:
     int32_t RebuildNum(int32_t num);
 private:
     std::unordered_map<std::size_t, Chunk> pool_;
-    bool is_debug_print_ = false;
 };
 
 #define MemPoolMgr Singleton<MemoryPool>::Instance()

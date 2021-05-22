@@ -1,9 +1,9 @@
 #pragma once
-#include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <typeinfo>
 #include <stdint.h>
+#include "debug_print.h"
 
 
 typedef void(*FUNC)(void);
@@ -12,7 +12,7 @@ typedef void(*FUNC)(void);
 * 定义一个能够打印虚函数的类
 */
 template <typename ClassType>
-class Virtual
+class Virtual : public DebugPrint
 {
 public:
     /*
@@ -37,7 +37,7 @@ public:
                 Print("第 %d 个虚函数地址: 0X%x ->", ++i, vtable);
                 FUNC f = (FUNC)*vtable;
                 //Print(" FUNC:%x f:%x ",*vtable, f);
-                if(nullptr != f && true == debug_print_)
+                if(nullptr != f && true == GetDebugStatus())
                 {
                     f();
                 }
@@ -53,29 +53,6 @@ public:
         Print("\n");
 
     }
-    void Print(const char* format, ...)
-    {
-        if(debug_print_)
-        {
-            va_list args;
-            char str[1024];
-            memset(str, 0 ,sizeof(char) *1024);
-            va_start(args, format);
-            vsprintf(str, format, args);
-            va_end(args);
-            printf("%s",str);
-            fflush(stdout);
-        }
-    }
-    /*
-    * 开关 DebugPrint
-    * @param enable 是否开启
-    */
-    void SetDebugPrint(bool enable)
-    {
-        debug_print_ = enable;
-    }
 private:
     ClassType& object;
-    bool debug_print_ = false;
 };

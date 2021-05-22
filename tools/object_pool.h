@@ -4,11 +4,12 @@
 #include <mutex>
 #include <cstdlib>
 #include "tools/singleton.h"
+#include "debug_print.h"
 /*
 * 定义对象池
 */
 template<typename ObjectType, size_t Count = 128>
-class ObjectPool
+class ObjectPool : public DebugPrint
 {
 public:
     ObjectPool(const ObjectPool&) = delete;
@@ -65,26 +66,19 @@ public:
        std::lock_guard<std::mutex> lock(lock_);
        free_objects_.push_back(object);
    }
+
     /*
-    * 开关 DebugPrint
-    * @param enable 是否开启
-    */
-    void SetDebugPrint(bool enable)
-    {
-        debug_print_ = enable;
-    }
-        /*
     * 测试打印
     */
     void DebugPrint()
     {
-        if(!debug_print_)
+        if(!GetDebugStatus())
         {
             return;
         }
-        printf("\n ========== ObjectPool ========== \n");
-        printf("FreeObjects 个数:%zu,using_memory_ 个数:%zu\n", free_objects_.size(), using_memory_.size());
-        printf("\n ---------- ObjectPool ---------- \n");
+        Print("\n ========== ObjectPool ========== \n");
+        Print("FreeObjects 个数:%zu,using_memory_ 个数:%zu\n", free_objects_.size(), using_memory_.size());
+        Print("\n ---------- ObjectPool ---------- \n");
     }
 private:
     /*
@@ -107,7 +101,6 @@ private:
     UsingMemory using_memory_;  // 正在使用的内存
     std::atomic<size_t> allocated_count_;   // 已分配对象的数量
     std::mutex lock_;
-    bool debug_print_ = false;
 };
 
 /*
