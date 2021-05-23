@@ -55,13 +55,13 @@ void NetworkMaster::StopWait()
 }
 void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
 {
-    auto* event = new NetEventWorker(MainToWorkerClose);
+    auto* event = new NetEventWorker(EID_MainToWorkerClose);
     event->SetConnectID(conn_id);
     NotifyWorker(event,type);
 }
 void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size) 
 {
-    auto* event = new NetEventWorker(MainToWorkerSend);
+    auto* event = new NetEventWorker(EID_MainToWorkerSend);
     event->SetConnectID(conn_id);
     event->SetData(data, size);
     NotifyWorker(event, type);
@@ -69,14 +69,14 @@ void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, u
 
 void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type)
 {
-    auto* event = new NetEventWorker(MainToWorkerNewAccepter);
+    auto* event = new NetEventWorker(EID_MainToWorkerNewAccepter);
     event->SetIP(ip);
     event->SetPort(port);
     NotifyWorker(event,type);
 }
 void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type)
 {
-    auto* event = new NetEventWorker(MainToWorkerNewConnecter);
+    auto* event = new NetEventWorker(EID_MainToWorkerNewConnecter);
     event->SetIP(ip);
     event->SetPort(port);
     NotifyWorker(event, type);
@@ -87,7 +87,7 @@ void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
     if(nullptr == networks_[index])
     {
         networks_[index].reset(GetNetwork_(type));
-        networks_[index]->Init();
+        networks_[index]->Init(this);
     }
     networks_[index]->PushEvent(std::move(event));
 }
@@ -107,20 +107,20 @@ void NetworkMaster::DispatchMainEvent_()
         {
             continue;
         }
-        switch (event->GetType())
+        switch (event->GetID())
         {
-        case WorkerToMainBinded:
+        case EID_WorkerToMainBinded:
             break;
-        case WorkerToMainAccepted:
+        case EID_WorkerToMainAccepted:
             OnAccepted(event->GetConnectID());
             break;
-        case WorkerToMainClose:
+        case EID_WorkerToMainClose:
             OnClose(event->GetConnectID());
             break;
-        case WorkerToMainConnected:
+        case EID_WorkerToMainConnected:
             OnConnected(event->GetConnectID());
             break;
-        case WorkerToMainRecv:
+        case EID_WorkerToMainRecv:
             OnReceived(event->GetConnectID(), event->GetData(), event->GetDataSize());
             break;
         default:

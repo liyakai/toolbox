@@ -3,7 +3,9 @@
 #include "event.h"
 #include "tools/ringbuffer.h"
 #include "tools/memory_pool.h"
+#include "network_mgr.h"
 
+class NetworkMaster;
 /// 事件队列
 using Event2Worker = RingBuffer<NetEventWorker*, 1024>;
 /// 事件处理函数
@@ -25,7 +27,7 @@ public:
     /*
     * 初始化网络
     */
-    virtual void Init();
+    virtual void Init(NetworkMaster* master);
     /*
     * 运行一次网络循环
     */
@@ -37,35 +39,35 @@ public:
 
 protected:
     /*
-    * 建立监听器
+    * 工作线程内建立监听器
     */
     virtual uint64_t OnNewAccepter(const std::string& ip, const uint16_t port) = 0;
     /*
-    * 建立连接器
+    * 工作线程内建立连接器
     */
     virtual uint64_t OnNewConnector(const std::string& ip, const uint16_t port) = 0;
     /*
-    * 关闭网络连接
+    * 关工作线程内闭网络连接
     */
     virtual void OnClose(uint64_t connect_id) = 0;
     /*
-    * 发送
+    * 工作线程内工作线程内发送
     */
     virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size);
     /*
-    * 接收到新连接
+    * 工作线程内接收到新连接
     */
     void OnAccepted(uint64_t connect_id);
     /*
-    * 连接到远端
+    * 工作线程内连接到远端
     */
     void OnConnected(uint64_t connect_id);
     /*
-    * 关闭网络连接
+    * 工作线程内关闭网络连接
     */
     void OnClosed(uint64_t connect_id);
     /*
-    * 接收到数据
+    * 工作线程内接收到数据
     */
     void OnReceived(uint64_t connect_id, const char* data, uint32_t size);
 private:
@@ -91,6 +93,6 @@ private:
     void HandleEvents_();
 private:
     Event2Worker event2worker_;
-
+    NetworkMaster* master_;
 };
 

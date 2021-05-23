@@ -2,29 +2,29 @@
 #include "tools/memory_pool.h"
 #include <string.h>
 
-Event::Event(uint32_t id)
+Event::Event(EventID id)
     : id_(id)
     {
         
     }
 
-uint32_t Event::GetID()
+EventID Event::GetID()
 {
     return id_;
 }
 
 
 
-NetEventWorker::NetEventWorker(NetEventWorkerType type)
-    :type_(type)
+NetEventWorker::NetEventWorker(EventID event_id)
+    : Event(event_id)
 {
 }
 
 NetEventWorker::~NetEventWorker()
 {
-    switch(type_)
+    switch(GetID())
     {
-        case MainToWorkerSend:
+        case EID_MainToWorkerSend:
             MemPoolMgr->GiveBack(detail_.stream_.data_);
             break;
         default:
@@ -83,15 +83,15 @@ uint32_t NetEventWorker::GetDataSize() const
 
 
 
-NetEventMain::NetEventMain(NetEvenMainType type)
+NetEventMain::NetEventMain(EventID event_id)
+    : Event(event_id)
 {
-    type_ = type;
 }
 NetEventMain::~NetEventMain()
 {
-    switch(type_)
+    switch(GetID())
     {
-        case WorkerToMainRecv:
+        case EID_WorkerToMainRecv:
             MemPoolMgr->GiveBack(stream_.data_);
             break;
         default:
@@ -141,11 +141,11 @@ void EventBasedObject::HandleEvent(Event* event)
     }
     iter->second(event);
 }
-void EventBasedObject::RegistereventHandler(uint32_t event_id, EventHandle func)
+void EventBasedObject::RegistereventHandler(EventID event_id, EventHandle func)
 {
     event_func_map_[event_id] = func;
 }
-void EventBasedObject::UnregisterEventHandler(uint32_t event_id)
+void EventBasedObject::UnregisterEventHandler(EventID event_id)
 {
     auto iter = event_func_map_.find(event_id);
     if(iter != event_func_map_.end())

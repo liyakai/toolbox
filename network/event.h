@@ -4,6 +4,24 @@
 #include <unordered_map>
 #include <functional>
 
+enum EventID
+{
+    EID_NONE = 0,
+    EID_MainToWorkerNewAccepter,
+    EID_MainToWorkerNewConnecter,
+    EID_MainToWorkerClose,
+    EID_MainToWorkerSend,
+    EID_WorkerToMainBinded,
+    EID_WorkerToMainBindFailed,
+    EID_WorkerToMainConnected,
+    EID_WorkerToMainConnectFailed,
+    EID_WorkerToMainAccepted,
+    EID_WorkerToMainClose,
+    EID_WorkerToMainRecv,
+
+    EID_MAX,
+};
+
 /*
 * 定义事件
 */
@@ -14,7 +32,7 @@ public:
     * 构造
     * @param id 事件ID
     */
-    Event(uint32_t id);
+    Event(EventID id);
     /*
     * 析构
     */
@@ -22,40 +40,26 @@ public:
     /*
     * 获取事件 ID
     */
-    uint32_t GetID();
+    EventID GetID();
 private:
-    uint32_t id_ = 0;   // 事件ID
-};
-
-enum NetEventWorkerType
-{
-    MainToWorkerNewAccepter = 1,
-    MainToWorkerNewConnecter,
-    MainToWorkerClose,
-    MainToWorkerSend,
-
-    MainToWorkerMax,
+    EventID id_ = EID_NONE;   // 事件ID
 };
 
 /*
 * 定义工作线程内处理的事件
 */
-class NetEventWorker
+class NetEventWorker : public Event
 {
 public:
     /*
     * 构造
     * @param type 事件类型
     */
-    NetEventWorker(NetEventWorkerType type);
+    NetEventWorker(EventID event_id);
     /*
     * 析构
     */
     virtual ~NetEventWorker();
-    /*
-    * 获取事件类型
-    */
-    NetEventWorkerType GetType(){ return type_; };
     /*
     * 设置 IP 
     */
@@ -111,40 +115,22 @@ private:
         Detail(){}
         ~Detail(){};
     } detail_;
-    NetEventWorkerType type_;   // 事件类型
-};
-
-enum NetEvenMainType
-{
-    WorkerToMainBinded = static_cast<int>(NetEventWorkerType::MainToWorkerMax) + 1,
-    WorkerToMainBindFailed,
-    WorkerToMainConnected,
-    WorkerToMainConnectFailed,
-    WorkerToMainAccepted,
-    WorkerToMainClose,
-    WorkerToMainRecv,
-
-    MainToMainMax,
 };
 
 /*
 * 定义主线程内处理的网络事件
 */
-class NetEventMain
+class NetEventMain : public Event
 {
 public:
     /*
     * 构造
     */
-    NetEventMain(NetEvenMainType type);
+    NetEventMain(EventID event_id);
     /*
     * 析构
     */
     virtual ~NetEventMain();
-    /*
-    * 获取事件类型
-    */
-    NetEvenMainType GetType(){ return type_; };
     /*
     * 设置 连接ID
     */
@@ -166,7 +152,6 @@ public:
     */
     uint32_t GetDataSize() const;
 private:
-    NetEvenMainType type_;
     struct Stream
     {
         uint64_t connect_id_;
@@ -200,12 +185,12 @@ public:
     * @param event_id 事件ID
     * @param func 事件函数
     */
-    void RegistereventHandler(uint32_t event_id, EventHandle func);
+    void RegistereventHandler(EventID event_id, EventHandle func);
     /*
     * 取消事件注册
     * @param event_id
     */
-   void UnregisterEventHandler(uint32_t event_id);
+   void UnregisterEventHandler(EventID event_id);
 private:
     using EventFuncMap = std::unordered_map<std::uint32_t, EventHandle>;
     EventFuncMap event_func_map_; // 事件处理函数表

@@ -5,6 +5,8 @@
 #include "event.h"
 #include "network.h"
 
+class INetwork;
+
 // 网络类型
 enum NetworkType
 {
@@ -15,6 +17,9 @@ enum NetworkType
 
 using Event2Main = RingBuffer<NetEventMain*, 1024>;
 
+/*
+* 定义网络主线程
+*/
 class NetworkMaster
 {
 public:
@@ -46,6 +51,11 @@ public:
     * 通知工作线程发送数据
     */
     void Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size);
+    /*
+    * 工作线程投递事件到主线程
+    * @param event 事件
+    */
+   void NotifyMain(NetEventMain* event);
 protected:
     /*
     * 主线程内处理接受新连接事件
@@ -90,11 +100,6 @@ protected:
     * @param type 网络类型
     */
     void NotifyWorker(NetEventWorker* event, NetworkType type);
-    /*
-    * 工作线程投递事件到主线程
-    * @param event 事件
-    */
-   void NotifyMain(NetEventMain* event);
 
 private:
     /*
