@@ -10,3 +10,5 @@ typedef enum _error_code
     ERR_PARAM_NULLPTR,          // 参数为空指针
     
 } ErrCode;
+
+#define MAX_SOCKET_COUNT			20000

@@ -36,7 +36,7 @@ public:
     /*
     * 析构
     */
-    ~Event();
+    virtual ~Event();
     /*
     * 获取事件 ID
     */

@@ -9,7 +9,7 @@ EpollCtrl::EpollCtrl(uint max_events)
 {
 }
 
-bool EpollCtrl::CreateEpoll()
+bool EpollCtrl::Init()
 {
     epoll_fd_ = epoll_create(max_events_);
     if(epoll_fd_ < 0)
