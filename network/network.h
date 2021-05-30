@@ -29,6 +29,10 @@ public:
     */
     virtual void Init(NetworkMaster* master);
     /*
+    * 逆初始化网络
+    */
+    virtual void UnInit();
+    /*
     * 运行一次网络循环
     */
     virtual void Update();
@@ -45,7 +49,7 @@ protected:
     /*
     * 工作线程内建立连接器
     */
-    virtual uint64_t OnNewConnector(const std::string& ip, const uint16_t port) = 0;
+    virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port) = 0;
     /*
     * 关工作线程内闭网络连接
     */
@@ -53,7 +57,7 @@ protected:
     /*
     * 工作线程内工作线程内发送
     */
-    virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size);
+    virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) = 0;
     /*
     * 工作线程内接收到新连接
     */

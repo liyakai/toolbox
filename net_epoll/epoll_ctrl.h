@@ -17,7 +17,7 @@ public:
     * 创建 epoll
     * @return 错误码
     */
-    bool CreateEpoll();
+    bool Init();
     /*
     * 销毁 epoll
     */
