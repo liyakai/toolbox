@@ -2,6 +2,10 @@
 
 #include "tools/singleton.h"
 #include <sys/epoll.h>
+#include "epoll_define.h"
+#include "epoll_socket.h"
+
+
 /*
 * epoll 类
 */
@@ -15,9 +19,9 @@ public:
     EpollCtrl(uint max_events);
     /*
     * 创建 epoll
-    * @return 错误码
+    * @return 是否成功
     */
-    bool Init();
+    bool CreateEpoll();
     /*
     * 销毁 epoll
     */
@@ -44,6 +48,10 @@ public:
     */
     bool DelEvent(int socket_fd);
     /*
+    * 操作事件
+    */
+    bool OperEvent(EpollSocket& socket, EpollOperType op_type, SockEventType event_type);
+    /*
     * epoll_wait
     * @param msec 等待毫秒数
     * @return 有读写通知的文件描述符的个数
@@ -55,6 +63,10 @@ public:
     * @return epoll_event*
     */
     epoll_event* GetEvent(int index);
+    /*
+    * 执行一次 epoll wait
+    */
+   bool RunOnce();
 private:
 
 private:

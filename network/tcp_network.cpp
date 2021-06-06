@@ -16,7 +16,7 @@ TcpNetwork::~TcpNetwork()
 void TcpNetwork::Init(NetworkMaster* master)
 {
     INetwork::Init(master);
-    epoll_ctrl_.Init();
+    epoll_ctrl_.CreateEpoll();
 }
 
 void TcpNetwork::UnInit()

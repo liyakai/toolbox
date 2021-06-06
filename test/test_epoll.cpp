@@ -4,7 +4,7 @@
 FIXTURE_BEGIN(NetEpoll)
 
 CASE(TestNetEpoll){
-    EpollCtrlMgr->Init();
+    EpollCtrlMgr->CreateEpoll();
     EpollCtrlMgr->Destroy();
 
 
