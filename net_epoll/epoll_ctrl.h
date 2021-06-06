@@ -5,7 +5,6 @@
 #include "epoll_define.h"
 #include "epoll_socket.h"
 
-
 /*
 * epoll 类
 */
@@ -33,7 +32,7 @@ public:
     * @param ptr 透传指针
     * @return 是否成功
     */
-    bool AddEvent(int socket_fd, int event, void* ptr);
+    bool AddEvent(int socket_fd, int event, void *ptr);
     /*
     * 修改事件
     * @param socket_fd 文件描述符
@@ -41,7 +40,7 @@ public:
     * @param ptr 透传指针
     * @return 是否成功
     */
-    bool ModEvent(int socket_fd, int event, void* ptr);
+    bool ModEvent(int socket_fd, int event, void *ptr);
     /*
     * 删除事件
     * @param socket_fd 文件描述符
@@ -50,7 +49,7 @@ public:
     /*
     * 操作事件
     */
-    bool OperEvent(EpollSocket& socket, EpollOperType op_type, SockEventType event_type);
+    bool OperEvent(EpollSocket &socket, EpollOperType op_type, SockEventType event_type);
     /*
     * epoll_wait
     * @param msec 等待毫秒数
@@ -62,17 +61,17 @@ public:
     * @param index 事件序号
     * @return epoll_event*
     */
-    epoll_event* GetEvent(int index);
+    epoll_event *GetEvent(int index);
     /*
     * 执行一次 epoll wait
     */
-   bool RunOnce();
-private:
+    bool RunOnce();
 
 private:
-    uint32_t max_events_ = 0;   // 最大事件数
-    int      epoll_fd_;         // epoll 文件描述符
-    epoll_event* events_;       // epoll 事件数组
+private:
+    uint32_t max_events_ = 0; // 最大事件数
+    int epoll_fd_;            // epoll 文件描述符
+    epoll_event *events_;     // epoll 事件数组
 };
 
 #define EpollCtrlMgr Singleton<EpollCtrl>::Instance(10240)

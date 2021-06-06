@@ -1,8 +1,8 @@
 #pragma once
 
-#define MAX_SOCKET_COUNT    20000
-#define MAXEVENTS           8192    /* epoll_create参数 */
-#define EPOLL_WAIT_MSECONDS 2      
+#define MAX_SOCKET_COUNT 20000
+#define MAXEVENTS 8192 /* epoll_create参数 */
+#define EPOLL_WAIT_MSECONDS 2
 
 /*
 * 错误码
@@ -10,10 +10,10 @@
 enum class ErrCode
 {
     ERR_SUCCESS = 0,
-    ERR_MALLOC_FAILED,          // 分配内存失败
-    ERR_PARAM_NULLPTR,          // 参数为空指针
-    
-} ;
+    ERR_MALLOC_FAILED, // 分配内存失败
+    ERR_PARAM_NULLPTR, // 参数为空指针
+
+};
 
 enum class SocketType
 {
@@ -50,11 +50,12 @@ enum SockEventType
 
 struct EpollData
 {
-    SocketType socket_type;   // socket type
-    void* ptr;      // socket ptr
+    SocketType socket_type; // socket type
+    void *ptr;              // socket ptr
     EpollData()
         : socket_type(SocketType::SOCK_TYPE_INVALID), ptr(nullptr)
-    {}
+    {
+    }
     void Reset()
     {
         socket_type = SocketType::SOCK_TYPE_INVALID;
