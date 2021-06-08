@@ -66,7 +66,7 @@ bool EpollCtrl::OperEvent(EpollSocket &socket, EpollOperType op_type, SockEventT
     event.events |= EPOLLET;
     if (event_type & SOCKET_EVENT_RECV)
     {
-        if (now_event & SOCKET_EVENT_SEND) // ÒÑ¾­×¢²áĞ´ÊÂ¼ş
+        if (now_event & SOCKET_EVENT_SEND) // å·²ç»æ³¨å†Œå†™äº‹ä»¶
         {
             event.events |= EPOLLOUT;
         }
@@ -77,7 +77,7 @@ bool EpollCtrl::OperEvent(EpollSocket &socket, EpollOperType op_type, SockEventT
     }
     else if (event_type & SOCKET_EVENT_SEND)
     {
-        if (now_event & SOCKET_EVENT_RECV) // ÒÑ¾­×¢²á¶ÁÊÂ¼ş
+        if (now_event & SOCKET_EVENT_RECV) // å·²ç»æ³¨å†Œè¯»äº‹ä»¶
         {
             event.events |= EPOLLIN;
         }
@@ -115,6 +115,7 @@ epoll_event *EpollCtrl::GetEvent(int index)
 bool EpollCtrl::RunOnce()
 {
     epoll_event evt;
+    time_t time_stamp = time(0);    // æ—¶é—´æˆ³
     int count = EpollWait(EPOLL_WAIT_MSECONDS);
     if (count < 0)
     {
@@ -124,15 +125,18 @@ bool EpollCtrl::RunOnce()
     {
         epoll_event &event = events_[i];
         EpollSocket *socket = static_cast<EpollSocket *>(event.data.ptr);
+        if(nullptr == socket) continue;
         if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
         {
             epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
         }
         else if (event.events & EPOLLIN)
         {
+            socket->UpdateEpollEvent(SOCKET_EVENT_RECV, time_stamp);
         }
         else if (event.events & EPOLLOUT)
         {
+            socket->UpdateEpollEvent(SOCKET_EVENT_SEND, time_stamp);
         }
     }
     return true;
