@@ -1,17 +1,18 @@
 #pragma once
 
+
 #define MAX_SOCKET_COUNT 20000
-#define MAXEVENTS 8192 /* epoll_create²ÎÊı */
+#define MAXEVENTS 8192 /* epoll_createå‚æ•° */
 #define EPOLL_WAIT_MSECONDS 2
 
 /*
-* ´íÎóÂë
+* é”™è¯¯ç 
 */
 enum class ErrCode
 {
     ERR_SUCCESS = 0,
-    ERR_MALLOC_FAILED, // ·ÖÅäÄÚ´æÊ§°Ü
-    ERR_PARAM_NULLPTR, // ²ÎÊıÎª¿ÕÖ¸Õë
+    ERR_MALLOC_FAILED, // åˆ†é…å†…å­˜å¤±è´¥
+    ERR_PARAM_NULLPTR, // å‚æ•°ä¸ºç©ºæŒ‡é’ˆ
 
 };
 
@@ -24,14 +25,14 @@ enum class SocketType
 
 enum class SocketState
 {
-    SOCK_STATE_INVALIE = 0,
-    SOCK_STATE_LISTENING,
-    SOCK_STATE_CONNECTING,
-    SOCK_STATE_ESTABLISHED,
+    SOCK_STATE_INVALIED = 1,    // åˆå§‹çŠ¶æ€
+    SOCK_STATE_LISTENING = 2,   // ç›‘å¬
+    SOCK_STATE_CONNECTING = 3,  // ä¸»åŠ¨è¿æ¥
+    SOCK_STATE_ESTABLISHED = 4, // è¿æ¥å»ºç«‹
 };
 
 /*
-* epoll ²Ù×÷
+* epoll æ“ä½œ
 */
 enum class EpollOperType
 {
@@ -40,25 +41,10 @@ enum class EpollOperType
 };
 
 /*
-* socket ¿ÉÍ¶µİÊÂ¼ş
+* socket å¯æŠ•é€’äº‹ä»¶
 */
 enum SockEventType
 {
     SOCKET_EVENT_RECV = 1,
     SOCKET_EVENT_SEND = 2,
-};
-
-struct EpollData
-{
-    SocketType socket_type; // socket type
-    void *ptr;              // socket ptr
-    EpollData()
-        : socket_type(SocketType::SOCK_TYPE_INVALID), ptr(nullptr)
-    {
-    }
-    void Reset()
-    {
-        socket_type = SocketType::SOCK_TYPE_INVALID;
-        ptr = nullptr;
-    }
 };

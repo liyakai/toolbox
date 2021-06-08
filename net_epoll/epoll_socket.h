@@ -1,60 +1,89 @@
 #pragma once
 #include <stdint.h>
+#include <time.h>
 #include "epoll_define.h"
+
 /*
-* ¶¨ÒåÃ¿Ò»¸öÁ¬½Ó
+* å®šä¹‰æ¯ä¸€ä¸ªè¿æ¥
 */
 class EpollSocket
 {
 public:
     /*
-    * ¹¹Ôì
+    * æ„é€ 
     */
     EpollSocket();
     /*
-    * Îö¹¹
+    * ææ„
     */
     ~EpollSocket();
     /*
-    * ³õÊ¼»¯
+    * åˆå§‹åŒ–
     */
     bool Init(SocketType type, uint32_t send_buff_len, uint32_t recv_buff_len);
     /*
-    * Äæ³õÊ¼»¯
+    * é€†åˆå§‹åŒ–
     */
     void UnInit();
     /*
-    * ÖØÖÃ
+    * é‡ç½®
     */
     void Reset();
     /*
-    * »ñÈ¡ÊÂ¼şÀàĞÍ
-    * @return ¿ÉÍ¶µİÊÂ¼şÀàĞÍ
+    * è·å–äº‹ä»¶ç±»å‹
+    * @return å¯æŠ•é€’äº‹ä»¶ç±»å‹
     */
     SockEventType GetEventType() const;
     /*
-    * »ñÈ¡ÎÄ¼şÃèÊö·û
-    * @return ÎÄ¼şÃèÊö·û
+    * è·å–æ–‡ä»¶æè¿°ç¬¦
+    * @return æ–‡ä»¶æè¿°ç¬¦
     */
     uint32_t GetSocketID() { return id_; }
     /*
-    * »ñÈ¡ socket ÊÇ·ñÖ´ĞĞ¹ı EPOLL_CTL_ADD
-    * @return ÊÇ·ñÖ´ĞĞ¹ı EPOLL_CTL_ADD
+    * è®¾ç½®ç›‘å¬socket
+    * @params listen_socket ç›‘å¬çš„socket
+    */
+    void SetListenSocket(int32_t listen_socket){ listen_socket_ = listen_socket; }
+    /*
+    * è·å–ç›‘å¬çš„socket
+    * @return ç›‘å¬çš„socket
+    */
+    int32_t GetListenSocket(){ return listen_socket_; }
+    /*
+    * è·å– socket æ˜¯å¦æ‰§è¡Œè¿‡ EPOLL_CTL_ADD
+    * @return bool
     */
     bool IsCtrlAdd() { return is_ctrl_add_; }
     /*
-    * »ñÈ¡ socket ÊÇ·ñÖ´ĞĞ¹ı EPOLL_CTL_ADD
-    * @params ÊÇ·ñÖ´ĞĞ¹ı EPOLL_CTL_ADD
+    * è·å– socket æ˜¯å¦æ‰§è¡Œè¿‡ EPOLL_CTL_ADD
+    * @params bool
     */
     void SetCtrlAdd(bool value);
+    /*
+    * æ›´æ–° epoll äº‹ä»¶
+    * @params event_type äº‹ä»¶ç±»å‹
+    * @params ts æ—¶é—´æˆ³
+    */
+    void UpdateEpollEvent(SockEventType event_type, time_t ts);
+private:
+    /*
+    * å¤„ç†æ¥å—å®¢æˆ·ç«¯è¿æ¥çš„æƒ…å†µ
+    */
+   void UpdateAccept();
+    /*
+    * æ¥å—å®¢æˆ·ç«¯è¿æ¥
+    * @return å®¢æˆ·ç«¯è¿æ¥æ–‡ä»¶æè¿°ç¬¦
+    */
+    int Accept();
 
 private:
     uint32_t id_ = 0; // socket_id
     uint32_t ip_ = 0;
     uint16_t port_ = 0;
+    int32_t listen_socket_ = 0;
 
-    EpollData epoll_data_;
-
-    SockEventType event_type_; // ¿ÉÍ¶µİÊÂ¼şÀàĞÍ
-    bool is_ctrl_add_ = false; // ÊÇ·ñÒÑ¾­Ö´ĞĞ¹ı EPOLL_CTL_ADD
+    SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket çŠ¶æ€
+    time_t last_recv_ts_ = 0;   // æœ€åä¸€æ¬¡è¯»åˆ°æ•°æ®çš„æ—¶é—´æˆ³
+    SockEventType event_type_; // å¯æŠ•é€’äº‹ä»¶ç±»å‹
+    bool is_ctrl_add_ = false; // æ˜¯å¦å·²ç»æ‰§è¡Œè¿‡ EPOLL_CTL_ADD
 };
