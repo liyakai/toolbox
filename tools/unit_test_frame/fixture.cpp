@@ -64,6 +64,7 @@ TestCase* Fixture::GetTestCase(const std::string& name)
             return testcase;
         }
     }
+    return nullptr;
 }
 
 void Fixture::SetTestCase(const std::string& name, bool able)
