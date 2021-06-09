@@ -39,6 +39,7 @@ void EpollSocket::UpdateAccept()
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
     event_type_ = SOCKET_EVENT_RECV;
+    
 
 }
 int EpollSocket::Accept()
@@ -54,7 +55,6 @@ int EpollSocket::Accept()
         return 0;
     }
     return client_fd;
-
 }
 
 void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)

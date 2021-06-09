@@ -75,6 +75,10 @@ private:
     * @return 客户端连接文件描述符
     */
     int Accept();
+    /*
+    *  初始化新的socket
+    */
+   
 
 private:
     uint32_t id_ = 0; // socket_id
@@ -83,7 +87,7 @@ private:
     int32_t listen_socket_ = 0;
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
-    time_t last_recv_ts_ = 0;   // 最后一次读到数据的时间戳
     SockEventType event_type_; // 可投递事件类型
+    time_t last_recv_ts_ = 0;   // 最后一次读到数据的时间戳
     bool is_ctrl_add_ = false; // 是否已经执行过 EPOLL_CTL_ADD
 };
