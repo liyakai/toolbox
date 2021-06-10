@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <errno.h>
 
 EpollSocket::EpollSocket()
 {
@@ -48,12 +49,17 @@ int EpollSocket::Accept()
     sockaddr_in addr;
     socklen_t addr_len = sizeof(sockaddr_in);
     memset(&addr, 0 ,addr_len);
-    // 接受客户端连接
-    client_fd = accept(listen_socket_, (sockaddr*)&addr,&addr_len);
-    if(client_fd < 0)
+    while(true)
     {
-        return 0;
+        // 接受客户端连接
+        client_fd = accept(listen_socket_, (sockaddr*)&addr,&addr_len);
+        if(-1 == client_fd && errno != EINTR)
+        {
+            break;
+        }
+        //EpollSocket* new_socket = EpollSocketMgr->Alloc();
     }
+
     return client_fd;
 }
 

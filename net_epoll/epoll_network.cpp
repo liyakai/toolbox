@@ -1,4 +1,4 @@
-#include "tcp_network.h"
+#include "epoll_network.h"
 #include "net_epoll/epoll_define.h"
 
 
@@ -17,6 +17,7 @@ void TcpNetwork::Init(NetworkMaster* master)
 {
     INetwork::Init(master);
     epoll_ctrl_.CreateEpoll();
+    sock_mgr_.Init(MAX_SOCKET_COUNT);
 }
 
 void TcpNetwork::UnInit()

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "network.h"
-#include "net_epoll/epoll_ctrl.h"
-
+#include "epoll_ctrl.h"
+#include "epoll_socket_mgr.h"
 /*
 * ¶¨Òå TcpÍøÂç
 */
@@ -51,4 +51,5 @@ protected:
 private:
     NetworkMaster *network_master_;
     EpollCtrl epoll_ctrl_;
+    EpollSocketMgr sock_mgr_;
 };
