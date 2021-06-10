@@ -7,17 +7,17 @@
 /*
 * socket 池子
 */
-class EpollSocketPool
+class EpollSocketMgr
 {
 public:
     /*
     * 构造
     */
-    EpollSocketPool();
+    EpollSocketMgr();
     /*
     * 析构
     */
-    ~EpollSocketPool();
+    ~EpollSocketMgr();
     /*
     * 初始化
     * @param max_count 最多可以连接的用户数
@@ -32,7 +32,30 @@ public:
     * @param conn_id 连接ID
     * @return socket
     */
-   EpollSocket* GetEpollSocket(uint32_t conn_id);
+    EpollSocket* GetEpollSocket(uint32_t conn_id);
+    /*
+    * 分配新的 EpollSocket
+    */
+    EpollSocket* Alloc();
+private:
+    /*
+    * 生成新的 index
+    */
+    uint16_t NewIndex();
+    /*
+    * 生成新的 ID
+    */
+    uint32_t NewID();
+    /*
+    * 工具函数 获取低16位
+    * @param val 32位无符号数字
+    * @return 低16位无符号数字
+    */
+    uint16_t GetLoWord(uint32_t val){ return (uint16_t)(val & 0xFFFF); }
+    /*
+    * 工具函数,拼接两个uint16_t为一个uint32_t
+    */
+    uint32_t MakeUint32(uint16_t hi_word, uint16_t lo_word){return ((uint32_t)hi_word | lo_word);}
 private:
     uint32_t max_socket_count_ = 0; // 池子最大数量
     uint16_t curr_index_ = 0;       // 当前用到的索引值

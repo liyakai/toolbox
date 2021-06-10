@@ -114,7 +114,7 @@ private:
 
 private:
     Event2Main event2main_;     // 主线程网络事件队列
-    std::atomic_bool stop_;     // 县城退出
+    std::atomic_bool stop_;     // 线程退出
     std::unique_ptr<std::thread> worker_ = nullptr;   // 工作线程
     using NetworkArray = std::array<std::unique_ptr<INetwork>, NT_MAX>;
     NetworkArray networks_;     // 网络实现 

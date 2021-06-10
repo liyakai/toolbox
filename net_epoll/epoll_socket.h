@@ -35,10 +35,13 @@ public:
     */
     SockEventType GetEventType() const;
     /*
-    * 获取文件描述符
-    * @return 文件描述符
+    * 获取 socket id
     */
     uint32_t GetSocketID() { return id_; }
+    /*
+    * 设置 socket id
+    */
+    void SetSocketID(uint32_t id) { id_ = id; }
     /*
     * 设置监听socket
     * @params listen_socket 监听的socket
