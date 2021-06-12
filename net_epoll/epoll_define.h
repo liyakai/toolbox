@@ -1,11 +1,10 @@
 #pragma once
 
 
-#define MAX_SOCKET_COUNT        20000
+#define MAX_SOCKET_COUNT        40000
 #define MAXEVENTS               8192 /* epoll_create参数 */
 #define EPOLL_WAIT_MSECONDS     2
 #define INVALID_CONN_ID	 		UINT32_MAX
-#define MAX_SOCKET_COUNT			10000
 /*
 * 错误码
 */

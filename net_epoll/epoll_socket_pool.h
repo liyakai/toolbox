@@ -4,20 +4,21 @@
 #include <vector>
 #include "epoll_socket.h"
 
+class EpollSocket;
 /*
 * socket 池子
 */
-class EpollSocketMgr
+class EpollSocketPool
 {
 public:
     /*
     * 构造
     */
-    EpollSocketMgr();
+    EpollSocketPool();
     /*
     * 析构
     */
-    ~EpollSocketMgr();
+    ~EpollSocketPool();
     /*
     * 初始化
     * @param max_count 最多可以连接的用户数

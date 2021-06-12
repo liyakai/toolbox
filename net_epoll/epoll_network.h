@@ -2,54 +2,54 @@
 
 #include "network.h"
 #include "epoll_ctrl.h"
-#include "epoll_socket_mgr.h"
+#include "epoll_socket_pool.h"
 /*
-* ¶¨Òå TcpÍøÂç
+* å®šä¹‰ Tcpç½‘ç»œ
 */
 class TcpNetwork : public INetwork
 {
 public:
     /*
-    * ¹¹Ôì
+    * æ„é€ 
     */
     TcpNetwork();
     /*
-    * Îö¹¹
+    * ææ„
     */
     virtual ~TcpNetwork();
     /*
-    * ³õÊ¼»¯
+    * åˆå§‹åŒ–
     */
     virtual void Init(NetworkMaster* master) override;
     /*
-    * Äæ³õÊ¼»¯ÍøÂç
+    * é€†åˆå§‹åŒ–ç½‘ç»œ
     */
     virtual void UnInit() override;
     /*
-    * Ö´ĞĞÒ»´ÎÍøÂçÑ­»·
+    * æ‰§è¡Œä¸€æ¬¡ç½‘ç»œå¾ªç¯
     */
     virtual void Update() override;
    
 protected:
     /*
-    * ¹¤×÷Ïß³ÌÄÚ½¨Á¢¼àÌıÆ÷
+    * å·¥ä½œçº¿ç¨‹å†…å»ºç«‹ç›‘å¬å™¨
     */
     virtual uint64_t OnNewAccepter(const std::string& ip, const uint16_t port) override;
     /*
-    * ¹¤×÷Ïß³ÌÄÚ½¨Á¢Á¬½ÓÆ÷
+    * å·¥ä½œçº¿ç¨‹å†…å»ºç«‹è¿æ¥å™¨
     */
     virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port) override;
     /*
-    * ¹Ø¹¤×÷Ïß³ÌÄÚ±ÕÍøÂçÁ¬½Ó
+    * å…³å·¥ä½œçº¿ç¨‹å†…é—­ç½‘ç»œè¿æ¥
     */
     virtual void OnClose(uint64_t connect_id) override;
     /*
-    * ¹¤×÷Ïß³ÌÄÚ¹¤×÷Ïß³ÌÄÚ·¢ËÍ
+    * å·¥ä½œçº¿ç¨‹å†…å·¥ä½œçº¿ç¨‹å†…å‘é€
     */
     virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) override;
 
 private:
     NetworkMaster *network_master_;
     EpollCtrl epoll_ctrl_;
-    EpollSocketMgr sock_mgr_;
+    EpollSocketPool sock_mgr_;
 };

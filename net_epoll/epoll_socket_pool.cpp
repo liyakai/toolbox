@@ -1,11 +1,13 @@
-#include "epoll_socket_mgr.h"
+#include "epoll_socket_pool.h"
+#include "epoll_define.h"
+#include "epoll_socket.h"
 
-EpollSocketMgr::EpollSocketMgr(){}
-EpollSocketMgr::~EpollSocketMgr()
+EpollSocketPool::EpollSocketPool(){}
+EpollSocketPool::~EpollSocketPool()
 {
     UnInit();
 }
-bool EpollSocketMgr::Init(uint32_t max_count)
+bool EpollSocketPool::Init(uint32_t max_count)
 {
     if(0 == max_count)
     {
@@ -26,7 +28,7 @@ bool EpollSocketMgr::Init(uint32_t max_count)
     return true;
 }
 
-void EpollSocketMgr::UnInit()
+void EpollSocketPool::UnInit()
 {
     for(auto &es : free_list_)
     {
@@ -44,7 +46,7 @@ void EpollSocketMgr::UnInit()
     socket_vector_.clear();
 }
 
-EpollSocket* EpollSocketMgr::GetEpollSocket(uint32_t conn_id)
+EpollSocket* EpollSocketPool::GetEpollSocket(uint32_t conn_id)
 {
     uint16_t index = GetLoWord(conn_id);
     if(index < max_socket_count_)
@@ -54,7 +56,7 @@ EpollSocket* EpollSocketMgr::GetEpollSocket(uint32_t conn_id)
     return nullptr;
 }
 
-EpollSocket* EpollSocketMgr::Alloc()
+EpollSocket* EpollSocketPool::Alloc()
 {
     uint32_t conn_id = NewID();
     if(INVALID_CONN_ID == conn_id)
@@ -76,7 +78,7 @@ EpollSocket* EpollSocketMgr::Alloc()
     return socket;
 }
 
-uint16_t EpollSocketMgr::NewIndex()
+uint16_t EpollSocketPool::NewIndex()
 {
     if(active_slot_list_.empty())   // 剩余的下标用完了,交换
     {
@@ -93,7 +95,7 @@ uint16_t EpollSocketMgr::NewIndex()
     return index;
 }
 
-uint32_t EpollSocketMgr::NewID()
+uint32_t EpollSocketPool::NewID()
 {
     uint16_t index = NewIndex();
     if(index == UINT16_MAX)

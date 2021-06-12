@@ -3,6 +3,8 @@
 #include <time.h>
 #include "epoll_define.h"
 
+
+class EpollSocketPool;
 /*
 * 定义每一个连接
 */
@@ -43,6 +45,10 @@ public:
     */
     void SetSocketID(uint32_t id) { id_ = id; }
     /*
+    * 设置 socket 池子
+    */
+    void SetSocketMgr(EpollSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
+    /*
     * 设置监听socket
     * @params listen_socket 监听的socket
     */
@@ -77,10 +83,29 @@ private:
     * 接受客户端连接
     * @return 客户端连接文件描述符
     */
-    int Accept();
+    bool Accept();
     /*
     *  初始化新的socket
     */
+    void InitSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port);
+    /*
+    * 设置 非阻塞
+    */
+    int SetNonBlocking(int fd);
+    /*
+    * 关闭 keep alive
+    */
+    int SetKeepaliveOff(int fd);
+    /*
+    * 关闭延迟发送
+    */
+    int SetNagleOff(int fd);
+    /*
+    * 关闭 TIME_WWAIT
+    */
+    int SetLingerOff(int fd);
+
+
    
 
 private:
@@ -88,6 +113,8 @@ private:
     uint32_t ip_ = 0;
     uint16_t port_ = 0;
     int32_t listen_socket_ = 0;
+
+    EpollSocketPool *p_sock_pool_ = nullptr;  // socket 池子
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
     SockEventType event_type_; // 可投递事件类型
