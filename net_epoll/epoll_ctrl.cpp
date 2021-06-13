@@ -75,7 +75,7 @@ bool EpollCtrl::OperEvent(EpollSocket &socket, EpollOperType op_type, SockEventT
             event.events |= EPOLLIN;
         }
     }
-    else if (event_type & SOCKET_EVENT_SEND)
+    if (event_type & SOCKET_EVENT_SEND)
     {
         if (now_event & SOCKET_EVENT_RECV) // 已经注册读事件
         {

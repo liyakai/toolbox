@@ -29,6 +29,8 @@ public:
     * 执行一次网络循环
     */
     virtual void Update() override;
+public:
+    EpollCtrl& GetEpollCtrl(){ return epoll_ctrl_;}
    
 protected:
     /*

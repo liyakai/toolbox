@@ -53,13 +53,30 @@ public:
         return (read_pos_ - write_pos_ - 1) % buffer_size_;
     }
     /*
+    * 连续可写数据长度
+    */
+    size_t ContinuouslyWriteableSize()
+    {
+        return read_pos_ > write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : buffer_size_ - write_pos_ - 1;
+    }
+    /*
+    * 获取可写位置指针
+    */
+    char* GetWritePtr()
+    {
+        return buffer_ + write_pos_;
+    }
+    /*
     * 可读数据长度
     */
     size_t ReadableSize()
     {
         return (write_pos_ - read_pos_) % buffer_size_;
     }
-
+    /*
+    * 获取 buffer size
+    */
+    size_t GetBufferSize(){ return buffer_size_; }
     /*
     * 判空
     */
