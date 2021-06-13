@@ -2,8 +2,9 @@
 #include <stdint.h>
 #include <time.h>
 #include "epoll_define.h"
+#include "tools/ringbuffer.h"
 
-
+class TcpNetwork;
 class EpollSocketPool;
 /*
 * 定义每一个连接
@@ -35,7 +36,7 @@ public:
     * 获取事件类型
     * @return 可投递事件类型
     */
-    SockEventType GetEventType() const;
+    SockEventType GetEventType() const { return event_type_; };
     /*
     * 获取 socket id
     */
@@ -45,9 +46,29 @@ public:
     */
     void SetSocketID(uint32_t id) { id_ = id; }
     /*
+    * 设置远端IP
+    */
+    void SetIP(uint32_t ip){ip_ = ip;} 
+    /*
+    * 设置远端端口
+    */
+    void SetPort(uint16_t port){ port_ = port; }
+    /*
+    * 设置socket状态
+    */
+    void SetState(SocketState state) { socket_state_ = state; }
+    /*
+    * 设置可投递类型
+    */
+    void SetSockEventType(SockEventType type) { event_type_ = type; }
+    /*
     * 设置 socket 池子
     */
     void SetSocketMgr(EpollSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
+    /*
+    * 设置 tcp_network
+    */
+    void SetTcpNetwork(TcpNetwork* tcp_network){ p_tcp_network_ = tcp_network; }
     /*
     * 设置监听socket
     * @params listen_socket 监听的socket
@@ -78,16 +99,23 @@ private:
     /*
     * 处理接受客户端连接的情况
     */
-   void UpdateAccept();
-    /*
-    * 接受客户端连接
-    * @return 客户端连接文件描述符
-    */
-    bool Accept();
+    void UpdateAccept();
     /*
     *  初始化新的socket
     */
     void InitSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port);
+    /*
+    * 处理客户端数据的情况
+    */
+    void UpdateRecv();
+    /*
+    * 关闭套接字
+    */
+    void Close();
+    /*
+    * 套接字接收数据
+    */
+    size_t SocketRecv(int socket_fd, char* data, size_t size);
     /*
     * 设置 非阻塞
     */
@@ -114,10 +142,13 @@ private:
     uint16_t port_ = 0;
     int32_t listen_socket_ = 0;
 
+    TcpNetwork* p_tcp_network_ = nullptr;     // 工作线程
     EpollSocketPool *p_sock_pool_ = nullptr;  // socket 池子
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
     SockEventType event_type_; // 可投递事件类型
+    int recv_buff_len_ = 0;     // 接收buff大小
+    RingBuffer<char, DEFALT_RING_BUFF_SIZE> recv_ring_buffer_;
     time_t last_recv_ts_ = 0;   // 最后一次读到数据的时间戳
     bool is_ctrl_add_ = false; // 是否已经执行过 EPOLL_CTL_ADD
 };

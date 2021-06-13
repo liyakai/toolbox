@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <linux/tcp.h>  // TCP_NODELAY
 #include "epoll_socket_pool.h"
+#include "epoll_network.h"
 
 EpollSocket::EpollSocket()
 {
@@ -16,7 +17,11 @@ EpollSocket::EpollSocket()
 EpollSocket::~EpollSocket()
 {
 }
-
+bool EpollSocket::Init(SocketType type, uint32_t send_buff_len, uint32_t recv_buff_len)
+{
+    recv_buff_len_ = recv_buff_len;
+    return true;
+}
 void EpollSocket::UnInit()
 {
 }
@@ -25,10 +30,6 @@ void EpollSocket::Reset()
 {
 }
 
-SockEventType EpollSocket::GetEventType() const
-{
-    return event_type_;
-}
 
 void EpollSocket::SetCtrlAdd(bool value)
 {
@@ -36,25 +37,13 @@ void EpollSocket::SetCtrlAdd(bool value)
 }
 void EpollSocket::UpdateAccept()
 {
-    bool ret = Accept();
-    if(false == ret)
-    {
-        // 连接失败
-        return;
-    }
-    socket_state_ = SocketState::SOCK_STATE_LISTENING;
-    event_type_ = SOCKET_EVENT_RECV;
-    
-
-}
-bool EpollSocket::Accept()
-{
     int client_fd = 0;  // 客户端套接字
     sockaddr_in addr;
     socklen_t addr_len = sizeof(sockaddr_in);
-    memset(&addr, 0 ,addr_len);
+    
     while(true)
     {
+        memset(&addr, 0, addr_len);
         // 接受客户端连接
         client_fd = accept(listen_socket_, (sockaddr*)&addr,&addr_len);
         if(-1 == client_fd && errno != EINTR)
@@ -66,15 +55,74 @@ bool EpollSocket::Accept()
         {
             close(client_fd);
             // OnError();
-            return false;
+            return ;
         }
         InitSocket(new_socket, client_fd, addr.sin_addr.s_addr, addr.sin_port);
+        p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
     }
-
-    return client_fd;
+    socket_state_ = SocketState::SOCK_STATE_LISTENING;
+    event_type_ = SOCKET_EVENT_RECV;
 }
 
+
 void EpollSocket::InitSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port)
+{
+    SetNonBlocking(socket_fd);
+    SetKeepaliveOff(socket_fd);
+    SetLingerOff(socket_fd);
+    SetNagleOff(socket_fd);
+    socket->SetSocketID(socket_fd);
+    socket->SetIP(ip);
+    socket->SetPort(port);
+    socket->SetState(SocketState::SOCK_STATE_ESTABLISHED);
+    socket->SetSockEventType(SOCKET_EVENT_RECV);
+}
+
+void EpollSocket::UpdateRecv()
+{
+    int32_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
+    if (cur_buffer_size > MAX_RING_BUFF_SIZE)
+    {
+        // 读缓冲区超过最大限制, error
+        /* code */
+        return;
+    }
+    while(size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
+    {
+        int bytes = SocketRecv(id_, recv_ring_buffer_.GetWritePtr(), size);
+        if(bytes < 0)
+        {
+            // error close
+            return;
+        } else if (0 == bytes)
+        {
+            break;
+        }
+    }
+}
+
+size_t EpollSocket::SocketRecv(int socket_fd, char* data, size_t size)
+{
+    size_t recv_bytes = recv(socket_fd, data, (int) size, MSG_NOSIGNAL);
+    if(recv_bytes > 0)
+    {
+        return recv_bytes;
+    } else if( 0 == recv_bytes)
+    {
+        return -1;
+    } else // recv_bytes < 0
+    {
+        if((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
+        {
+            return 0;
+        } else 
+        {
+            return -1;
+        }
+    }
+}
+
+void EpollSocket::Close()
 {
 
 }
