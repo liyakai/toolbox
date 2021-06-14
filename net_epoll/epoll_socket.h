@@ -129,6 +129,10 @@ private:
     */
     void UpdateSend();
     /*
+    * 套接字发送数据
+    */
+    size_t SocketSend(int socket_fd, const char* data, size_t size);
+    /*
     * 设置 非阻塞
     */
     int SetNonBlocking(int fd);
@@ -162,6 +166,7 @@ private:
     SockEventType event_type_; // 可投递事件类型
     int recv_buff_len_ = 0;     // 接收buff大小
     RingBuffer<char, DEFALT_RING_BUFF_SIZE> recv_ring_buffer_;
+    RingBuffer<char, DEFALT_RING_BUFF_SIZE> send_ring_buffer_;
     time_t last_recv_ts_ = 0;   // 最后一次读到数据的时间戳
     bool is_ctrl_add_ = false; // 是否已经执行过 EPOLL_CTL_ADD
 };
