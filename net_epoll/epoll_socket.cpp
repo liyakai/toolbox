@@ -84,15 +84,15 @@ void EpollSocket::UpdateRecv()
     if (cur_buffer_size > MAX_RING_BUFF_SIZE)
     {
         // 读缓冲区超过最大限制, error
-        /* code */
+        Close();
         return;
     }
     while(size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
     {
-        int bytes = SocketRecv(id_, recv_ring_buffer_.GetWritePtr(), size);
+        int bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
         if(bytes < 0)
         {
-            // error close
+            Close();
             return;
         } else if (0 == bytes)
         {
@@ -122,9 +122,26 @@ size_t EpollSocket::SocketRecv(int socket_fd, char* data, size_t size)
     }
 }
 
-void EpollSocket::Close()
+void EpollSocket::UpdateConnect()
+{
+    event_type_ = SOCKET_EVENT_RECV;
+    socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
+}
+
+void EpollSocket::UpdateSend()
 {
 
+}
+
+void EpollSocket::Close()
+{
+    if(-1 != socket_id_)
+    {
+        // TO DO 通知上层
+        close(socket_id_);
+        socket_id_ = -1;
+        p_sock_pool_->Free(this);
+    }
 }
 
 void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
@@ -142,17 +159,17 @@ void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
         } else 
         {
             last_recv_ts_ = ts; // 更新最后一次读到数据的时间戳
-
+            UpdateRecv();
         }
     }
     if((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
     {
         if(socket_state_ == SocketState::SOCK_STATE_CONNECTING)
         {
-
+            UpdateConnect();
         } else 
         {
-
+            UpdateSend();
         }
     }
 

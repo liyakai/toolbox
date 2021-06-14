@@ -40,11 +40,15 @@ public:
     /*
     * 获取 socket id
     */
-    uint32_t GetSocketID() { return id_; }
+    int32_t GetSocketID() { return socket_id_; }
     /*
     * 设置 socket id
     */
-    void SetSocketID(uint32_t id) { id_ = id; }
+    void SetSocketID(int32_t id) { socket_id_ = id; }
+    /*
+    * 设置 分配的连接ID
+    */
+    void SetConnID(uint32_t id){ conn_id_ = id; }
     /*
     * 设置远端IP
     */
@@ -117,6 +121,14 @@ private:
     */
     size_t SocketRecv(int socket_fd, char* data, size_t size);
     /*
+    * 处理主动链接
+    */
+    void UpdateConnect();
+    /*
+    * 处理发送消息
+    */
+    void UpdateSend();
+    /*
     * 设置 非阻塞
     */
     int SetNonBlocking(int fd);
@@ -137,7 +149,8 @@ private:
    
 
 private:
-    uint32_t id_ = 0; // socket_id
+    uint32_t conn_id_ = INVALID_CONN_ID;
+    int32_t socket_id_ = -1; // socket_id
     uint32_t ip_ = 0;
     uint16_t port_ = 0;
     int32_t listen_socket_ = 0;

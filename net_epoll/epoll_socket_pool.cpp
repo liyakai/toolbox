@@ -72,10 +72,24 @@ EpollSocket* EpollSocketPool::Alloc()
     {
         socket = new EpollSocket;
     }
-    socket->SetSocketID(conn_id);
+    socket->SetConnID(conn_id);
     uint16_t index = GetLoWord(conn_id);
     socket_vector_[index] = socket;
     return socket;
+}
+
+void EpollSocketPool::Free(EpollSocket* socket)
+{
+    if(nullptr == socket)
+    {
+        return;
+    }
+    uint16_t index = GetLoWord(socket->GetSocketID());
+    socket_vector_[index] = nullptr;
+    free_slot_list_.emplace_back(index);
+    socket->Reset();
+    free_list_.emplace_back(socket);
+
 }
 
 uint16_t EpollSocketPool::NewIndex()
