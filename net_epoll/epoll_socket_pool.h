@@ -38,6 +38,10 @@ public:
     * 分配新的 EpollSocket
     */
     EpollSocket* Alloc();
+    /*
+    * 归还用过的 socket
+    */
+    void Free(EpollSocket* socket);
 private:
     /*
     * 生成新的 index
