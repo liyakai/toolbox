@@ -97,6 +97,9 @@ void EpollSocket::UpdateRecv()
         } else if (0 == bytes)
         {
             break;
+        }else
+        {
+            recv_ring_buffer_.AdjustWritePos(bytes);
         }
     }
 }
@@ -130,7 +133,42 @@ void EpollSocket::UpdateConnect()
 
 void EpollSocket::UpdateSend()
 {
+    while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
+    {
+        size_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
+        if(bytes < 0)
+        {
+            // 发送失败
+            Close();
+        }
+        send_ring_buffer_.AdjustReadPos(bytes);
+        if(bytes < size)
+        {
+            break;
+        }
 
+    }
+    
+
+}
+
+size_t EpollSocket::SocketSend(int socket_fd, const char* data, size_t size)
+{
+    int32_t send_bytes = send(socket_fd, data, (int)size, MSG_NOSIGNAL);
+    if(send_bytes < 0)
+    {
+        if((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
+        {
+            return 0;
+        } else 
+        {
+            return -1;
+        }
+    } else if(0 == send_bytes && size)
+    {
+        return -1;
+    }
+    return send_bytes;
 }
 
 void EpollSocket::Close()

@@ -57,7 +57,14 @@ public:
     */
     size_t ContinuouslyWriteableSize()
     {
-        return read_pos_ > write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : buffer_size_ - write_pos_ - 1;
+        return read_pos_ >= write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : buffer_size_ - write_pos_ - 1;
+    }
+    /*
+    * 调整写位置
+    */
+    void AdjustWritePos(size_t size)
+    {
+        write_pos_ = (write_pos_ + size) % buffer_size_;
     }
     /*
     * 获取可写位置指针
@@ -65,6 +72,27 @@ public:
     char* GetWritePtr()
     {
         return buffer_ + write_pos_;
+    }
+    /*
+    * 连续可读数据长度
+    */
+    size_t ContinuouslyReadableSize()
+    {
+        return write_pos_ >= read_pos_ ? write_pos_ - read_pos_ : buffer_size_ - read_pos_ - 1;
+    }
+    /*
+    * 获取可读位置指针
+    */
+    char* GetReadPtr()
+    {
+        return buffer_ + read_pos_;
+    }
+    /*
+    * 调整读位置
+    */
+    void AdjustReadPos(size_t size)
+    {
+        read_pos_ = (read_pos_ + size) % buffer_size_;
     }
     /*
     * 可读数据长度
