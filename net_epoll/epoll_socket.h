@@ -56,7 +56,7 @@ public:
     /*
     * 设置远端IP
     */
-    void SetIP(uint32_t ip){ip_ = ip;} 
+    void SetIP(std::string ip){ip_ = ip;} 
     /*
     * 设置远端端口
     */
@@ -107,11 +107,16 @@ public:
     * 初始化新的监听器
     * @param ip 监听IP
     * @param port 监听端口
-    * @param send_buff_size 发送缓冲区大小
-    * @param recv_buff_size 接收缓冲区大小
     * @retval 初始化是否成功
     */
-    bool InitNewAccepter(const std::string& ip, const uint16_t port, uint32_t send_buff_size = DEFAULT_RING_BUFF_SIZE, uint32_t recv_buff_size = DEFAULT_RING_BUFF_SIZE);
+    bool InitNewAccepter(const std::string& ip, const uint16_t port);
+    /*
+    * 初始化新的连接器
+    * @param ip 连接IP
+    * @param port 连接端口
+    * @retval 初始化是否成功
+    */
+    bool InitNewConnecter(const std::string &ip, uint16_t port);
 private:
     /*
     * 处理接受客户端连接的情况
@@ -120,7 +125,7 @@ private:
     /*
     *  初始化从accpet函数接收得来的socket
     */
-    void InitAccpetSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port);
+    void InitAccpetSocket(EpollSocket* socket, int socket_fd, std::string ip, uint16_t port);
     /*
     * 处理客户端数据的情况
     */
@@ -173,7 +178,7 @@ private:
 private:
     uint32_t conn_id_ = INVALID_CONN_ID;
     int32_t socket_id_ = -1; // socket_id
-    uint32_t ip_ = 0;
+    std::string ip_ = 0;
     uint16_t port_ = 0;
     int32_t listen_socket_ = 0;
 
