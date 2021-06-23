@@ -57,7 +57,7 @@ void EpollSocket::UpdateAccept()
             // OnError();
             return ;
         }
-        InitAccpetSocket(new_socket, client_fd, addr.sin_addr.s_addr, addr.sin_port);
+        InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port);
         p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
@@ -65,7 +65,7 @@ void EpollSocket::UpdateAccept()
 }
 
 
-void EpollSocket::InitAccpetSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port)
+void EpollSocket::InitAccpetSocket(EpollSocket* socket, int socket_fd, std::string ip, uint16_t port)
 {
     SetNonBlocking(socket_fd);
     SetKeepaliveOff(socket_fd);
@@ -213,7 +213,7 @@ void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
 
 }
 
-bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port, uint32_t send_buff_size, uint32_t recv_buff_size)
+bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port)
 {
     if(SocketState::SOCK_STATE_LISTENING == socket_state_)
     {
@@ -242,6 +242,33 @@ bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port, ui
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
     event_type_ = SOCKET_EVENT_RECV;
+    return true;
+}
+
+bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port)
+{
+    if(SocketState::SOCK_STATE_CONNECTING == socket_state_)
+    {
+        return false;
+    }
+    // 设置对端地址
+    ip_ = ip;
+    // 设置对端端口
+    port_ = port;
+    struct  sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    sa.sin_addr.s_addr = inet_addr(ip.c_str());
+    SetNonBlocking(socket_id_); // 设置为非阻塞
+    SetNagleOff(socket_id_);    // 关闭 Nagle
+    int32_t error = connect(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
+    if(error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
+    {
+        Close();
+        return false;
+    }
+    socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
     return true;
 }
 

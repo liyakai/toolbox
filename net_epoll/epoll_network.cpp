@@ -38,14 +38,25 @@ uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port)
     {
         return 0;
     }
-    if(true == new_socket->InitNewAccepter(ip, port))
+    if(false == new_socket->InitNewAccepter(ip, port))
     {
-        return new_socket->GetConnID();
+        return 0;
     }
+    epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return 0;
 }
 uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port)
 {
+    EpollSocket* new_socket = sock_mgr_.Alloc();
+    if(nullptr != new_socket)
+    {
+        return 0;
+    }
+    if(false == new_socket->InitNewConnecter(ip, port))
+    {
+        return 0;
+    }
+    epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return 0;
 }
 void TcpNetwork::OnClose(uint64_t connect_id)
