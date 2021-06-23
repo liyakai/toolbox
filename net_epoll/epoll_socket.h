@@ -45,6 +45,10 @@ public:
     * 设置 socket id
     */
     void SetSocketID(int32_t id) { socket_id_ = id; }
+    /* 
+    * 获取连接ID
+    */
+    uint32_t GetConnID(){ return conn_id_; }
     /*
     * 设置 分配的连接ID
     */
@@ -99,15 +103,24 @@ public:
     * @params ts 时间戳
     */
     void UpdateEpollEvent(SockEventType event_type, time_t ts);
+    /*
+    * 初始化新的监听器
+    * @param ip 监听IP
+    * @param port 监听端口
+    * @param send_buff_size 发送缓冲区大小
+    * @param recv_buff_size 接收缓冲区大小
+    * @retval 初始化是否成功
+    */
+    bool InitNewAccepter(const std::string& ip, const uint16_t port, uint32_t send_buff_size = DEFAULT_RING_BUFF_SIZE, uint32_t recv_buff_size = DEFAULT_RING_BUFF_SIZE);
 private:
     /*
     * 处理接受客户端连接的情况
     */
     void UpdateAccept();
     /*
-    *  初始化新的socket
+    *  初始化从accpet函数接收得来的socket
     */
-    void InitSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port);
+    void InitAccpetSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port);
     /*
     * 处理客户端数据的情况
     */
@@ -145,12 +158,17 @@ private:
     */
     int SetNagleOff(int fd);
     /*
-    * 关闭 TIME_WWAIT
+    * 关闭 TIME_WAIT
     */
     int SetLingerOff(int fd);
-
-
-   
+    /*
+    * 让端口释放后立即就可以被再此使用
+    */
+    int SetReuseAddrOn(int fd);
+    /*
+    * 设置 TCP_DEFER_ACCEPT 
+    */
+    int SetDeferAccept(int fd);
 
 private:
     uint32_t conn_id_ = INVALID_CONN_ID;
@@ -165,8 +183,8 @@ private:
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
     SockEventType event_type_; // 可投递事件类型
     int recv_buff_len_ = 0;     // 接收buff大小
-    RingBuffer<char, DEFALT_RING_BUFF_SIZE> recv_ring_buffer_;
-    RingBuffer<char, DEFALT_RING_BUFF_SIZE> send_ring_buffer_;
+    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
+    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;
     time_t last_recv_ts_ = 0;   // 最后一次读到数据的时间戳
     bool is_ctrl_add_ = false; // 是否已经执行过 EPOLL_CTL_ADD
 };

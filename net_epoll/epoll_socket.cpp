@@ -57,7 +57,7 @@ void EpollSocket::UpdateAccept()
             // OnError();
             return ;
         }
-        InitSocket(new_socket, client_fd, addr.sin_addr.s_addr, addr.sin_port);
+        InitAccpetSocket(new_socket, client_fd, addr.sin_addr.s_addr, addr.sin_port);
         p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
@@ -65,7 +65,7 @@ void EpollSocket::UpdateAccept()
 }
 
 
-void EpollSocket::InitSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port)
+void EpollSocket::InitAccpetSocket(EpollSocket* socket, int socket_fd, uint32_t ip, uint16_t port)
 {
     SetNonBlocking(socket_fd);
     SetKeepaliveOff(socket_fd);
@@ -213,6 +213,38 @@ void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
 
 }
 
+bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port, uint32_t send_buff_size, uint32_t recv_buff_size)
+{
+    if(SocketState::SOCK_STATE_LISTENING == socket_state_)
+    {
+        return false;
+    }
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    sa.sin_addr.s_addr = INADDR_ANY;
+    sa.sin_addr.s_addr = inet_addr(ip.c_str());
+    SetReuseAddrOn(socket_id_);     // 复用端口
+    SetLingerOff(socket_id_);       // 立即关闭该连接
+    SetDeferAccept(socket_id_);     // 1s 之内没有数据发送，则直接关闭连接
+    SetNonBlocking(socket_id_);     // 设置为非阻塞
+    // 绑定端口
+    int error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
+    if(error < 0)
+    {
+        return false;
+    }
+    error = listen(socket_id_, DEFAULT_BACKLOG_SIZE);
+    if(error < 0)
+    {
+        return false;
+    }
+    socket_state_ = SocketState::SOCK_STATE_LISTENING;
+    event_type_ = SOCKET_EVENT_RECV;
+    return true;
+}
+
 int EpollSocket::SetNonBlocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -234,7 +266,21 @@ int EpollSocket::SetLingerOff(int fd)
     linger so_linger;
     so_linger.l_onoff = 0;
     return setsockopt(fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+}
+/*
+这个套接字选项通知内核，如果端口忙，但TCP状态位于 TIME_WAIT ，可以重用端口。如果端口忙，而TCP状态位于其他状态，重用端口时依旧得到一个错误信息，指明"地址已经使用中"。
+如果你的服务程序停止后想立即重启，而新套接字依旧使用同一端口，此时SO_REUSEADDR 选项非常有用
+*/
+int EpollSocket::SetReuseAddrOn(int fd)
+{
+    int32_t reuse_addr = 1;
+    return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse_addr, sizeof(reuse_addr));
+}
 
+int EpollSocket::SetDeferAccept(int fd)
+{
+    int32_t  secs = 1;
+    return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &secs, sizeof(secs));  
 }
 
 

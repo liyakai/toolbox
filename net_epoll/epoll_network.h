@@ -3,6 +3,7 @@
 #include "network.h"
 #include "epoll_ctrl.h"
 #include "epoll_socket_pool.h"
+
 /*
 * 定义 Tcp网络
 */
@@ -54,4 +55,5 @@ private:
     NetworkMaster *network_master_;
     EpollCtrl epoll_ctrl_;
     EpollSocketPool sock_mgr_;
+
 };

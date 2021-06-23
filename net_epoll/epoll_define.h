@@ -5,8 +5,9 @@
 #define MAXEVENTS               8192 /* epoll_create参数 */
 #define EPOLL_WAIT_MSECONDS     2
 #define INVALID_CONN_ID	 		UINT32_MAX
-#define DEFALT_RING_BUFF_SIZE   16*1024     /* 16KB */
+#define DEFAULT_RING_BUFF_SIZE  16*1024     /* 16KB */
 #define MAX_RING_BUFF_SIZE      1024*1024   /* 1MB */
+#define DEFAULT_BACKLOG_SIZE    256 
 
 /*
 * 错误码
