@@ -3,7 +3,7 @@
 #include <atomic>
 #include <mutex>
 #include <cstdlib>
-#include "tools/singleton.h"
+#include "src/tools/singleton.h"
 #include "debug_print.h"
 /*
 * 定义对象池

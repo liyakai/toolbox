@@ -2,7 +2,7 @@
 
 #include <list>
 #include "fixture.h"
-#include "singleton.h"
+#include "src/tools/singleton.h"
 
 /*
 * 单元测试框架
