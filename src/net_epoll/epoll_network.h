@@ -1,6 +1,6 @@
 #pragma once
 
-#include "network.h"
+#include "src/network/network.h"
 #include "epoll_ctrl.h"
 #include "epoll_socket_pool.h"
 

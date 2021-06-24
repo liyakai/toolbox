@@ -1,5 +1,5 @@
-#include "tools/virtual_print.h"
-#include "tools/unit_test_frame/unittest.h"
+#include "src/tools/virtual_print.h"
+#include "unit_test_frame/unittest.h"
 
 
 FIXTURE_BEGIN(VirtualPrint)

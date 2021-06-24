@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <string.h>
-#include <debug_print.h>
+#include "debug_print.h"
 /*
 * 非线程安全的环形队列
 * Type 数据类型

@@ -1,5 +1,5 @@
 #include "epoll_network.h"
-#include "net_epoll/epoll_define.h"
+#include "epoll_define.h"
 
 
 TcpNetwork::TcpNetwork()

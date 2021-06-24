@@ -1,5 +1,5 @@
-#include "tools/memory_pool.h"
-#include "tools/unit_test_frame/unittest.h"
+#include "src/network/network_mgr.h"
+#include "unit_test_frame/unittest.h"
 
 FIXTURE_BEGIN(TCPNetWork)
 

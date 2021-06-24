@@ -1,8 +1,8 @@
 #pragma once
 
 #include "event.h"
-#include "tools/ringbuffer.h"
-#include "tools/memory_pool.h"
+#include "src/tools/ringbuffer.h"
+#include "src/tools/memory_pool.h"
 #include "network_mgr.h"
 
 class NetworkMaster;
