@@ -109,7 +109,7 @@ private:
         } stream_;
         struct Address
         {
-            std::string ip_;
+            std::string* ip_;
             uint16_t port_;
         } address_;
         Detail(){}

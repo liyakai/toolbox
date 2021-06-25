@@ -27,6 +27,7 @@ void TcpNetwork::UnInit()
 
 void TcpNetwork::Update()
 {
+    INetwork::Update();
     epoll_ctrl_.RunOnce();
 }
 
@@ -34,7 +35,7 @@ void TcpNetwork::Update()
 uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port)
 {
     EpollSocket* new_socket = sock_mgr_.Alloc();
-    if(nullptr != new_socket)
+    if(nullptr == new_socket)
     {
         return 0;
     }

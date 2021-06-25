@@ -1,5 +1,6 @@
 #include "event.h"
 #include "src/tools/memory_pool.h"
+#include "src/tools/object_pool.h"
 #include <string.h>
 
 Event::Event(EventID id)
@@ -7,7 +8,10 @@ Event::Event(EventID id)
     {
         
     }
+Event::~Event()
+{
 
+}
 EventID Event::GetID()
 {
     return id_;
@@ -35,12 +39,17 @@ NetEventWorker::~NetEventWorker()
 
 void NetEventWorker::SetIP(const std::string& ip)
 {
-    detail_.address_.ip_ = ip;
+    detail_.address_.ip_ = GetObject<std::string>(ip);
 }
 
 std::string NetEventWorker::GetIP() const
 {
-    return detail_.address_.ip_;
+    const static std::string NullString;
+    if(detail_.address_.ip_)
+    {
+        return *detail_.address_.ip_;
+    }
+    return NullString;
 }
 
 void NetEventWorker::SetPort(const uint16_t port)
