@@ -219,6 +219,13 @@ bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port)
     {
         return false;
     }
+    socket_id_ = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+    if (socket_id_ < 0)
+    {
+        return false;
+    }
+    
+
     struct sockaddr_in sa;
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;

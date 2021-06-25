@@ -11,7 +11,7 @@ using Event2Worker = RingBuffer<NetEventWorker*, 1024>;
 /// 事件处理函数
 using EventHandler = std::function<void(Event* event)>;
 /*
-* 网络基类
+* Worker 网络基类
 */
 class INetwork : public EventBasedObject
 {
@@ -33,7 +33,7 @@ public:
     */
     virtual void UnInit();
     /*
-    * 运行一次网络循环
+    * 运行一次网络循环 派生类要调用基类的 Update()
     */
     virtual void Update();
     /*

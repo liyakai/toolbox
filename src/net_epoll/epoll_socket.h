@@ -178,7 +178,7 @@ private:
 private:
     uint32_t conn_id_ = INVALID_CONN_ID;
     int32_t socket_id_ = -1; // socket_id
-    std::string ip_ = 0;
+    std::string ip_;
     uint16_t port_ = 0;
     int32_t listen_socket_ = 0;
 

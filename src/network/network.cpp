@@ -29,6 +29,11 @@ void INetwork::Init(NetworkMaster* master)
 {
     master_ = master;
 }
+void INetwork::UnInit()
+{
+
+
+}
 void INetwork::Update()
 {
     // 处理主线程发来的事件
@@ -106,7 +111,7 @@ void INetwork::HandleEvents_()
         if(event2worker_.Read<NetEventWorker*>(event))
         {
             HandleEvent(event);
-            MemPoolMgr->GiveBack((char*)event);
+            GiveBackObject(event);
         }
     }
 }

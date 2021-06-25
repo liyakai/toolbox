@@ -1,5 +1,6 @@
-#include "src/network/network_mgr.h"
-
+#include "network_mgr.h"
+#include "src/net_epoll/epoll_network.h"
+#include "src/tools/object_pool.h"
 NetworkMaster::NetworkMaster()
 {
     stop_.store(false);
@@ -69,14 +70,14 @@ void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, u
 
 void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type)
 {
-    auto* event = new NetEventWorker(EID_MainToWorkerNewAccepter);
+    auto* event = GetObject<NetEventWorker>(EID_MainToWorkerNewAccepter);
     event->SetIP(ip);
     event->SetPort(port);
     NotifyWorker(event,type);
 }
 void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type)
 {
-    auto* event = new NetEventWorker(EID_MainToWorkerNewConnecter);
+    auto* event = GetObject<NetEventWorker>(EID_MainToWorkerNewConnecter);
     event->SetIP(ip);
     event->SetPort(port);
     NotifyWorker(event, type);
@@ -134,9 +135,14 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     switch (type)
     {
     case NT_TCP:
-        // return new INetwork(new TcpNetwork());
+    {
+        auto* tcp_network = new TcpNetwork();
+        tcp_network->Init(this);
+        return tcp_network;
         break;
-    
+    }
+    case Unknown:
+    case NT_MAX:
     default:
         break;
     }

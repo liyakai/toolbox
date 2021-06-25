@@ -16,7 +16,6 @@ enum NetworkType
 };
 
 using Event2Main = RingBuffer<NetEventMain*, 1024>;
-
 /*
 * 定义网络主线程
 */
@@ -79,7 +78,7 @@ protected:
     * @param size 数据长度
     */
     virtual void OnReceived(uint64_t conn_id, const char* data, size_t size){};
-protected:
+public:
     /*
     * 通知工作线程建立一个监听器
     * @param ip 监听ip
