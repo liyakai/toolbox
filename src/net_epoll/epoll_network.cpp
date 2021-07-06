@@ -4,6 +4,7 @@
 
 TcpNetwork::TcpNetwork()
      : epoll_ctrl_(MAX_SOCKET_COUNT)
+     , session_buffer_(new char[RECV_BUFFER_MAX_SIZE])
   
 {
 }
@@ -39,6 +40,8 @@ uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port)
     {
         return 0;
     }
+    new_socket->SetSocketMgr(&sock_mgr_);
+    new_socket->SetTcpNetwork(this);
     if(false == new_socket->InitNewAccepter(ip, port))
     {
         return 0;

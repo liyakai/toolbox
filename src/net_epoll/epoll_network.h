@@ -43,17 +43,18 @@ protected:
     */
     virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port) override;
     /*
-    * 关工作线程内闭网络连接
+    * 工作线程内闭网络连接
     */
     virtual void OnClose(uint64_t connect_id) override;
     /*
     * 工作线程内工作线程内发送
     */
     virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) override;
-
+private:
+    void OnReceive_(EpollSocket* socket);
 private:
     NetworkMaster *network_master_;
     EpollCtrl epoll_ctrl_;
     EpollSocketPool sock_mgr_;
-
+    std::unique_ptr<char> session_buffer_ = nullptr;  // 单次读取的会话缓冲
 };

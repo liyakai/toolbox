@@ -6,6 +6,27 @@
 #include "network_mgr.h"
 
 class NetworkMaster;
+
+enum class ENetErrCode
+{
+    NET_NO_ERROR = 0,
+    NET_SYS_ERROR,           // 系统错误，同时会返回errno
+    NET_INVALID_PACKET_SIZE, // 错误的包长
+    NET_CONNECT_FAILED,      // 连接出错
+    NET_LISTEN_FAILED,       // 监听出错
+    NET_ACCEPT_FAILED,       // accept 出错
+    NET_SEND_FAILED,         // 发包出错
+    NET_RECV_FAILED,         // 收包出错
+    NET_ALLOC_FAILED,        // 申请内存出错，在socket对象申请上
+    NET_SEND_BUFF_OVERFLOW,  // 发送缓冲区满
+    NET_RECV_BUFF_OVERFLOW,  // 接收缓冲区满
+    NET_ENCODE_BUFF_OVERFLOW,// 打包缓冲区满
+    NET_DECODE_BUFF_OVERFLOW,// 解包缓冲区满
+
+    NET_SEND_PIPE_OVERFLOW,  // 发送ringbuffer满
+    NET_RECV_PIPE_OVERFLOW,  // 接收ringbuffer满
+};
+
 /// 事件队列
 using Event2Worker = RingBuffer<NetEventWorker*, 1024>;
 /// 事件处理函数
@@ -58,20 +79,25 @@ protected:
     * 工作线程内工作线程内发送
     */
     virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) = 0;
+public:
     /*
-    * 工作线程内接收到新连接
+    * 工作线程内接收到新连接,通知主线程
     */
     void OnAccepted(uint64_t connect_id);
     /*
-    * 工作线程内连接到远端
+    * 工作线程内连接到远端成功,通知主线程
     */
     void OnConnected(uint64_t connect_id);
     /*
-    * 工作线程内关闭网络连接
+    * 工作线程内连接到远端失败,通知主线程
+    */
+    void OnConnectedFailed(ENetErrCode err_code, int32_t err_no);
+    /*
+    * 工作线程内关闭网络连接,通知主线程
     */
     void OnClosed(uint64_t connect_id);
     /*
-    * 工作线程内接收到数据
+    * 工作线程内接收到数据,通知主线程
     */
     void OnReceived(uint64_t connect_id, const char* data, uint32_t size);
 private:

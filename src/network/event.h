@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <functional>
 
+enum class ENetErrCode;
+
 enum EventID
 {
     EID_NONE = 0,
@@ -99,9 +101,9 @@ public:
 
 
 private:
-    union Detail
+    union NetReq
     {
-        struct Stream
+        struct SendReq
         {
             uint64_t connect_id_;
             char* data_;
@@ -112,9 +114,9 @@ private:
             std::string* ip_;
             uint16_t port_;
         } address_;
-        Detail(){}
-        ~Detail(){};
-    } detail_;
+        NetReq(){}
+        ~NetReq(){};
+    } net_req_;
 };
 
 /*
@@ -151,13 +153,34 @@ public:
     * 获取数据大小
     */
     uint32_t GetDataSize() const;
+    /*
+    * 设置错误码
+    */
+    void SetConnectFailed(ENetErrCode net_err, int32_t sys_err);
+    /*
+    * 获取网络错误码
+    */
+    ENetErrCode GetNetErr();
+    /*
+    * 获取系统错误码
+    */
+    int32_t GetSysErr();
 private:
-    struct Stream
+    union NetEvt
     {
-        uint64_t connect_id_;
-        char* data_;
-        uint32_t size_;
-    } stream_;
+        struct Stream
+        {
+            uint64_t connect_id_;
+            char* data_;
+            uint32_t size_;
+        } stream_;
+        struct ConnectFailed
+        {
+            ENetErrCode net_err_code;
+            int32_t sys_err_code;
+        } connect_failed_;
+    } net_evt_;
+    
 };
 
 using EventHandle = std::function<void(Event* event)>;

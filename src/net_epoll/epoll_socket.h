@@ -78,16 +78,6 @@ public:
     */
     void SetTcpNetwork(TcpNetwork* tcp_network){ p_tcp_network_ = tcp_network; }
     /*
-    * 设置监听socket
-    * @params listen_socket 监听的socket
-    */
-    void SetListenSocket(int32_t listen_socket){ listen_socket_ = listen_socket; }
-    /*
-    * 获取监听的socket
-    * @return 监听的socket
-    */
-    int32_t GetListenSocket(){ return listen_socket_; }
-    /*
     * 获取 socket 是否执行过 EPOLL_CTL_ADD
     * @return bool
     */
@@ -139,6 +129,10 @@ private:
     */
     size_t SocketRecv(int socket_fd, char* data, size_t size);
     /*
+    * 处理接收到的数据
+    */
+    void ProcessRecvData();
+    /*
     * 处理主动链接
     */
     void UpdateConnect();
@@ -180,7 +174,6 @@ private:
     int32_t socket_id_ = -1; // socket_id
     std::string ip_;
     uint16_t port_ = 0;
-    int32_t listen_socket_ = 0;
 
     TcpNetwork* p_tcp_network_ = nullptr;     // 工作线程
     EpollSocketPool *p_sock_pool_ = nullptr;  // socket 池子
