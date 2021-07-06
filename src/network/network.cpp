@@ -45,7 +45,27 @@ void INetwork::PushEvent(NetEventWorker* event)
     event2worker_.Write<NetEventWorker*>(event);
 }
 
-void INetwork::OnClose(uint64_t connect_id)
+void INetwork::OnAccepted(uint64_t connect_id)
+{
+    auto* accept_event = GetObject<NetEventMain>(EID_WorkerToMainAccepted);
+    accept_event->SetConnectID(connect_id);
+    master_->NotifyMain(accept_event);
+}
+void INetwork::OnConnected(uint64_t connect_id)
+{
+    auto* connected_event = GetObject<NetEventMain>(EID_WorkerToMainConnected);
+    connected_event->SetConnectID(connect_id);
+    master_->NotifyMain(connected_event);
+}
+
+void INetwork::OnConnectedFailed(ENetErrCode err_code, int32_t err_no)
+{
+    auto* connected_failed_event = GetObject<NetEventMain>(EID_WorkerToMainConnected);
+    connected_failed_event->SetConnectFailed(err_code, err_no);
+    master_->NotifyMain(connected_failed_event);
+}
+
+void INetwork::OnClosed(uint64_t connect_id)
 {
     auto* close_event = GetObject<NetEventMain>(EID_WorkerToMainClose);
     close_event->SetConnectID(connect_id);

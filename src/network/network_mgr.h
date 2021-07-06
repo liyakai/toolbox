@@ -67,6 +67,11 @@ protected:
     */
     virtual void OnConnected(uint64_t conn_id){};
     /*
+    * 主线程内处理主动连接事件
+    * @param conn_id 连接ID
+    */
+    virtual void OnConnectedFailed(ENetErrCode err_code, int32_t err_no){};
+    /*
     * 主线程内处理连接关闭事件
     * @param conn_id 连接ID
     */

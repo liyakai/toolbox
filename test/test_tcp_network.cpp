@@ -1,18 +1,44 @@
 #include "src/network/network_mgr.h"
 #include "unit_test_frame/unittest.h"
 
+class TestNetworkMaster : public NetworkMaster, public DebugPrint
+{
+    void OnAccepted(uint64_t conn_id) override 
+    {
+        if(GetDebugStatus())
+        {
+            Print("接到客户端连接,连接ID:%llu\n", conn_id);
+        }
+    };
+    void OnReceived(uint64_t conn_id, const char* data, size_t size) override
+    {
+        if(GetDebugStatus())
+        {
+            Print("收到客户端数据长度为%d,部分内容为[1024]:\n", size, data);
+        }
+    };
+    void OnClose(uint64_t conn_id) override
+    {
+        if(GetDebugStatus())
+        {
+            Print("断开与客户端之间的连接,连接ID:%ul\n", conn_id);
+        }
+    }
+};
+
 FIXTURE_BEGIN(TCPNetWork)
 
 CASE(test_tcp)
 {
-    Singleton<NetworkMaster>::Instance()->Accept("127.0.0.1", 9500, NT_TCP);
-    Singleton<NetworkMaster>::Instance()->Start();
+    Singleton<TestNetworkMaster>::Instance()->SetDebugPrint(true);
+    Singleton<TestNetworkMaster>::Instance()->Accept("127.0.0.1", 9500, NT_TCP);
+    Singleton<TestNetworkMaster>::Instance()->Start();
     bool run = true;
     std::thread t([&](){
         while(run)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            Singleton<NetworkMaster>::Instance()->Update();
+            Singleton<TestNetworkMaster>::Instance()->Update();
         }
     });
     uint32_t used_time = 0;

@@ -6,7 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/tcp.h>  // TCP_NODELAY
+#include <linux/tcp.h> // TCP_NODELAY
 #include "epoll_socket_pool.h"
 #include "epoll_network.h"
 
@@ -30,42 +30,44 @@ void EpollSocket::Reset()
 {
 }
 
-
 void EpollSocket::SetCtrlAdd(bool value)
 {
     is_ctrl_add_ = value;
 }
 void EpollSocket::UpdateAccept()
 {
-    int client_fd = 0;  // 客户端套接字
+    int client_fd = 0; // 客户端套接字
     sockaddr_in addr;
     socklen_t addr_len = sizeof(sockaddr_in);
-    
-    while(true)
+
+    while (true)
     {
         memset(&addr, 0, addr_len);
         // 接受客户端连接
-        client_fd = accept(listen_socket_, (sockaddr*)&addr,&addr_len);
-        if(-1 == client_fd && errno != EINTR)
+        client_fd = accept(socket_id_, (sockaddr *)&addr, &addr_len);
+        if (-1 == client_fd && errno != EINTR)
         {
             break;
         }
-        EpollSocket* new_socket = p_sock_pool_->Alloc();
-        if(nullptr == new_socket)
+        EpollSocket *new_socket = p_sock_pool_->Alloc();
+        if (nullptr == new_socket)
         {
             close(client_fd);
             // OnError();
-            return ;
+            return;
         }
+        new_socket->SetSocketMgr(p_sock_pool_);
+        new_socket->SetTcpNetwork(p_tcp_network_);
         InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port);
+        // 通知主线程有新的客户端连接进来
+        p_tcp_network_->OnAccepted(new_socket->GetSocketID());
         p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
     event_type_ = SOCKET_EVENT_RECV;
 }
 
-
-void EpollSocket::InitAccpetSocket(EpollSocket* socket, int socket_fd, std::string ip, uint16_t port)
+void EpollSocket::InitAccpetSocket(EpollSocket *socket, int socket_fd, std::string ip, uint16_t port)
 {
     SetNonBlocking(socket_fd);
     SetKeepaliveOff(socket_fd);
@@ -80,55 +82,82 @@ void EpollSocket::InitAccpetSocket(EpollSocket* socket, int socket_fd, std::stri
 
 void EpollSocket::UpdateRecv()
 {
-    int32_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
+    size_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
     if (cur_buffer_size > MAX_RING_BUFF_SIZE)
     {
         // 读缓冲区超过最大限制, error
         Close();
         return;
     }
-    while(size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
+    while (size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
     {
         int bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
-        if(bytes < 0)
+        if (bytes < 0)
         {
             Close();
             return;
-        } else if (0 == bytes)
+        }
+        else if (0 == bytes)
         {
             break;
-        }else
+        }
+        else
         {
             recv_ring_buffer_.AdjustWritePos(bytes);
         }
+        ProcessRecvData();
     }
 }
 
-size_t EpollSocket::SocketRecv(int socket_fd, char* data, size_t size)
+size_t EpollSocket::SocketRecv(int socket_fd, char *data, size_t size)
 {
-    size_t recv_bytes = recv(socket_fd, data, (int) size, MSG_NOSIGNAL);
-    if(recv_bytes > 0)
+    size_t recv_bytes = recv(socket_fd, data, (int)size, MSG_NOSIGNAL);
+    if (recv_bytes > 0)
     {
         return recv_bytes;
-    } else if( 0 == recv_bytes)
+    }
+    else if (0 == recv_bytes)
     {
         return -1;
-    } else // recv_bytes < 0
+    }
+    else // recv_bytes < 0
     {
-        if((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
+        if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
         {
             return 0;
-        } else 
+        }
+        else
         {
             return -1;
         }
     }
 }
 
+void EpollSocket::ProcessRecvData()
+{
+    auto data_size = recv_ring_buffer_.ReadableSize();
+    // 这里暂时采用 len|buff 的方式分割数据.可重构为传入解包方法
+    if (data_size < sizeof(uint32_t))
+    {
+        return;
+    }
+    uint32_t len = 0;
+    recv_ring_buffer_.Copy((char *)&len, sizeof(uint32_t));
+    if (data_size < sizeof(uint32_t) + len)
+    {
+        return;
+    }
+    recv_ring_buffer_.AdjustReadPos(sizeof(uint32_t));
+    char *buff_block = MemPoolMgr->GetMemory(len);
+    recv_ring_buffer_.Read(buff_block, len);
+    p_tcp_network_->OnReceived(GetConnID(), buff_block, len);
+}
+
 void EpollSocket::UpdateConnect()
 {
     event_type_ = SOCKET_EVENT_RECV;
     socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
+    p_tcp_network_->OnConnected(GetSocketID());
 }
 
 void EpollSocket::UpdateSend()
@@ -136,35 +165,34 @@ void EpollSocket::UpdateSend()
     while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
     {
         size_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
-        if(bytes < 0)
+        if (bytes < 0)
         {
             // 发送失败
             Close();
         }
         send_ring_buffer_.AdjustReadPos(bytes);
-        if(bytes < size)
+        if (bytes < size)
         {
             break;
         }
-
     }
-    
-
 }
 
-size_t EpollSocket::SocketSend(int socket_fd, const char* data, size_t size)
+size_t EpollSocket::SocketSend(int socket_fd, const char *data, size_t size)
 {
     int32_t send_bytes = send(socket_fd, data, (int)size, MSG_NOSIGNAL);
-    if(send_bytes < 0)
+    if (send_bytes < 0)
     {
-        if((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
+        if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
         {
             return 0;
-        } else 
+        }
+        else
         {
             return -1;
         }
-    } else if(0 == send_bytes && size)
+    }
+    else if (0 == send_bytes && size)
     {
         return -1;
     }
@@ -173,9 +201,10 @@ size_t EpollSocket::SocketSend(int socket_fd, const char* data, size_t size)
 
 void EpollSocket::Close()
 {
-    if(-1 != socket_id_)
+    if (-1 != socket_id_)
     {
-        // TO DO 通知上层
+        // 通知主线程 socket 关闭
+        p_tcp_network_->OnClosed(GetSocketID());
         close(socket_id_);
         socket_id_ = -1;
         p_sock_pool_->Free(this);
@@ -184,47 +213,47 @@ void EpollSocket::Close()
 
 void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
 {
-    if(SocketState::SOCK_STATE_INVALIED == socket_state_)
+    if (SocketState::SOCK_STATE_INVALIED == socket_state_)
     {
         // socket 已经关闭
         return;
     }
-    if((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
+    if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
     {
-        if(socket_state_ == SocketState::SOCK_STATE_LISTENING)
+        if (socket_state_ == SocketState::SOCK_STATE_LISTENING)
         {
             UpdateAccept();
-        } else 
+        }
+        else
         {
             last_recv_ts_ = ts; // 更新最后一次读到数据的时间戳
             UpdateRecv();
         }
     }
-    if((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
+    if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
     {
-        if(socket_state_ == SocketState::SOCK_STATE_CONNECTING)
+        if (socket_state_ == SocketState::SOCK_STATE_CONNECTING)
         {
             UpdateConnect();
-        } else 
+        }
+        else
         {
             UpdateSend();
         }
     }
-
 }
 
-bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port)
+bool EpollSocket::InitNewAccepter(const std::string &ip, const uint16_t port)
 {
-    if(SocketState::SOCK_STATE_LISTENING == socket_state_)
+    if (SocketState::SOCK_STATE_LISTENING == socket_state_)
     {
         return false;
     }
-    socket_id_ = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+    socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_id_ < 0)
     {
         return false;
     }
-    
 
     struct sockaddr_in sa;
     memset(&sa, 0, sizeof(sa));
@@ -232,18 +261,18 @@ bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port)
     sa.sin_port = htons(port);
     sa.sin_addr.s_addr = INADDR_ANY;
     sa.sin_addr.s_addr = inet_addr(ip.c_str());
-    SetReuseAddrOn(socket_id_);     // 复用端口
-    SetLingerOff(socket_id_);       // 立即关闭该连接
-    SetDeferAccept(socket_id_);     // 1s 之内没有数据发送，则直接关闭连接
-    SetNonBlocking(socket_id_);     // 设置为非阻塞
+    SetReuseAddrOn(socket_id_); // 复用端口
+    SetLingerOff(socket_id_);   // 立即关闭该连接
+    SetDeferAccept(socket_id_); // 1s 之内没有数据发送，则直接关闭连接
+    SetNonBlocking(socket_id_); // 设置为非阻塞
     // 绑定端口
-    int error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
-    if(error < 0)
+    int error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
+    if (error < 0)
     {
         return false;
     }
     error = listen(socket_id_, DEFAULT_BACKLOG_SIZE);
-    if(error < 0)
+    if (error < 0)
     {
         return false;
     }
@@ -254,7 +283,7 @@ bool EpollSocket::InitNewAccepter(const std::string& ip, const uint16_t port)
 
 bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port)
 {
-    if(SocketState::SOCK_STATE_CONNECTING == socket_state_)
+    if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
     {
         return false;
     }
@@ -262,20 +291,22 @@ bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port)
     ip_ = ip;
     // 设置对端端口
     port_ = port;
-    struct  sockaddr_in sa;
+    struct sockaddr_in sa;
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
     sa.sin_addr.s_addr = inet_addr(ip.c_str());
     SetNonBlocking(socket_id_); // 设置为非阻塞
     SetNagleOff(socket_id_);    // 关闭 Nagle
-    int32_t error = connect(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
-    if(error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
+    int32_t error = connect(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
+    if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
     {
+        // 通知 主线程连接失败
+        p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_SYS_ERROR, errno);
         Close();
         return false;
     }
-    socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
+    socket_state_ = SocketState::SOCK_STATE_CONNECTING;
     return true;
 }
 
@@ -287,12 +318,12 @@ int EpollSocket::SetNonBlocking(int fd)
 int EpollSocket::SetKeepaliveOff(int fd)
 {
     int keepalive = 0;
-    return setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,(char*)&keepalive,sizeof(keepalive));
+    return setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
 }
 int EpollSocket::SetNagleOff(int fd)
 {
     int nodelay = 1;
-    return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char*)&nodelay, sizeof(nodelay));
+    return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
 }
 // SOCKET在close时候不等待缓冲区发送完成
 int EpollSocket::SetLingerOff(int fd)
@@ -308,15 +339,14 @@ int EpollSocket::SetLingerOff(int fd)
 int EpollSocket::SetReuseAddrOn(int fd)
 {
     int32_t reuse_addr = 1;
-    return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse_addr, sizeof(reuse_addr));
+    return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse_addr, sizeof(reuse_addr));
 }
 
 int EpollSocket::SetDeferAccept(int fd)
 {
-    int32_t  secs = 1;
-    return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &secs, sizeof(secs));  
+    int32_t secs = 1;
+    return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &secs, sizeof(secs));
 }
-
 
 // TCP之Nagle算法&&延迟ACK
 

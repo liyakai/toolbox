@@ -29,7 +29,7 @@ NetEventWorker::~NetEventWorker()
     switch(GetID())
     {
         case EID_MainToWorkerSend:
-            MemPoolMgr->GiveBack(detail_.stream_.data_);
+            MemPoolMgr->GiveBack(net_req_.stream_.data_);
             break;
         default:
             break;
@@ -39,51 +39,51 @@ NetEventWorker::~NetEventWorker()
 
 void NetEventWorker::SetIP(const std::string& ip)
 {
-    detail_.address_.ip_ = GetObject<std::string>(ip);
+    net_req_.address_.ip_ = GetObject<std::string>(ip);
 }
 
 std::string NetEventWorker::GetIP() const
 {
     const static std::string NullString;
-    if(detail_.address_.ip_)
+    if(net_req_.address_.ip_)
     {
-        return *detail_.address_.ip_;
+        return *net_req_.address_.ip_;
     }
     return NullString;
 }
 
 void NetEventWorker::SetPort(const uint16_t port)
 {
-    detail_.address_.port_ = port;
+    net_req_.address_.port_ = port;
 }
 
 uint16_t NetEventWorker::GetPort() const
 {
-    return detail_.address_.port_;
+    return net_req_.address_.port_;
 }
 
 void NetEventWorker::SetConnectID(const uint64_t conn_id)
 {
-    detail_.stream_.connect_id_ = conn_id;
+    net_req_.stream_.connect_id_ = conn_id;
 }
 uint64_t NetEventWorker::GetConnectID() const
 {
-    return detail_.stream_.connect_id_;
+    return net_req_.stream_.connect_id_;
 }
 
 void NetEventWorker::SetData(const char* data, uint32_t size)
 {
-    detail_.stream_.data_ = MemPoolMgr->GetMemory(size);
-    detail_.stream_.size_ = size;
-    memmove(detail_.stream_.data_, data, size);
+    net_req_.stream_.data_ = MemPoolMgr->GetMemory(size);
+    net_req_.stream_.size_ = size;
+    memmove(net_req_.stream_.data_, data, size);
 }
 const char* NetEventWorker::GetData() const
 {
-    return detail_.stream_.data_;
+    return net_req_.stream_.data_;
 }
 uint32_t NetEventWorker::GetDataSize() const
 {
-    return detail_.stream_.size_;
+    return net_req_.stream_.size_;
 }
 
 
@@ -101,7 +101,7 @@ NetEventMain::~NetEventMain()
     switch(GetID())
     {
         case EID_WorkerToMainRecv:
-            MemPoolMgr->GiveBack(stream_.data_);
+            MemPoolMgr->GiveBack(net_evt_.stream_.data_);
             break;
         default:
             break;
@@ -110,26 +110,41 @@ NetEventMain::~NetEventMain()
 
 void NetEventMain::SetConnectID(const uint64_t conn_id)
 {
-    stream_.connect_id_ = conn_id;
+    net_evt_.stream_.connect_id_ = conn_id;
 }
 uint64_t NetEventMain::GetConnectID() const
 {
-    return stream_.connect_id_;
+    return net_evt_.stream_.connect_id_;
 }
 
 void NetEventMain::SetData(const char* data, uint32_t size)
 {
-    stream_.data_ = MemPoolMgr->GetMemory(size);
-    stream_.size_ = size;
-    memmove(stream_.data_, data, size);
+    net_evt_.stream_.data_ = MemPoolMgr->GetMemory(size);
+    net_evt_.stream_.size_ = size;
+    memmove(net_evt_.stream_.data_, data, size);
 }
 const char* NetEventMain::GetData() const
 {
-    return stream_.data_;
+    return net_evt_.stream_.data_;
 }
 uint32_t NetEventMain::GetDataSize() const
 {
-    return stream_.size_;
+    return net_evt_.stream_.size_;
+}
+
+void NetEventMain::SetConnectFailed(ENetErrCode net_err, int32_t sys_err)
+{
+    net_evt_.connect_failed_.net_err_code = net_err;
+    net_evt_.connect_failed_.sys_err_code = sys_err;
+}
+
+ENetErrCode NetEventMain::GetNetErr()
+{
+    return net_evt_.connect_failed_.net_err_code;
+}
+int32_t NetEventMain::GetSysErr()
+{
+    return net_evt_.connect_failed_.sys_err_code;
 }
 
 EventBasedObject::EventBasedObject()

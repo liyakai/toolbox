@@ -121,6 +121,9 @@ void NetworkMaster::DispatchMainEvent_()
         case EID_WorkerToMainConnected:
             OnConnected(event->GetConnectID());
             break;
+        case EID_WorkerToMainConnectFailed:
+            OnConnectedFailed(event->GetNetErr(),event->GetSysErr());
+            break;
         case EID_WorkerToMainRecv:
             OnReceived(event->GetConnectID(), event->GetData(), event->GetDataSize());
             break;

@@ -1,13 +1,14 @@
 #pragma once
 
 
-#define MAX_SOCKET_COUNT        40000
-#define MAXEVENTS               8192 /* epoll_create参数 */
-#define EPOLL_WAIT_MSECONDS     2
-#define INVALID_CONN_ID	 		UINT32_MAX
-#define DEFAULT_RING_BUFF_SIZE  16*1024     /* 16KB */
-#define MAX_RING_BUFF_SIZE      1024*1024   /* 1MB */
-#define DEFAULT_BACKLOG_SIZE    256 
+constexpr size_t MAX_SOCKET_COUNT           =   40000;
+constexpr size_t MAXEVENTS                  =   8192; /* epoll_create参数 */
+constexpr size_t EPOLL_WAIT_MSECONDS        =   2;
+constexpr size_t INVALID_CONN_ID	 	    =   UINT32_MAX;
+constexpr size_t DEFAULT_RING_BUFF_SIZE     =   16*1024;     /* 16KB */
+constexpr size_t MAX_RING_BUFF_SIZE         =   1024*1024;   /* 1MB */
+constexpr size_t DEFAULT_BACKLOG_SIZE       =   256;    
+constexpr size_t RECV_BUFFER_MAX_SIZE       =   1024 * 256;
 
 /*
 * 错误码
