@@ -310,6 +310,15 @@ bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port)
     return true;
 }
 
+void EpollSocket::Send(const char* data, size_t len)
+{
+    if(nullptr == data || 0 == len)
+    {
+        return;
+    }
+    
+}
+
 int EpollSocket::SetNonBlocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);

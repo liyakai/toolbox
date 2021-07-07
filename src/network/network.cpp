@@ -116,7 +116,7 @@ void INetwork::OnMainToWorkerClose_(Event* event)
 void INetwork::OnMainToWorkerSend_(Event* event)
 {
     auto send_tcp = dynamic_cast<NetEventWorker*>(event);
-    if(nullptr != send_tcp)
+    if(nullptr == send_tcp)
     {
         return;
     }
