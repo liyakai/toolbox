@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
+#include <string>
 /*
 * 定义 debug 打印基类
 */
@@ -44,5 +45,25 @@ public:
    bool GetDebugStatus()
    {
        return debug_print_;
+   }
+   /*
+   * 打印二进制内容
+   */
+   void PrintData(const char* data, size_t size, std::string msg = "")
+   {
+        if(!msg.empty())
+        {
+            Print("%s\n", msg.c_str());
+        }
+        
+        for(size_t i = 0; i < size; i++)
+        {
+            if(0 != i && 0 == i % 16)
+            {
+                Print("\n");
+            } 
+            Print("0x%02x ", data[i]);     
+        }
+        Print("\n");
    }
 };

@@ -14,8 +14,10 @@ class TestNetworkMaster : public NetworkMaster, public DebugPrint
     {
         if(GetDebugStatus())
         {
-            Print("收到客户端数据长度为%d,部分内容为[1024]:\n", size, data);
+            Print("收到客户端数据长度为%d\n", size);
+            PrintData(data, 32);
         }
+        Send(NT_TCP, conn_id, data, size);
     };
     void OnClose(uint64_t conn_id) override
     {

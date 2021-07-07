@@ -107,6 +107,12 @@ public:
     * @retval 初始化是否成功
     */
     bool InitNewConnecter(const std::string &ip, uint16_t port);
+    /*
+    * 发送数据
+    * @param data 发送数据指针
+    * @param len 发送数据长度
+    */
+    void Send(const char* data, size_t len);
 private:
     /*
     * 处理接受客户端连接的情况
