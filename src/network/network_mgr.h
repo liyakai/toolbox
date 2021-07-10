@@ -75,7 +75,7 @@ protected:
     * 主线程内处理连接关闭事件
     * @param conn_id 连接ID
     */
-    virtual void OnClose(uint64_t conn_id){};
+    virtual void OnClose(uint64_t conn_id, ENetErrCode net_err, int32_t sys_err){};
     /*
     * 主线程内处理数据可读事件
     * @param conn_id 连接ID

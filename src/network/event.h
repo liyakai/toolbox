@@ -93,7 +93,7 @@ public:
     /*
     * 获取 数据
     */
-    const char* GetData() const;
+    char* GetData() const;
     /*
     * 获取数据大小
     */
@@ -133,52 +133,76 @@ public:
     * 析构
     */
     virtual ~NetEventMain();
-    /*
-    * 设置 连接ID
-    */
-    void SetConnectID(const uint64_t conn_id);
-    /*
-    * 获取 连接ID
-    */
-    uint64_t GetConnectID() const;
-    /*
-    * 设置 数据
-    */
-    void SetData(const char* data, uint32_t size);
-    /*
-    * 获取 数据
-    */
-    const char* GetData() const;
-    /*
-    * 获取数据大小
-    */
-    uint32_t GetDataSize() const;
-    /*
-    * 设置错误码
-    */
-    void SetConnectFailed(ENetErrCode net_err, int32_t sys_err);
-    /*
-    * 获取网络错误码
-    */
-    ENetErrCode GetNetErr();
-    /*
-    * 获取系统错误码
-    */
-    int32_t GetSysErr();
-private:
+    // /*
+    // * 设置 连接ID
+    // */
+    // void SetConnectID(const uint64_t conn_id);
+    // /*
+    // * 获取 连接ID
+    // */
+    // uint64_t GetConnectID() const;
+    // /*
+    // * 设置 数据
+    // */
+    // void SetData(const char* data, uint32_t size);
+    // /*
+    // * 获取 数据
+    // */
+    // char* GetData() const;
+    // /*
+    // * 获取数据大小
+    // */
+    // uint32_t GetDataSize() const;
+    // /*
+    // * 设置错误码
+    // */
+    // void SetConnectFailed(ENetErrCode net_err, int32_t sys_err);
+    // /*
+    // * 获取网络错误码
+    // */
+    // ENetErrCode GetNetErr();
+    // /*
+    // * 获取系统错误码
+    // */
+    // int32_t GetSysErr();
+public:
     union NetEvt
     {
-        struct Stream
+        struct ConnectSucessed
         {
             uint64_t connect_id_;
-            char* data_;
-            uint32_t size_;
-        } stream_;
-        struct ConnectFailed
+        } connect_sucessed_;
+        struct ConnectFailedEvt
         {
             ENetErrCode net_err_code;
             int32_t sys_err_code;
         } connect_failed_;
+        struct Bind
+        {
+            uint64_t connect_id_;
+        } bind_;
+        struct Accept
+        {
+            uint64_t connect_id_;
+        } accept_;
+        struct Recv
+        {
+            uint64_t connect_id_;
+            const char* data_;
+            uint32_t size_;
+        } recv_;
+        struct Error 
+        {
+            uint64_t connect_id_;
+            ENetErrCode net_err_code;
+            int32_t sys_err_code;
+        } error_;
+        struct Close
+        {
+            uint64_t connect_id_;
+            ENetErrCode net_err_;
+            int32_t sys_err_;
+        } close_;
     } net_evt_;
     
 };

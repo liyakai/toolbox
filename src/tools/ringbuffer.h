@@ -40,10 +40,10 @@ public:
     /*
     * 判断是否需要扩容
     */
-    bool NeedEnlage()
+    bool NeedEnlage(size_t new_len)
     {
         auto ratio = (double)(buffer_size_ - WriteableSize()) / (double)buffer_size_;
-        return ratio > ratio_;
+        return ratio > ratio_ || WriteableSize() < new_len;
     }
     /*
     * 可写数据长度[使用一个元素空间来判满]
@@ -128,7 +128,7 @@ public:
     */
     size_t Write(const char* buffer, size_t len)
     {
-        if(NeedEnlage())
+        while(NeedEnlage(len))
         {
             if(!Enlage())
             {

@@ -19,7 +19,7 @@ class TestNetworkMaster : public NetworkMaster, public DebugPrint
         }
         Send(NT_TCP, conn_id, data, size);
     };
-    void OnClose(uint64_t conn_id) override
+    void OnClose(uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) override
     {
         if(GetDebugStatus())
         {

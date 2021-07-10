@@ -24,10 +24,25 @@ bool EpollSocket::Init(SocketType type, uint32_t send_buff_len, uint32_t recv_bu
 }
 void EpollSocket::UnInit()
 {
+    conn_id_ = INVALID_CONN_ID;
+    socket_id_ = -1;
+    port_ = 0;
+
+    p_tcp_network_ = nullptr;
+    p_sock_pool_ = nullptr;
+
+    socket_state_ = SocketState::SOCK_STATE_INVALIED;
+    event_type_ = SOCKET_EVENT_INVALID;
+    recv_buff_len_ = 0;
+    recv_ring_buffer_.Clear();
+    send_ring_buffer_.Clear();
+    last_recv_ts_ = 0;
+    is_ctrl_add_ = false;
 }
 
 void EpollSocket::Reset()
 {
+    UnInit();
 }
 
 void EpollSocket::SetCtrlAdd(bool value)
@@ -86,15 +101,15 @@ void EpollSocket::UpdateRecv()
     if (cur_buffer_size > MAX_RING_BUFF_SIZE)
     {
         // 读缓冲区超过最大限制, error
-        Close();
+        Close(ENetErrCode::NET_RECV_BUFF_OVERFLOW);
         return;
     }
     while (size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
     {
-        int bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
+        int32_t bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
         if (bytes < 0)
         {
-            Close();
+            Close(ENetErrCode::NET_RECV_FAILED);
             return;
         }
         else if (0 == bytes)
@@ -109,9 +124,9 @@ void EpollSocket::UpdateRecv()
     }
 }
 
-size_t EpollSocket::SocketRecv(int socket_fd, char *data, size_t size)
+int32_t EpollSocket::SocketRecv(int socket_fd, char *data, size_t size)
 {
-    size_t recv_bytes = recv(socket_fd, data, (int)size, MSG_NOSIGNAL);
+    int recv_bytes = recv(socket_fd, data, (int)size, MSG_NOSIGNAL);
     if (recv_bytes > 0)
     {
         return recv_bytes;
@@ -168,7 +183,7 @@ void EpollSocket::UpdateSend()
         if (bytes < 0)
         {
             // 发送失败
-            Close();
+            Close(ENetErrCode::NET_SEND_FAILED);
         }
         send_ring_buffer_.AdjustReadPos(bytes);
         if (bytes < size)
@@ -178,9 +193,9 @@ void EpollSocket::UpdateSend()
     }
 }
 
-size_t EpollSocket::SocketSend(int socket_fd, const char *data, size_t size)
+int32_t EpollSocket::SocketSend(int socket_fd, const char *data, size_t size)
 {
-    int32_t send_bytes = send(socket_fd, data, (int)size, MSG_NOSIGNAL);
+    int send_bytes = send(socket_fd, data, (int)size, MSG_NOSIGNAL);
     if (send_bytes < 0)
     {
         if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
@@ -199,14 +214,15 @@ size_t EpollSocket::SocketSend(int socket_fd, const char *data, size_t size)
     return send_bytes;
 }
 
-void EpollSocket::Close()
+void EpollSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (-1 != socket_id_)
     {
         // 通知主线程 socket 关闭
-        p_tcp_network_->OnClosed(GetSocketID());
+        p_tcp_network_->OnClosed((uint64_t)GetConnID(),(int32_t)net_err, sys_err);
         close(socket_id_);
         socket_id_ = -1;
+        socket_state_ = SocketState::SOCK_STATE_INVALIED;
         p_sock_pool_->Free(this);
     }
 }
@@ -303,7 +319,7 @@ bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port)
     {
         // 通知 主线程连接失败
         p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_SYS_ERROR, errno);
-        Close();
+        Close(ENetErrCode::NET_SYS_ERROR, errno);
         return false;
     }
     socket_state_ = SocketState::SOCK_STATE_CONNECTING;
@@ -316,6 +332,30 @@ void EpollSocket::Send(const char* data, size_t len)
     {
         return;
     }
+
+    if(false == recv_ring_buffer_.Empty())
+    {
+        size_t write_size = recv_ring_buffer_.Write(data, len);
+        if(write_size < len || recv_ring_buffer_.GetBufferSize() > MAX_RING_BUFF_SIZE)
+        {
+            Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);
+        }
+        recv_ring_buffer_.Write(data, len);
+        return;
+    }
+
+    int32_t sended = SocketSend(GetSocketID(), data, len);
+    if(-1 == sended)
+    {
+        Close(ENetErrCode::NET_SYS_ERROR, errno);
+        return;
+    } else if((int32_t)len == sended)
+    {
+        return;
+    } else if ((int32_t)len > sended)
+    {
+        recv_ring_buffer_.Write(data + sended, len - sended);
+    }   
     
 }
 
