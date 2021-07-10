@@ -48,35 +48,37 @@ void INetwork::PushEvent(NetEventWorker* event)
 void INetwork::OnAccepted(uint64_t connect_id)
 {
     auto* accept_event = GetObject<NetEventMain>(EID_WorkerToMainAccepted);
-    accept_event->SetConnectID(connect_id);
+    accept_event->net_evt_.accept_.connect_id_ = connect_id;
     master_->NotifyMain(accept_event);
 }
 void INetwork::OnConnected(uint64_t connect_id)
 {
     auto* connected_event = GetObject<NetEventMain>(EID_WorkerToMainConnected);
-    connected_event->SetConnectID(connect_id);
+    connected_event->net_evt_.connect_sucessed_.connect_id_ = connect_id;
     master_->NotifyMain(connected_event);
 }
 
 void INetwork::OnConnectedFailed(ENetErrCode err_code, int32_t err_no)
 {
     auto* connected_failed_event = GetObject<NetEventMain>(EID_WorkerToMainConnected);
-    connected_failed_event->SetConnectFailed(err_code, err_no);
+    connected_failed_event->net_evt_.connect_failed_.net_err_code = err_code;
+    connected_failed_event->net_evt_.connect_failed_.sys_err_code = err_no;
     master_->NotifyMain(connected_failed_event);
 }
 
-void INetwork::OnClosed(uint64_t connect_id)
+void INetwork::OnClosed(uint64_t connect_id, int32_t net_err, int32_t sys_err)
 {
     auto* close_event = GetObject<NetEventMain>(EID_WorkerToMainClose);
-    close_event->SetConnectID(connect_id);
+    close_event->net_evt_.error_.connect_id_ = connect_id;
     master_->NotifyMain(close_event);
 }
 
 void INetwork::OnReceived(uint64_t connect_id, const char* data, uint32_t size)
 {
     auto* receive_event = GetObject<NetEventMain>(EID_WorkerToMainRecv);
-    receive_event->SetData(data, size);
-    receive_event->SetConnectID(connect_id);
+    receive_event->net_evt_.recv_.connect_id_ = connect_id;
+    receive_event->net_evt_.recv_.data_ = data;
+    receive_event->net_evt_.recv_.size_ = size;
     master_->NotifyMain(receive_event);
 }
 
@@ -89,7 +91,7 @@ void INetwork::OnMainToWorkerNewAccepter_(Event* event)
     }
     auto conn_id = OnNewAccepter(accepter_event->GetIP(), accepter_event->GetPort());
     auto bind_tcp = GetObject<NetEventMain>(EID_WorkerToMainBinded);
-    bind_tcp->SetConnectID(conn_id);
+    bind_tcp->net_evt_.bind_.connect_id_ = conn_id;
     master_->NotifyMain(bind_tcp);
 }
 

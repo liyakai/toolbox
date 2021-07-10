@@ -47,7 +47,7 @@ uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port)
         return 0;
     }
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
-    return 0;
+    return new_socket->GetConnID();
 }
 uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port)
 {

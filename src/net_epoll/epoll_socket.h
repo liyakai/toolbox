@@ -3,6 +3,7 @@
 #include <time.h>
 #include "epoll_define.h"
 #include "src/tools/ringbuffer.h"
+#include "network.h"
 
 class TcpNetwork;
 class EpollSocketPool;
@@ -113,6 +114,7 @@ public:
     * @param len 发送数据长度
     */
     void Send(const char* data, size_t len);
+
 private:
     /*
     * 处理接受客户端连接的情况
@@ -129,11 +131,11 @@ private:
     /*
     * 关闭套接字
     */
-    void Close();
+    void Close(ENetErrCode net_err, int32_t sys_err = 0);
     /*
     * 套接字接收数据
     */
-    size_t SocketRecv(int socket_fd, char* data, size_t size);
+    int32_t SocketRecv(int socket_fd, char* data, size_t size);
     /*
     * 处理接收到的数据
     */
@@ -149,7 +151,7 @@ private:
     /*
     * 套接字发送数据
     */
-    size_t SocketSend(int socket_fd, const char* data, size_t size);
+    int32_t SocketSend(int socket_fd, const char* data, size_t size);
     /*
     * 设置 非阻塞
     */
@@ -185,7 +187,7 @@ private:
     EpollSocketPool *p_sock_pool_ = nullptr;  // socket 池子
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
-    SockEventType event_type_; // 可投递事件类型
+    SockEventType event_type_ = SOCKET_EVENT_INVALID; // 可投递事件类型
     int recv_buff_len_ = 0;     // 接收buff大小
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;
