@@ -90,7 +90,6 @@ void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
     if(nullptr == networks_[index])
     {
         networks_[index].reset(GetNetwork_(type));
-        networks_[index]->Init(this);
     }
     networks_[index]->PushEvent(std::move(event));
 }

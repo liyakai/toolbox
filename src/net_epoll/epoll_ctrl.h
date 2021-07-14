@@ -49,7 +49,7 @@ public:
     /*
     * 操作事件
     */
-    bool OperEvent(EpollSocket &socket, EpollOperType op_type, SockEventType event_type);
+    bool OperEvent(EpollSocket &socket, EpollOperType op_type, int32_t event_type);
     /*
     * epoll_wait
     * @param msec 等待毫秒数

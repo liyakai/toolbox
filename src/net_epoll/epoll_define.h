@@ -53,4 +53,5 @@ enum SockEventType
     SOCKET_EVENT_INVALID = 0,
     SOCKET_EVENT_RECV = 1,
     SOCKET_EVENT_SEND = 2,
+    SOCKET_EVENT_ERR = 4,
 };
