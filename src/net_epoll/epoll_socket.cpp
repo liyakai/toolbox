@@ -92,7 +92,7 @@ void EpollSocket::InitAccpetSocket(EpollSocket *socket, int socket_fd, std::stri
     socket->SetIP(ip);
     socket->SetPort(port);
     socket->SetState(SocketState::SOCK_STATE_ESTABLISHED);
-    socket->SetSockEventType(SOCKET_EVENT_RECV);
+    socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
 }
 
 void EpollSocket::UpdateRecv()
@@ -151,7 +151,7 @@ int32_t EpollSocket::SocketRecv(int socket_fd, char *data, size_t size)
 void EpollSocket::ProcessRecvData()
 {
     auto data_size = recv_ring_buffer_.ReadableSize();
-    // 这里暂时采用 len|buff 的方式分割数据.可重构为传入解包方法
+    // 这里暂时采用 len|buff 的方式[len包含len自身的长度]分割数据.可重构为传入解包方法
     if (data_size < sizeof(uint32_t))
     {
         return;
@@ -162,7 +162,6 @@ void EpollSocket::ProcessRecvData()
     {
         return;
     }
-    recv_ring_buffer_.AdjustReadPos(sizeof(uint32_t));
     char *buff_block = MemPoolMgr->GetMemory(len);
     recv_ring_buffer_.Read(buff_block, len);
     p_tcp_network_->OnReceived(GetConnID(), buff_block, len);
@@ -170,9 +169,9 @@ void EpollSocket::ProcessRecvData()
 
 void EpollSocket::UpdateConnect()
 {
-    event_type_ = SOCKET_EVENT_RECV;
+    event_type_ |= SOCKET_EVENT_RECV;
     socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
-    p_tcp_network_->OnConnected(GetSocketID());
+    p_tcp_network_->OnConnected(GetConnID());
 }
 
 void EpollSocket::UpdateSend()
@@ -214,6 +213,28 @@ int32_t EpollSocket::SocketSend(int socket_fd, const char *data, size_t size)
     return send_bytes;
 }
 
+void EpollSocket::UpdateError()
+{
+    if(SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
+    {
+        Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
+    } else 
+    {
+        p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
+    }
+}
+
+int32_t EpollSocket::GetSocketError()
+{
+    int32_t error = 0;
+    socklen_t len = sizeof(error);
+    if(getsockopt(socket_id_, SOL_SOCKET, SO_ERROR, &error, &len) == -1)
+    {
+        return 0;
+    }
+    return error;
+}
+
 void EpollSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (-1 != socket_id_)
@@ -233,10 +254,15 @@ void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
     {
         // socket 已经关闭
         return;
+    
+    }
+    if(event_type & SOCKET_EVENT_ERR)
+    {
+        UpdateError();
     }
     if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
     {
-        if (socket_state_ == SocketState::SOCK_STATE_LISTENING)
+        if (SocketState::SOCK_STATE_LISTENING == socket_state_)
         {
             UpdateAccept();
         }
@@ -248,7 +274,7 @@ void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
     }
     if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
     {
-        if (socket_state_ == SocketState::SOCK_STATE_CONNECTING)
+        if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
         {
             UpdateConnect();
         }
@@ -303,6 +329,13 @@ bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port)
     {
         return false;
     }
+
+    socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (socket_id_ < 0)
+    {
+        return false;
+    }
+
     // 设置对端地址
     ip_ = ip;
     // 设置对端端口
@@ -323,6 +356,7 @@ bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port)
         return false;
     }
     socket_state_ = SocketState::SOCK_STATE_CONNECTING;
+    event_type_ = SOCKET_EVENT_SEND;
     return true;
 }
 
@@ -333,14 +367,14 @@ void EpollSocket::Send(const char* data, size_t len)
         return;
     }
 
-    if(false == recv_ring_buffer_.Empty())
+    if(false == send_ring_buffer_.Empty())
     {
-        size_t write_size = recv_ring_buffer_.Write(data, len);
-        if(write_size < len || recv_ring_buffer_.GetBufferSize() > MAX_RING_BUFF_SIZE)
+        size_t write_size = send_ring_buffer_.Write(data, len);
+        if(write_size < len || send_ring_buffer_.GetBufferSize() > MAX_RING_BUFF_SIZE)
         {
             Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);
         }
-        recv_ring_buffer_.Write(data, len);
+        send_ring_buffer_.Write(data, len);
         return;
     }
 
@@ -354,7 +388,7 @@ void EpollSocket::Send(const char* data, size_t len)
         return;
     } else if ((int32_t)len > sended)
     {
-        recv_ring_buffer_.Write(data + sended, len - sended);
+        send_ring_buffer_.Write(data + sended, len - sended);
     }   
     
 }

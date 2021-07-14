@@ -37,7 +37,7 @@ public:
     * 获取事件类型
     * @return 可投递事件类型
     */
-    SockEventType GetEventType() const { return event_type_; };
+    int32_t GetEventType() const { return event_type_; };
     /*
     * 获取 socket id
     */
@@ -69,7 +69,7 @@ public:
     /*
     * 设置可投递类型
     */
-    void SetSockEventType(SockEventType type) { event_type_ = type; }
+    void SetSockEventType(int32_t type) { event_type_ = type; }
     /*
     * 设置 socket 池子
     */
@@ -153,6 +153,14 @@ private:
     */
     int32_t SocketSend(int socket_fd, const char* data, size_t size);
     /*
+    * 处理错误事件
+    */
+    void UpdateError();
+    /*
+    * 获取 socket 错误
+    */
+    int32_t GetSocketError();
+    /*
     * 设置 非阻塞
     */
     int SetNonBlocking(int fd);
@@ -187,7 +195,7 @@ private:
     EpollSocketPool *p_sock_pool_ = nullptr;  // socket 池子
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
-    SockEventType event_type_ = SOCKET_EVENT_INVALID; // 可投递事件类型
+    int32_t event_type_ = SOCKET_EVENT_INVALID; // 可投递事件类型
     int recv_buff_len_ = 0;     // 接收buff大小
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;

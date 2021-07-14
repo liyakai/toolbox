@@ -56,6 +56,8 @@ uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port)
     {
         return 0;
     }
+    new_socket->SetSocketMgr(&sock_mgr_);
+    new_socket->SetTcpNetwork(this);
     if(false == new_socket->InitNewConnecter(ip, port))
     {
         return 0;

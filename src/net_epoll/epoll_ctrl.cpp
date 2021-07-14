@@ -57,11 +57,11 @@ bool EpollCtrl::DelEvent(int socket_fd)
     return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
 }
 
-bool EpollCtrl::OperEvent(EpollSocket &socket, EpollOperType op_type, SockEventType event_type)
+bool EpollCtrl::OperEvent(EpollSocket &socket, EpollOperType op_type, int32_t event_type)
 {
     epoll_event event;
     memset(&event, 0, sizeof(event));
-    const SockEventType now_event = socket.GetEventType();
+    const auto now_event = socket.GetEventType();
     event.data.ptr = &socket;
     event.events |= EPOLLET;
     if (event_type & SOCKET_EVENT_RECV)
@@ -128,6 +128,7 @@ bool EpollCtrl::RunOnce()
         if(nullptr == socket) continue;
         if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
         {
+            socket->UpdateEpollEvent(SOCKET_EVENT_ERR, time_stamp);
             epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
         }
         else if (event.events & EPOLLIN)

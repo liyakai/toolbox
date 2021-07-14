@@ -60,7 +60,7 @@ void INetwork::OnConnected(uint64_t connect_id)
 
 void INetwork::OnConnectedFailed(ENetErrCode err_code, int32_t err_no)
 {
-    auto* connected_failed_event = GetObject<NetEventMain>(EID_WorkerToMainConnected);
+    auto* connected_failed_event = GetObject<NetEventMain>(EID_WorkerToMainConnectFailed);
     connected_failed_event->net_evt_.connect_failed_.net_err_code = err_code;
     connected_failed_event->net_evt_.connect_failed_.sys_err_code = err_no;
     master_->NotifyMain(connected_failed_event);
