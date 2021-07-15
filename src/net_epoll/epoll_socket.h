@@ -114,6 +114,10 @@ public:
     * @param len 发送数据长度
     */
     void Send(const char* data, size_t len);
+    /*
+    * 关闭套接字
+    */
+    void Close(ENetErrCode net_err, int32_t sys_err = 0);
 
 private:
     /*
@@ -128,10 +132,6 @@ private:
     * 处理客户端数据的情况
     */
     void UpdateRecv();
-    /*
-    * 关闭套接字
-    */
-    void Close(ENetErrCode net_err, int32_t sys_err = 0);
     /*
     * 套接字接收数据
     */

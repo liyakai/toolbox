@@ -67,7 +67,12 @@ uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port)
 }
 void TcpNetwork::OnClose(uint64_t connect_id)
 {
-
+    auto socket = sock_mgr_.GetEpollSocket((uint32_t)connect_id);
+    if(nullptr == socket)
+    {
+        return;
+    }
+    socket->Close(ENetErrCode::NET_NO_ERROR);
 }
 
 void TcpNetwork::OnSend(uint64_t connect_id, const char* data, uint32_t size)
