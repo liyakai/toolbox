@@ -75,7 +75,7 @@ void EpollSocket::UpdateAccept()
         new_socket->SetTcpNetwork(p_tcp_network_);
         InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port);
         // 通知主线程有新的客户端连接进来
-        p_tcp_network_->OnAccepted(new_socket->GetSocketID());
+        p_tcp_network_->OnAccepted(new_socket->GetConnID());
         p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
@@ -170,6 +170,7 @@ void EpollSocket::ProcessRecvData()
 void EpollSocket::UpdateConnect()
 {
     event_type_ |= SOCKET_EVENT_RECV;
+    p_tcp_network_->GetEpollCtrl().OperEvent(*this, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
     socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
     p_tcp_network_->OnConnected(GetConnID());
 }
