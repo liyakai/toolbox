@@ -70,18 +70,20 @@ void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, u
     NotifyWorker(event, type);
 }
 
-void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type)
+void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
 {
     auto* event = GetObject<NetEventWorker>(EID_MainToWorkerNewAccepter);
     event->SetIP(ip);
     event->SetPort(port);
+    event->SetBuffSize(send_buff_size, recv_buff_size);
     NotifyWorker(event,type);
 }
-void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type)
+void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
 {
     auto* event = GetObject<NetEventWorker>(EID_MainToWorkerNewConnecter);
     event->SetIP(ip);
     event->SetPort(port);
+    event->SetBuffSize(send_buff_size, recv_buff_size);
     NotifyWorker(event, type);
 }
 void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)

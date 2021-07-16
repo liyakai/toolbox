@@ -89,15 +89,19 @@ public:
     * @param ip 监听ip
     * @param port 监听端口
     * @param type 网络类型
+    * @param send_buff_size 发送缓冲区大小
+    * @param recv_buff_size 接收缓冲区大小
     */
-    void Accept(const std::string& ip, uint16_t port, NetworkType type);
+    void Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
     /*
     * 通知工作线程建立一个主动连接
     * @param ip 连接ip
     * @param port 连接端口
     * @param type 网络类型
+    * @param send_buff_size 发送缓冲区大小
+    * @param recv_buff_size 接收缓冲区大小
     */
-    void Connect(const std::string& ip, uint16_t port, NetworkType type);
+    void Connect(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
     /*
     * 主线程投递事件到工作线程
     * @param event 事件

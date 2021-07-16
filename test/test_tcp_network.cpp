@@ -52,8 +52,8 @@ public:
         {
             // echo 发来的信息
             // 换头后发送给 client
-            Print("收到 echo 数据长度为%d\n", size);
-            PrintData(data, 32);
+            // Print("收到 echo 数据长度为%d\n", size);
+            // PrintData(data, 32);
             uint64_t connect_id = 0;
             memmove(&connect_id, data + sizeof(uint32_t), sizeof(connect_id));
 
@@ -62,10 +62,11 @@ public:
             uint64_t client_conn_id = 0;
             memmove(send_data, &send_data_size, sizeof(uint32_t));  // buff len
             memmove(&client_conn_id, data + sizeof(uint32_t), sizeof(uint64_t));
-            memmove(send_data + sizeof(uint32_t), data + sizeof(uint32_t) + sizeof(uint64_t), size - sizeof(uint32_t) -  + sizeof(uint64_t)); // data
+            memmove(send_data + sizeof(uint32_t), data + sizeof(uint32_t) + sizeof(uint64_t), size - sizeof(uint32_t) - sizeof(uint64_t)); // data
 
             Print("转发给 client 的数据长度为%d,conn_id:%lu\n", send_data_size, client_conn_id);
             PrintData(data, 32);
+            Print("\n\n");
             Send(NT_TCP, client_conn_id, send_data, send_data_size);
             
             MemPoolMgr->GiveBack(send_data);
@@ -78,13 +79,12 @@ public:
 
             char* send_data = MemPoolMgr->GetMemory(size + sizeof(uint64_t));
             uint32_t send_data_size = size + sizeof(uint64_t);  
-            Print("send_data_size: %u\n", send_data_size);
             memmove(send_data, &send_data_size, sizeof(uint32_t));  // buff len
             memmove(send_data + sizeof(uint32_t), &conn_id, sizeof(uint64_t));  // conn_id
             memmove(send_data + sizeof(uint32_t) + sizeof(uint64_t), data + sizeof(uint32_t), size - sizeof(uint32_t)); // data
 
-            Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
-            PrintData(send_data, 32);
+            // Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
+            // PrintData(send_data, 32);
 
             Send(NT_TCP, echo_conn_id_, send_data, send_data_size);
 
@@ -107,7 +107,7 @@ CASE(test_tcp_echo)
     return;
     fprintf(stderr,"网络库测试用例: test_tcp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, NT_TCP);
+    Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, NT_TCP, 2*1024*1024, 2*1024*1024);
     Singleton<TestNetworkEcho>::Instance()->Start();
     bool run = true;
     std::thread t([&](){
@@ -144,11 +144,11 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    return;
+    // return;
     fprintf(stderr,"网络库测试用例: test_tcp_forward \n");
     Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
     Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, NT_TCP);
-    Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, NT_TCP);
+    Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, NT_TCP, 2*1024*1024, 2*1024*1024);
     Singleton<TestNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&](){

@@ -66,11 +66,11 @@ protected:
     /*
     * 主线程通知,工作线程内建立监听器
     */
-    virtual uint64_t OnNewAccepter(const std::string &ip, const uint16_t port) = 0;
+    virtual uint64_t OnNewAccepter(const std::string &ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
     /*
     * 主线程通知,工作线程内建立连接器
     */
-    virtual uint64_t OnNewConnecter(const std::string &ip, const uint16_t port) = 0;
+    virtual uint64_t OnNewConnecter(const std::string &ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
     /*
     * 主线程通知,关工作线程内闭网络连接
     */

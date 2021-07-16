@@ -26,7 +26,12 @@ public:
     */
     ~RingBuffer()
     {
-        delete[] buffer_;
+        if(nullptr != buffer_)
+        {
+            delete[] buffer_;
+            buffer_ = nullptr;
+        }
+        
     }
 
     /*

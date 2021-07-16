@@ -5,10 +5,10 @@ constexpr size_t MAX_SOCKET_COUNT           =   40000;
 constexpr size_t MAXEVENTS                  =   8192; /* epoll_create参数 */
 constexpr size_t EPOLL_WAIT_MSECONDS        =   2;
 constexpr size_t INVALID_CONN_ID	 	    =   UINT32_MAX;
-constexpr size_t DEFAULT_RING_BUFF_SIZE     =   1*1024*1024;   /* 1MB */
-constexpr size_t MAX_RING_BUFF_SIZE         =   4*1024*1024;   /* 4MB */
+constexpr size_t DEFAULT_TCP_BUFFER_SIZE    =   256 * 1024;        /* 256 k */
+constexpr size_t DEFAULT_RING_BUFF_SIZE     =   256 * 1024;        /* 256 k */
+constexpr size_t MAX_RING_BUFF_SIZE_FACTOR  =   4; 
 constexpr size_t DEFAULT_BACKLOG_SIZE       =   256;    
-constexpr size_t RECV_BUFFER_MAX_SIZE       =   1024 * 256;
 
 /*
 * 错误码

@@ -61,6 +61,21 @@ uint16_t NetEventWorker::GetPort() const
 {
     return net_req_.address_.port_;
 }
+void NetEventWorker::SetBuffSize(int32_t send_size, int32_t recv_size)
+{
+    net_req_.address_.send_buff_size = send_size;
+    net_req_.address_.recv_buff_size = recv_size;
+}
+
+int32_t NetEventWorker::GetSendBuffSize()
+{
+    return net_req_.address_.send_buff_size;
+}
+
+int32_t NetEventWorker::GetRecvBuffSize()
+{
+    return net_req_.address_.recv_buff_size;
+}
 
 void NetEventWorker::SetConnectID(const uint64_t conn_id)
 {

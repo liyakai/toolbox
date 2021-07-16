@@ -79,6 +79,18 @@ public:
     */
     uint16_t GetPort() const;
     /*
+    * 设置 buff 大小
+    */
+    void SetBuffSize(int32_t send_size, int32_t recv_size);
+    /*
+    * 获取发送 buff 大小
+    */
+    int32_t GetSendBuffSize();
+    /*
+    * 获取 接收 buff 大小
+    */
+    int32_t GetRecvBuffSize();
+    /*
     * 设置 连接ID
     */
     void SetConnectID(const uint64_t conn_id);
@@ -107,12 +119,14 @@ private:
         {
             uint64_t connect_id_;
             char* data_;
-            uint32_t size_;
+            int32_t size_;
         } stream_;
         struct Address
         {
             std::string* ip_;
             uint16_t port_;
+            int32_t send_buff_size;
+            int32_t recv_buff_size;
         } address_;
         NetReq(){}
         ~NetReq(){};

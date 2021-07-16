@@ -24,7 +24,7 @@ public:
     /*
     * 初始化
     */
-    bool Init(SocketType type, uint32_t send_buff_len, uint32_t recv_buff_len);
+    bool Init(int32_t send_buff_len, int32_t recv_buff_len);
     /*
     * 逆初始化
     */
@@ -100,14 +100,14 @@ public:
     * @param port 监听端口
     * @retval 初始化是否成功
     */
-    bool InitNewAccepter(const std::string& ip, const uint16_t port);
+    bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
     /*
     * 初始化新的连接器
     * @param ip 连接IP
     * @param port 连接端口
     * @retval 初始化是否成功
     */
-    bool InitNewConnecter(const std::string &ip, uint16_t port);
+    bool InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
     /*
     * 发送数据
     * @param data 发送数据指针
@@ -127,7 +127,7 @@ private:
     /*
     *  初始化从accpet函数接收得来的socket
     */
-    void InitAccpetSocket(EpollSocket* socket, int socket_fd, std::string ip, uint16_t port);
+    void InitAccpetSocket(EpollSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
     /*
     * 处理客户端数据的情况
     */
@@ -135,7 +135,7 @@ private:
     /*
     * 套接字接收数据
     */
-    int32_t SocketRecv(int socket_fd, char* data, size_t size);
+    int32_t SocketRecv(int32_t socket_fd, char* data, size_t size);
     /*
     * 处理接收到的数据
     */
@@ -151,7 +151,7 @@ private:
     /*
     * 套接字发送数据
     */
-    int32_t SocketSend(int socket_fd, const char* data, size_t size);
+    int32_t SocketSend(int32_t socket_fd, const char* data, size_t size);
     /*
     * 处理错误事件
     */
@@ -163,27 +163,31 @@ private:
     /*
     * 设置 非阻塞
     */
-    int SetNonBlocking(int fd);
+    int32_t SetNonBlocking(int32_t fd);
     /*
     * 关闭 keep alive
     */
-    int SetKeepaliveOff(int fd);
+    int32_t SetKeepaliveOff(int32_t fd);
     /*
     * 关闭延迟发送
     */
-    int SetNagleOff(int fd);
+    int32_t SetNagleOff(int32_t fd);
     /*
     * 关闭 TIME_WAIT
     */
-    int SetLingerOff(int fd);
+    int32_t SetLingerOff(int32_t fd);
     /*
     * 让端口释放后立即就可以被再此使用
     */
-    int SetReuseAddrOn(int fd);
+    int32_t SetReuseAddrOn(int32_t fd);
     /*
     * 设置 TCP_DEFER_ACCEPT 
     */
-    int SetDeferAccept(int fd);
+    int32_t SetDeferAccept(int32_t fd);
+    /*
+    * 设置 TCP buffer 的大小
+    */
+    int32_t SetTcpBuffSize(int32_t fd); 
 
 private:
     uint32_t conn_id_ = INVALID_CONN_ID;
@@ -196,9 +200,10 @@ private:
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
     int32_t event_type_ = SOCKET_EVENT_INVALID; // 可投递事件类型
-    int recv_buff_len_ = 0;     // 接收buff大小
-    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
+    int32_t send_buff_len_ = 0;     // 接收缓冲区大小
+    int32_t recv_buff_len_ = 0;     // 接收buff大小
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;
+    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
     time_t last_recv_ts_ = 0;   // 最后一次读到数据的时间戳
     bool is_ctrl_add_ = false; // 是否已经执行过 EPOLL_CTL_ADD
 };

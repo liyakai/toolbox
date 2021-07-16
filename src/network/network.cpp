@@ -89,7 +89,7 @@ void INetwork::OnMainToWorkerNewAccepter_(Event* event)
     {
         return;
     }
-    auto conn_id = OnNewAccepter(accepter_event->GetIP(), accepter_event->GetPort());
+    auto conn_id = OnNewAccepter(accepter_event->GetIP(), accepter_event->GetPort(), accepter_event->GetSendBuffSize(), accepter_event->GetRecvBuffSize());
     auto bind_tcp = GetObject<NetEventMain>(EID_WorkerToMainBinded);
     bind_tcp->net_evt_.bind_.connect_id_ = conn_id;
     master_->NotifyMain(bind_tcp);
@@ -102,7 +102,7 @@ void INetwork::OnMainToWorkerNewConnecter_(Event* event)
     {
         return;
     }
-    OnNewConnecter(connecter_tcp->GetIP(), connecter_tcp->GetPort());
+    OnNewConnecter(connecter_tcp->GetIP(), connecter_tcp->GetPort(), connecter_tcp->GetSendBuffSize(), connecter_tcp->GetRecvBuffSize());
 }
 
 void INetwork::OnMainToWorkerClose_(Event* event)
