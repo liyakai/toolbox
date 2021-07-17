@@ -62,7 +62,7 @@ public:
     */
     size_t ContinuouslyWriteableSize()
     {
-        return read_pos_ >= write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : buffer_size_ - write_pos_ - 1;
+        return read_pos_ >= write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : std::min(WriteableSize(), buffer_size_ - write_pos_);
     }
     /*
     * 调整写位置
@@ -83,7 +83,7 @@ public:
     */
     size_t ContinuouslyReadableSize()
     {
-        return write_pos_ >= read_pos_ ? write_pos_ - read_pos_ : buffer_size_ - read_pos_ - 1;
+        return write_pos_ >= read_pos_ ? write_pos_ - read_pos_ : std::min(ReadableSize(), buffer_size_ - read_pos_);
     }
     /*
     * 获取可读位置指针
@@ -249,15 +249,17 @@ public:
     /*
     * 测试打印
     */
-    void DebugPrint()
+    void DebugPrint(bool force = false, bool detail = true)
     {
-        if(!GetDebugStatus())
+        bool old_debug_status = GetDebugStatus();
+        if(false == force && false == old_debug_status)
         {
             return;
         }
+        SetDebugPrint(true);
         Print("\n ========== RingBuffer ========== \n");
         Print("缓冲区大小:%zu,读位置:%zu,写位置:%zu,警戒值:%f\n", buffer_size_, read_pos_, write_pos_, ratio_);
-        for(size_t i = 0; i < buffer_size_; i++)
+        for(size_t i = 0; true == detail && i < buffer_size_; i++)
         {
             // if(0 != i && 0 == (i % 10))
             // {
@@ -266,6 +268,7 @@ public:
             Print("0x%02X ",buffer_[i]);
         }
         Print("\n ---------- RingBuffer ---------- \n");
+        SetDebugPrint(old_debug_status);
     }
 private:
     /*

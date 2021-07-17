@@ -84,7 +84,7 @@ void EpollSocketPool::Free(EpollSocket* socket)
     {
         return;
     }
-    uint16_t index = GetLoWord(socket->GetSocketID());
+    uint16_t index = GetLoWord(socket->GetConnID());
     socket_vector_[index] = nullptr;
     free_slot_list_.emplace_back(index);
     socket->Reset();

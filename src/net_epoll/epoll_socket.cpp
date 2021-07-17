@@ -122,8 +122,10 @@ void EpollSocket::UpdateRecv()
         }
         else
         {
-            fprintf(stderr, "接收数据size:%d\n", bytes);
+            // fprintf(stderr, "接收数据size:%d,buff连续可写的空间:%zu\n", bytes, size);
             recv_ring_buffer_.AdjustWritePos(bytes);
+            // fprintf(stderr, "接收数据size:%d,buff连续可写的空间:%zu\n", bytes, recv_ring_buffer_.ContinuouslyWriteableSize());
+            // recv_ring_buffer_.DebugPrint(true,false);
         }
         ProcessRecvData();
     }
@@ -169,7 +171,8 @@ void EpollSocket::ProcessRecvData()
     }
     char *buff_block = MemPoolMgr->GetMemory(len);
     recv_ring_buffer_.Read(buff_block, len);
-    fprintf(stderr, "处理数据size:%d\n", len);
+    // fprintf(stderr, "处理数据size:%d\n", len);
+    // recv_ring_buffer_.DebugPrint(true,false);
     p_tcp_network_->OnReceived(GetConnID(), buff_block, len);
 }
 
@@ -186,7 +189,6 @@ void EpollSocket::UpdateSend()
     while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
     {
         int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
-        fprintf(stderr, "发送数据size:%d\n", bytes);
         if (bytes < 0)
         {
             // 发送失败
@@ -218,6 +220,7 @@ int32_t EpollSocket::SocketSend(int32_t socket_fd, const char *data, size_t size
     {
         return -1;
     }
+    // fprintf(stderr, "发送数据size:%d\n", send_bytes);
     return send_bytes;
 }
 
@@ -389,8 +392,10 @@ void EpollSocket::Send(const char* data, size_t len)
         if(write_size < len || send_ring_buffer_.GetBufferSize() > MAX_RING_BUFF_SIZE_FACTOR * send_buff_len_)
         {
             Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);
+            return;
         }
         send_ring_buffer_.Write(data, len);
+        UpdateSend();
         return;
     }
 
@@ -451,14 +456,14 @@ int32_t EpollSocket::SetTcpBuffSize(int32_t fd)
 {
     if(send_buff_len_ > static_cast<int32_t>(DEFAULT_TCP_BUFFER_SIZE))
     {
-        fprintf(stderr, "设定 send buffer");
+        // fprintf(stderr, "设定 send buffer");
         int32_t snd_size = DEFAULT_TCP_BUFFER_SIZE;
         socklen_t optlen = sizeof(snd_size);
         setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (char*)&snd_size, optlen);
     }
     if(recv_buff_len_ > static_cast<int32_t>(DEFAULT_TCP_BUFFER_SIZE))
     {
-        fprintf(stderr, "设定 recv buffer");
+        // fprintf(stderr, "设定 recv buffer");
         int32_t rcv_size = DEFAULT_TCP_BUFFER_SIZE;
         socklen_t optlen = sizeof(rcv_size);
         setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char*)&rcv_size, optlen);
