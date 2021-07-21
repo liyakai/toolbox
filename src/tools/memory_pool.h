@@ -30,7 +30,7 @@ public:
     /*
     * 归还内存块
     */
-    void GiveBack(char* pointer);
+    void GiveBack(char* pointer, std::string debug_tag = "");
     /*
     * 剩余内存块个数
     */
@@ -65,7 +65,7 @@ public:
     * 归还内存
     * @param 归还内存的指针
     */
-    void GiveBack(char* pointer);
+    void GiveBack(char* pointer, std::string debug_tag = "");
 	/*
 	* 调试打印
 	*/

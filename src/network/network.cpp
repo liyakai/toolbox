@@ -19,10 +19,11 @@ INetwork::~INetwork()
         NetEventWorker* event;
         if(event2worker_.Read<NetEventWorker*>(event))
         {
-            MemPoolMgr->GiveBack((char*)event);
+            GiveBackObject(event);
         }
         
     }
+    event2worker_.Clear();
 }
 
 void INetwork::Init(NetworkMaster* master)
@@ -66,10 +67,21 @@ void INetwork::OnConnectedFailed(ENetErrCode err_code, int32_t err_no)
     master_->NotifyMain(connected_failed_event);
 }
 
-void INetwork::OnClosed(uint64_t connect_id, int32_t net_err, int32_t sys_err)
+void INetwork::OnErrored(uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
+{
+    auto* errored_event = GetObject<NetEventMain>(EID_WorkerToMainErrored);
+    errored_event->net_evt_.error_.connect_id_ = connect_id;
+    errored_event->net_evt_.error_.net_err_code = err_code;
+    errored_event->net_evt_.error_.sys_err_code = err_no;
+    master_->NotifyMain(errored_event);
+}
+
+void INetwork::OnClosed(uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
 {
     auto* close_event = GetObject<NetEventMain>(EID_WorkerToMainClose);
-    close_event->net_evt_.error_.connect_id_ = connect_id;
+    close_event->net_evt_.close_.connect_id_ = connect_id;
+    close_event->net_evt_.close_.net_err_ = err_code;
+    close_event->net_evt_.close_.sys_err_ = err_no;
     master_->NotifyMain(close_event);
 }
 

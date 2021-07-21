@@ -22,6 +22,7 @@ enum class ENetErrCode
     NET_RECV_BUFF_OVERFLOW,   // 接收缓冲区满
     NET_ENCODE_BUFF_OVERFLOW, // 打包缓冲区满
     NET_DECODE_BUFF_OVERFLOW, // 解包缓冲区满
+    NET_INVALID_SOCKET,       // socket 无效
 
     NET_SEND_PIPE_OVERFLOW, // 发送ringbuffer满
     NET_RECV_PIPE_OVERFLOW, // 接收ringbuffer满
@@ -94,9 +95,13 @@ public:
     */
     void OnConnectedFailed(ENetErrCode err_code, int32_t err_no);
     /*
+    * 工作线程内产生错误,通知主线程
+    */
+    void OnErrored(uint64_t connect_id, ENetErrCode err_code, int32_t err_no);
+    /*
     * 工作线程内关闭网络连接,通知主线程
     */
-    void OnClosed(uint64_t connect_id, int32_t net_err, int32_t sys_err);
+    void OnClosed(uint64_t connect_id, ENetErrCode err_code, int32_t err_no);
     /*
     * 工作线程内接收到数据,通知主线程
     */

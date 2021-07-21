@@ -45,7 +45,7 @@ public:
     /*
     * 判断是否需要扩容
     */
-    bool NeedEnlage(size_t new_len)
+    bool NeedEnlage(size_t new_len = 0)
     {
         auto ratio = (double)(buffer_size_ - WriteableSize()) / (double)buffer_size_;
         return ratio > ratio_ || WriteableSize() < new_len;
@@ -62,6 +62,13 @@ public:
     */
     size_t ContinuouslyWriteableSize()
     {
+        while(NeedEnlage())
+        {
+            if(!Enlage())
+            {
+                return 0;
+            }
+        }
         return read_pos_ >= write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : std::min(WriteableSize(), buffer_size_ - write_pos_);
     }
     /*

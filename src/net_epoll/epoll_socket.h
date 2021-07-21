@@ -139,7 +139,7 @@ private:
     /*
     * 处理接收到的数据
     */
-    void ProcessRecvData();
+    bool ProcessRecvData(uint32_t &len);
     /*
     * 处理主动链接
     */

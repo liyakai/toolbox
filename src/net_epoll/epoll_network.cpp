@@ -37,6 +37,7 @@ uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, i
     EpollSocket* new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
     {
+        OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
@@ -53,6 +54,7 @@ uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, 
     EpollSocket* new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
     {
+        OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);

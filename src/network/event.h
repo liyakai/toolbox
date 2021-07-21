@@ -17,6 +17,7 @@ enum EventID
     EID_WorkerToMainBindFailed,
     EID_WorkerToMainConnected,
     EID_WorkerToMainConnectFailed,
+    EID_WorkerToMainErrored,
     EID_WorkerToMainAccepted,
     EID_WorkerToMainClose,
     EID_WorkerToMainRecv,

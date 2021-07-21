@@ -45,7 +45,7 @@ void NetworkMaster::StopWait()
         NetEventWorker* event;
         if(event2main_.Read<NetEventWorker*>(event))
         {
-            MemPoolMgr->GiveBack((char*)event);
+            MemPoolMgr->GiveBack((char*)event, "NetworkMaster::StopWait");
         }
     }
     for(auto& network : networks_)
@@ -56,7 +56,7 @@ void NetworkMaster::StopWait()
 }
 void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
 {
-    auto* event = new NetEventWorker(EID_MainToWorkerClose);
+    auto* event = GetObject<NetEventWorker>(EID_MainToWorkerClose);
     event->SetConnectID(conn_id);
     NotifyWorker(event,type);
 }
@@ -64,7 +64,7 @@ void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, u
 {
     auto* data_to_worker = MemPoolMgr->GetMemory(size);
     memmove(data_to_worker, data, size);
-    auto* event = new NetEventWorker(EID_MainToWorkerSend);
+    auto* event = GetObject<NetEventWorker>(EID_MainToWorkerSend);
     event->SetConnectID(conn_id);
     event->SetData(data_to_worker, size);
     NotifyWorker(event, type);
@@ -130,15 +130,20 @@ void NetworkMaster::DispatchMainEvent_()
             OnConnectedFailed(event->net_evt_.connect_failed_.net_err_code,
                               event->net_evt_.connect_failed_.sys_err_code);
             break;
+        case EID_WorkerToMainErrored:
+            OnErrored(event->net_evt_.error_.connect_id_,
+                      event->net_evt_.error_.net_err_code,
+                      event->net_evt_.error_.sys_err_code);
+            break;
         case EID_WorkerToMainRecv:
             OnReceived(event->net_evt_.recv_.connect_id_,
                        event->net_evt_.recv_.data_,
                        event->net_evt_.recv_.size_);
-            MemPoolMgr->GiveBack((char*)event->net_evt_.recv_.data_);
             break;
         default:
             break;
         }
+        GiveBackObject(event);
     }
 }
 

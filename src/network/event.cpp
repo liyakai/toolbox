@@ -29,7 +29,7 @@ NetEventWorker::~NetEventWorker()
     switch(GetID())
     {
         case EID_MainToWorkerSend:
-            MemPoolMgr->GiveBack(net_req_.stream_.data_);
+            MemPoolMgr->GiveBack(net_req_.stream_.data_, "NetEventWorker::~NetEventWorker");
             break;
         default:
             break;
@@ -88,7 +88,7 @@ uint64_t NetEventWorker::GetConnectID() const
 
 void NetEventWorker::SetData(const char* data, uint32_t size)
 {
-    net_req_.stream_.data_ = MemPoolMgr->GetMemory(size);
+    net_req_.stream_.data_ = const_cast<char*>(data);
     net_req_.stream_.size_ = size;
     memmove(net_req_.stream_.data_, data, size);
 }
@@ -116,7 +116,7 @@ NetEventMain::~NetEventMain()
     switch(GetID())
     {
         case EID_WorkerToMainRecv:
-            MemPoolMgr->GiveBack((char*)net_evt_.recv_.data_);
+            MemPoolMgr->GiveBack((char*)net_evt_.recv_.data_, "NetEventMain::~NetEventMain");
             break;
         default:
             break;

@@ -47,7 +47,7 @@ char* Chunk::GetMemory()
     return nullptr;
 }
 
-void Chunk::GiveBack(char* pointer)
+void Chunk::GiveBack(char* pointer, std::string debug_tag)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     mem_list_.push_back(pointer);
@@ -80,7 +80,7 @@ int32_t MemoryPool::RebuildNum(int32_t num)
 
 char* MemoryPool::GetMemory(std::size_t size)
 {
-    size = RebuildNum(size + 4);
+    size = RebuildNum(size + sizeof(std::uint32_t));
 #if !ENABLE_MEMORY_POOL
     return new char[size];
 #endif // !ENABLE_MEMORY_POOL
@@ -98,7 +98,7 @@ char* MemoryPool::GetMemory(std::size_t size)
     return reinterpret_cast<char*>(p) + sizeof(std::uint32_t);
 }
 
-void MemoryPool::GiveBack(char* pointer)
+void MemoryPool::GiveBack(char* pointer, std::string debug_tag)
 {
 #if !ENABLE_MEMORY_POOL
     delete pointer;
@@ -114,7 +114,7 @@ void MemoryPool::GiveBack(char* pointer)
         delete (pointer - sizeof(std::uint32_t));
         return;
     }
-    return pool_[index].GiveBack(pointer - sizeof(std::uint32_t));
+    return pool_[index].GiveBack(pointer - sizeof(std::uint32_t), debug_tag);
 }
 
 void MemoryPool::DebugPrint()
