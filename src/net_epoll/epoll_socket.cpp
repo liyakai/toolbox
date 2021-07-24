@@ -117,12 +117,13 @@ void EpollSocket::UpdateRecv()
         {
             recv_ring_buffer_.AdjustWritePos(bytes);
         }
-        uint32_t len = 0;
-        while(ProcessRecvData(len))
+        ErrCode process_result;
+        while(ErrCode::ERR_SUCCESS == (process_result = ProcessRecvData()))
         {}
-        if (len > static_cast<uint32_t>(recv_buff_len_))
+        if (ErrCode::ERR_INVALID_PACKET_SIZE == process_result)
         {
             Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
+            return;
         }
         
 
@@ -160,23 +161,28 @@ int32_t EpollSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
     }
 }
 
-bool EpollSocket::ProcessRecvData(uint32_t &len)
+ErrCode EpollSocket::ProcessRecvData()
 {
     auto data_size = recv_ring_buffer_.ReadableSize();
     // 这里暂时采用 len|buff 的方式[len包含len自身的长度]分割数据.可重构为传入解包方法
     if (data_size < sizeof(uint32_t))
     {
-        return false;
+        return ErrCode::ERR_INSUFFICIENT_LENGTH;
     }
+    uint32_t len = 0;
     recv_ring_buffer_.Copy((char *)&len, sizeof(size_t));
-    if (data_size < len)
+    if (len > static_cast<uint32_t>(recv_buff_len_))
     {
-        return false;
+        DebugPrint::PrintfData(recv_ring_buffer_.GetReadPtr(),32);
+        return ErrCode::ERR_INVALID_PACKET_SIZE;
+    } else if (data_size < len)
+    {
+        return ErrCode::ERR_INSUFFICIENT_LENGTH;
     }
     char *buff_block = MemPoolMgr->GetMemory(len);
     recv_ring_buffer_.Read(buff_block, len);
     p_tcp_network_->OnReceived(GetConnID(), buff_block, len);
-    return true;
+    return ErrCode::ERR_SUCCESS;
 }
 
 void EpollSocket::UpdateConnect()
@@ -394,6 +400,20 @@ void EpollSocket::Send(const char* data, size_t len)
     {
         return;
     }
+    if(1412 != len && 1 == GetConnID())
+    {
+        fprintf(stderr,"1412 != len:%zu conn_id:%u\n", len, GetConnID());
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
+    }
+    uint32_t send_data_size = 0;  
+    memmove(&send_data_size, data,  sizeof(uint32_t));  // buff len
+    if(1412 != send_data_size && 1 == GetConnID())
+    {
+        fprintf(stderr,"1412 != send_data_size:%u conn_id:%u\n", send_data_size, GetConnID());
+        DebugPrint::PrintfData(data,32);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
+    }
+
 
     if(false == send_ring_buffer_.Empty())
     {

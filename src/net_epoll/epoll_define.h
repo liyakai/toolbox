@@ -18,6 +18,8 @@ enum class ErrCode
     ERR_SUCCESS = 0,
     ERR_MALLOC_FAILED, // 分配内存失败
     ERR_PARAM_NULLPTR, // 参数为空指针
+    ERR_INSUFFICIENT_LENGTH,    // 长度不足
+    ERR_INVALID_PACKET_SIZE,    // 包长度非法
 
 };
 

@@ -43,9 +43,10 @@ void NetworkMaster::StopWait()
     while (!event2main_.Empty())
     {
         NetEventWorker* event;
-        if(event2main_.Read<NetEventWorker*>(event))
+        if(event2main_.Read<NetEventWorker*>(event)
+        && nullptr != event)
         {
-            MemPoolMgr->GiveBack((char*)event, "NetworkMaster::StopWait");
+            GiveBackObject(event);
         }
     }
     for(auto& network : networks_)
@@ -62,11 +63,29 @@ void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
 }
 void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size) 
 {
+    uint32_t send_data_size = 0;  
+    memmove(&send_data_size, data,  sizeof(uint32_t));  // buff len
+    if(1412 != send_data_size && 1 == conn_id)
+    {
+        fprintf(stderr,"NetworkMaster::Send 1412 != send_data_size:%u conn_id:%lu\n", send_data_size, conn_id);
+        DebugPrint::PrintfData(data,32);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
+    }
+
     auto* data_to_worker = MemPoolMgr->GetMemory(size);
     memmove(data_to_worker, data, size);
     auto* event = GetObject<NetEventWorker>(EID_MainToWorkerSend);
     event->SetConnectID(conn_id);
     event->SetData(data_to_worker, size);
+
+    memmove(&send_data_size, data_to_worker,  sizeof(uint32_t));  // buff len
+    if(1412 != send_data_size && 1 == conn_id)
+    {
+        fprintf(stderr,"NetworkMaster::Send data_to_worker 1412 != send_data_size:%u conn_id:%lu\n", send_data_size, conn_id);
+        DebugPrint::PrintfData(data,32);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
+    }
+
     NotifyWorker(event, type);
 }
 
@@ -107,8 +126,10 @@ void NetworkMaster::DispatchMainEvent_()
     while(!event2main_.Empty())
     {
         NetEventMain* event;
-        if(!event2main_.Read<NetEventMain*>(event))
+        if(!event2main_.Read<NetEventMain*>(event)
+        || nullptr == event)
         {
+            OnErrored(0, ENetErrCode::NET_INVALID_SOCKET, 0);
             continue;
         }
         switch (event->GetID())

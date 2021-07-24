@@ -142,10 +142,15 @@ void INetwork::HandleEvents_()
     while(!event2worker_.Empty())
     {
         NetEventWorker* event = nullptr;
-        if(event2worker_.Read<NetEventWorker*>(event))
+        if(true == event2worker_.Read<NetEventWorker*>(event) 
+        && nullptr != event)
         {
             HandleEvent(event);
             GiveBackObject(event);
+        } 
+        else
+        {
+            OnErrored(0, ENetErrCode::NET_INVALID_SOCKET, 0);
         }
     }
 }

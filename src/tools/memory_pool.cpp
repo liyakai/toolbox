@@ -17,6 +17,7 @@ Chunk::~Chunk()
 
 bool Chunk::SetChunkSize(std::size_t size)
 {
+    SetDebugPrint(false);
     if (0 == chunk_size_)
     {
         chunk_size_ = size;
@@ -38,11 +39,15 @@ char* Chunk::GetMemory()
         }
         auto pointer = mem_list_.front();
         mem_list_.pop_front();
+        // debug_free_set_.erase(pointer);     // debug code
+        // debug_used_set_.insert(pointer);    // debug code
+        // DebugPrint("Chunk::GetMemory");     // debug code
         return pointer;
     } while (true);
     if (is_empry)
-    {
-        return new char[chunk_size_];
+    {   char* new_char = new char[chunk_size_];
+        // debug_used_set_.insert(new_char);   // debug code
+        return new_char;
     }
     return nullptr;
 }
@@ -50,12 +55,37 @@ char* Chunk::GetMemory()
 void Chunk::GiveBack(char* pointer, std::string debug_tag)
 {
     std::lock_guard<std::mutex> lock(mutex_);
+    // // debug code
+    // auto iter_free = debug_free_set_.find(pointer);
+    // if(iter_free != debug_free_set_.end())
+    // {
+    //     Print("[内存池.Chunk] 归还的内存块已经在free内存中,目前在重复归还!point:%p %s\n", pointer, debug_tag.c_str());
+        
+    //     return;
+    // }
+    // auto iter_used = debug_used_set_.find(pointer);
+    // if(iter_used == debug_used_set_.end())
+    // {
+    //     Print("[内存池.Chunk] 归还的内存块不在used内存中!point:%p %s\n", pointer, debug_tag.c_str());
+    //     return;
+    // }
+    // debug_free_set_.insert(pointer);
+    // debug_used_set_.erase(pointer);
+    // // end of debug code
+
     mem_list_.push_back(pointer);
+
+    // DebugPrint("Chunk::GiveBack");  // debug code
 }
 
 std::size_t Chunk::Size()
 {
     return mem_list_.size();
+}
+
+void Chunk::DebugPrint(std::string debug_tag)
+{
+    // Print("[内存池.Chunk] debug_tag: %s 内存池目前的容量为:%zu debug_free_set_ size:%zu debug_used_set_ size:%zu \n", debug_tag.c_str(), Size(), debug_free_set_.size(), debug_used_set_.size());
 }
 
 MemoryPool::MemoryPool()

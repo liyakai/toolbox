@@ -139,7 +139,7 @@ private:
     /*
     * 处理接收到的数据
     */
-    bool ProcessRecvData(uint32_t &len);
+    ErrCode ProcessRecvData();
     /*
     * 处理主动链接
     */
@@ -201,7 +201,7 @@ private:
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
     int32_t event_type_ = SOCKET_EVENT_INVALID; // 可投递事件类型
     int32_t send_buff_len_ = 0;     // 接收缓冲区大小
-    int32_t recv_buff_len_ = 0;     // 接收buff大小
+    int32_t recv_buff_len_ = 0;     // 接收缓冲区大小
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
     time_t last_recv_ts_ = 0;   // 最后一次读到数据的时间戳
