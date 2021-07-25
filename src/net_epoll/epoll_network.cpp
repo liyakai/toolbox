@@ -34,7 +34,7 @@ void TcpNetwork::Update()
 
 uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
-    EpollSocket* new_socket = sock_mgr_.Alloc();
+    auto new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
     {
         OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
@@ -51,7 +51,7 @@ uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, i
 }
 uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
-    EpollSocket* new_socket = sock_mgr_.Alloc();
+    auto new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
     {
         OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
@@ -78,7 +78,7 @@ void TcpNetwork::OnClose(uint64_t connect_id)
 
 void TcpNetwork::OnSend(uint64_t connect_id, const char* data, uint32_t size)
 {
-    EpollSocket* socket = sock_mgr_.GetEpollSocket(connect_id);
+    auto socket = sock_mgr_.GetEpollSocket(connect_id);
     if(nullptr == socket)
     {
         return;

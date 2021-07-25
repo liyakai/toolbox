@@ -36,10 +36,6 @@ public:
     */
     ~ObjectPool()
     {
-        for(auto mem : using_memory_)
-        {
-            delete[] mem;
-        }
         free_objects_.clear();
         using_memory_.clear();
     }
@@ -102,17 +98,17 @@ private:
     */
     void Expand()
     {
-        auto* memory = new char[Count * sizeof(ObjectType)];
+        std::unique_ptr<char> memory = std::unique_ptr<char>(new char[Count * sizeof(ObjectType)]);
         for(auto i = 0; i < Count; i++)
         {
-            free_objects_.push_back(reinterpret_cast<ObjectType*>(memory + i * sizeof(ObjectType)));
+            free_objects_.emplace_back(reinterpret_cast<ObjectType*>(memory.get() + i * sizeof(ObjectType)));
         }
-        using_memory_.push_back(memory);
+        using_memory_.emplace_back(std::move(memory));
     }
     
 private:
     using FreeObjects = std::list<ObjectType*>;
-    using UsingMemory = std::list<char*>;
+    using UsingMemory = std::list<std::unique_ptr<char>>;
     FreeObjects free_objects_;  // 可用对象
     UsingMemory using_memory_;  // 正在使用的内存
     std::atomic<size_t> allocated_count_;   // 已分配对象的数量
