@@ -19,7 +19,7 @@ INetwork::~INetwork()
         NetEventWorker* event;
         if(event2worker_.Read<NetEventWorker*>(event))
         {
-            GiveBackObject(event);
+            GiveBackObject(event, "INetwork::~INetwork");
         }
         
     }
@@ -146,7 +146,7 @@ void INetwork::HandleEvents_()
         && nullptr != event)
         {
             HandleEvent(event);
-            GiveBackObject(event);
+            GiveBackObject(event, "INetwork::HandleEvents_");
         } 
         else
         {

@@ -3,8 +3,12 @@
 #include <atomic>
 #include <mutex>
 #include <cstdlib>
+#include <algorithm>
 #include "src/tools/singleton.h"
 #include "debug_print.h"
+
+#define ENABLE_DEBUG_OBJECT_POOL 1
+
 /*
 * 定义对象池
 */
@@ -22,6 +26,9 @@ public:
     ObjectPool()
     : allocated_count_(0)
     {
+#if ENABLE_DEBUG_OBJECT_POOL
+        SetDebugPrint(true);
+#endif // ENABLE_DEBUG_OBJECT_POOL
         Expand();
     };
     /*
@@ -59,11 +66,20 @@ public:
     /*
     * 回收对象
     */
-   void GiveBack(ObjectType* object)
+   void GiveBack(ObjectType* object, std::string debug_tag = "")
    {
        allocated_count_.fetch_sub(1);
        object->~ObjectType();
        std::lock_guard<std::mutex> lock(lock_);
+#if ENABLE_DEBUG_OBJECT_POOL
+       auto iter = find(free_objects_.begin(), free_objects_.end(), object);
+       if(iter != free_objects_.end())
+       {
+           Print("[对象池] debug_tag:%s 重复回收对象:%p\n", debug_tag.c_str(), object);
+           std::this_thread::sleep_for(std::chrono::milliseconds(1000*1000));
+           return;
+       }
+#endif // ENABLE_DEBUG_OBJECT_POOL
        free_objects_.push_back(object);
    }
 
@@ -127,8 +143,8 @@ static ObjectType* GetObject(Args...args)
 * 归还对象
 */
 template<typename ObjectType>
-static void GiveBackObject(ObjectType* object)
+static void GiveBackObject(ObjectType* object, std::string debug_tag = "")
 {
-    GetObjectPoolMgrRef<ObjectType>().GiveBack(object);
+    GetObjectPoolMgrRef<ObjectType>().GiveBack(object, debug_tag);
 }
 

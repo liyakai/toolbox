@@ -128,7 +128,7 @@ void EpollSocket::UpdateRecv()
         
 
         size_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
-        if (cur_buffer_size > MAX_RING_BUFF_SIZE_FACTOR * recv_buff_len_)
+        if (cur_buffer_size > static_cast<size_t>(recv_buff_len_))
         {
             // 读缓冲区超过最大限制, error
             Close(ENetErrCode::NET_RECV_BUFF_OVERFLOW);
@@ -409,7 +409,7 @@ void EpollSocket::Send(const char* data, size_t len)
     memmove(&send_data_size, data,  sizeof(uint32_t));  // buff len
     if(1412 != send_data_size && 1 == GetConnID())
     {
-        fprintf(stderr,"1412 != send_data_size:%u conn_id:%u\n", send_data_size, GetConnID());
+        fprintf(stderr,"EpollSocket::Send 1412 != send_data_size:%u conn_id:%u\n", send_data_size, GetConnID());
         DebugPrint::PrintfData(data,32);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
     }
@@ -418,7 +418,7 @@ void EpollSocket::Send(const char* data, size_t len)
     if(false == send_ring_buffer_.Empty())
     {
         size_t write_size = send_ring_buffer_.Write(data, len);
-        if(write_size < len || send_ring_buffer_.GetBufferSize() > MAX_RING_BUFF_SIZE_FACTOR * send_buff_len_)
+        if(write_size < len || send_ring_buffer_.GetBufferSize() > static_cast<size_t>(send_buff_len_))
         {
             Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);
             return;
@@ -440,7 +440,7 @@ void EpollSocket::Send(const char* data, size_t len)
     {
         send_ring_buffer_.Write(data + sended, len - sended);
     }   
-    MemPoolMgr->GiveBack(const_cast<char*>(data), "EpollSocket::Send");
+    // MemPoolMgr->GiveBack(const_cast<char*>(data), "EpollSocket::Send");
 }
 
 int32_t EpollSocket::SetNonBlocking(int32_t fd)

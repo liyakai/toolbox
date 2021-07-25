@@ -3,7 +3,6 @@
 #include "singleton.h"
 #include <list>
 #include <unordered_map>
-#include <set>
 #include "debug_print.h"
 /*
 *  相同大小内存块的管理
@@ -36,17 +35,11 @@ public:
     * 剩余内存块个数
     */
     std::size_t Size();
-    /*
-    * Debug status
-    */
-    void DebugPrint(std::string debug_tag = "");
 
 private:
     std::size_t chunk_size_ = 0;
     std::mutex mutex_;
     std::list<char*> mem_list_;
-    // std::set<char*> debug_free_set_;        // debug code
-    // std::set<char*> debug_used_set_;        // debug code
 };
 
 /*

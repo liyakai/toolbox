@@ -7,7 +7,9 @@ NetworkMaster::NetworkMaster()
 }
 
 NetworkMaster::~NetworkMaster()
-{}
+{
+    event2main_.Clear();
+}
 
 bool NetworkMaster::Start()
 {
@@ -46,7 +48,7 @@ void NetworkMaster::StopWait()
         if(event2main_.Read<NetEventWorker*>(event)
         && nullptr != event)
         {
-            GiveBackObject(event);
+            GiveBackObject(event,"NetworkMaster::StopWait");
         }
     }
     for(auto& network : networks_)
@@ -164,7 +166,7 @@ void NetworkMaster::DispatchMainEvent_()
         default:
             break;
         }
-        GiveBackObject(event);
+        GiveBackObject(event, "NetworkMaster::DispatchMainEvent_");
     }
 }
 

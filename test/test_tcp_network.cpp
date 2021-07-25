@@ -95,6 +95,8 @@ public:
 
             if(1404 == send_data_size)
             {
+                fprintf(stderr,"换头后发送给 echo 1412 != send_data_size:%u conn_id:%lu\n", send_data_size, echo_conn_id_);
+                DebugPrint::PrintfData(data,32);
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
             }
             Send(NT_TCP, echo_conn_id_, send_data, send_data_size);
@@ -118,7 +120,7 @@ CASE(test_tcp_echo)
     // return;
     fprintf(stderr,"网络库测试用例: test_tcp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, NT_TCP, 2*1024*1024, 2*1024*1024);
+    Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, NT_TCP, 10*1024*1024, 10*1024*1024);
     Singleton<TestNetworkEcho>::Instance()->Start();
     bool run = true;
     std::thread t([&](){
@@ -159,7 +161,7 @@ CASE(test_tcp_forward)
     fprintf(stderr,"网络库测试用例: test_tcp_forward \n");
     Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
     Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, NT_TCP);
-    Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, NT_TCP, 2*1024*1024, 2*1024*1024);
+    Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, NT_TCP, 10*1024*1024, 10*1024*1024);
     Singleton<TestNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&](){
