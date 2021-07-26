@@ -1,7 +1,7 @@
 #include "memory_pool.h"
 #include <algorithm>
 #define ENABLE_MEMORY_POOL 1
-#define ENABLE_DEBUG_MEMORY_POOL 1
+#define ENABLE_DEBUG_MEMORY_POOL 0
 
 Chunk::Chunk()
 {

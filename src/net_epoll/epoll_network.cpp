@@ -22,7 +22,9 @@ void TcpNetwork::Init(NetworkMaster* master)
 
 void TcpNetwork::UnInit()
 {
-
+    sock_mgr_.UnInit();
+    epoll_ctrl_.Destroy();
+    INetwork::UnInit();
 }
 
 void TcpNetwork::Update()

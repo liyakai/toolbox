@@ -7,7 +7,7 @@
 #include "src/tools/singleton.h"
 #include "debug_print.h"
 
-#define ENABLE_DEBUG_OBJECT_POOL 1
+#define ENABLE_DEBUG_OBJECT_POOL 0
 
 /*
 * 定义对象池
@@ -76,7 +76,7 @@ public:
            return;
        }
 #endif // ENABLE_DEBUG_OBJECT_POOL
-       free_objects_.push_back(object);
+       free_objects_.emplace_back(object);
    }
 
     /*

@@ -1,5 +1,6 @@
 #include "src/network/network_mgr.h"
 #include "unit_test_frame/unittest.h"
+#include <gperftools/profiler.h>
 
 class TestNetworkEcho : public NetworkMaster, public DebugPrint
 {
@@ -118,6 +119,7 @@ FIXTURE_BEGIN(TCPNetWork)
 CASE(test_tcp_echo)
 {
     // return;
+    ProfilerStart("test_tcp_echo.prof");
     fprintf(stderr,"网络库测试用例: test_tcp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
     Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, NT_TCP, 10*1024*1024, 10*1024*1024);
@@ -132,7 +134,7 @@ CASE(test_tcp_echo)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 24*3600*1000;
+    uint32_t run_mill_seconds = 120*1000;
     while(true)
     {
         if(used_time > run_mill_seconds) break;
@@ -152,12 +154,14 @@ CASE(test_tcp_echo)
     run = false;
     t.join();
     Singleton<TestNetworkEcho>::Instance()->StopWait();
+    ProfilerStop();
     return ;
 }
 
 CASE(test_tcp_forward)
 {
-    // return;
+    return;
+    ProfilerStart("test_tcp_forward.prof");
     fprintf(stderr,"网络库测试用例: test_tcp_forward \n");
     Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
     Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, NT_TCP);
@@ -173,7 +177,7 @@ CASE(test_tcp_forward)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 24*3600*1000;
+    uint32_t run_mill_seconds = 120*1000;
     while(true)
     {
         if(used_time > run_mill_seconds) break;
@@ -193,6 +197,7 @@ CASE(test_tcp_forward)
     run = false;
     t.join();
     Singleton<TestNetworkForward>::Instance()->StopWait();
+    ProfilerStop();
     return;
 }
 

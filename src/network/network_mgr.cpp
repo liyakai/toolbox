@@ -53,6 +53,10 @@ void NetworkMaster::StopWait()
     }
     for(auto& network : networks_)
     {
+        if(nullptr != network)
+        {
+            network->UnInit();
+        }
         network.reset();
     }
 
