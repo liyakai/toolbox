@@ -9,7 +9,7 @@
 constexpr size_t STACK_SIZE = 1024 * 1024;
 constexpr size_t DEFAULT_COROUTINE = 16;
 
-using  CoroutineFunc = std::function< void (class schedule*, void *ud) >; 
+using  CoroutineFunc = std::function< void (class Schedule*, void *ud) >; 
 
 enum class COROUTINE_STATUS
 {
@@ -50,7 +50,7 @@ public:
     /*
     * 获取协程上下文
     */
-    ucontext_t* GetUcontext(){ return &ctx_; }
+    ucontext_t& GetUcontext(){ return ctx_; }
     /*
     * 获取运行时栈的大小
     */
@@ -68,6 +68,10 @@ public:
     */
     ptrdiff_t GetCap(){ return cap_; }
     /*
+    * 设置 cap
+    */
+    void SetCap(ptrdiff_t cap){ cap_ = cap; }
+    /*
     * 重新分配栈
     */
     void ReNewStack()
@@ -75,6 +79,17 @@ public:
         delete stack_;
         stack_ = new char[cap_];
     }
+    /*
+    * 执行回调函数
+    */
+    void InvokeFunc(Schedule* sch, void *ud)
+    {
+        func_(sch, ud);
+    }
+    /*
+    * 获取协程参数
+    */
+    void* GetParamUd(){ return ud_;}
 private:
     CoroutineFunc func_;             // 协程所用的函数
     void *ud_;                       // 协程参数
@@ -102,7 +117,11 @@ public:
     }
     ~Schedule()
     {
-
+        for (size_t i = 0; i < co_vec_.size(); i++)
+        {
+            CoroutineDelete(i);
+        }
+        
     }
     /*
     * 创建协程
@@ -136,6 +155,17 @@ public:
     static void mainfunc(uint32_t low32, uint32_t hi32)
     {
         uintptr_t ptr = (uintptr_t)low32 | ((uintptr_t)hi32 << 32);
+        auto* sch = (Schedule*)ptr;
+        int id = sch->CoroutineRunning();
+        auto* co = sch->GetCoroutine(id);
+        if(nullptr == co)
+        {
+            return;
+        }
+        co->InvokeFunc(sch, co->GetParamUd());
+        sch->CoroutineDelete(id);
+
+        
     }
     /*
     * 重新开始协程
@@ -146,11 +176,7 @@ public:
         {
             return;
         }
-        if(id < 0 || id > (int32_t)co_vec_.size())
-        {
-            return;
-        }
-        auto* co = co_vec_[id];
+        auto* co = GetCoroutine(id);
         if(nullptr == co)
         {
             return;
@@ -159,45 +185,31 @@ public:
         {
         case COROUTINE_STATUS::COROUTINE_READY:
             {
-                auto* ucontext = co->GetUcontext();
-                getcontext(ucontext);
-                ucontext->uc_stack.ss_sp = stack_;
-                ucontext->uc_stack.ss_size = STACK_SIZE;
-                ucontext->uc_link = &main_;
+                auto& ucontext = co->GetUcontext();
+                getcontext(&ucontext);
+                ucontext.uc_stack.ss_sp = stack_;
+                ucontext.uc_stack.ss_size = STACK_SIZE;
+                ucontext.uc_link = &main_;
                 running_ = id;
                 co->SetStatus(COROUTINE_STATUS::COROUTINE_RUNNING);
                 uintptr_t ptr = reinterpret_cast<uintptr_t>(this);
-                makecontext(ucontext,(void (*)(void))mainfunc, 2, static_cast<uint32_t>(ptr), static_cast<uint32_t>(ptr >> 32));
-                swapcontext(&main_, ucontext);
+                makecontext(&ucontext,(void (*)(void))mainfunc, 2, static_cast<uint32_t>(ptr), static_cast<uint32_t>(ptr >> 32));
+                swapcontext(&main_, &ucontext);
                 break;
             }
         case COROUTINE_STATUS::COROUTINE_SUSPEND:
         {
             memmove(stack_ + STACK_SIZE - co->GetSize(), co->GetStack(), co->GetSize());
+            running_ = id;
+            co->SetStatus(COROUTINE_STATUS::COROUTINE_RUNNING);
+            auto &ucontext = co->GetUcontext();
+            swapcontext(&main_, &ucontext);
             break;
         }
         default:
             break;
         }
     } 
-private:
-    /*
-    * 保存堆栈
-    */
-    static void SaveStack(Coroutine *co, char* top)
-    {
-        char dummy = 0;
-        if(top - &dummy > (int32_t)STACK_SIZE)
-        {
-            return;
-        }
-        if(co->GetCap() < top - &dummy )
-        {
-            co->ReNewStack();
-        }
-        co->SetSize(top - &dummy);
-        memmove(co->GetStack(), &dummy, co->GetSize());
-    }
     /*
     * 让出 
     */
@@ -209,29 +221,26 @@ private:
             return;
         }
         auto* co = co_vec_[id];
-        if((char*)co <= stack_)
+        if((char*)&co <= stack_)
         {
             return;
         }
         SaveStack(co, stack_ + STACK_SIZE);
         co->SetStatus(COROUTINE_STATUS::COROUTINE_SUSPEND);
         running_ = running_init_;
-        swapcontext(co->GetUcontext(), &main_);
+        swapcontext(&co->GetUcontext(), &main_);
     }
     /*
     * 协程状态
     */
     COROUTINE_STATUS CoroutineStatus(int32_t id)
     {
-        if(id < 0 || id > (int32_t)co_vec_.size())
+        auto* co = GetCoroutine(id);
+        if(nullptr == co)
         {
             return COROUTINE_STATUS::COROUTINE_DEAD;
         }
-        if(nullptr == co_vec_[id])
-        {
-            return COROUTINE_STATUS::COROUTINE_DEAD;
-        }
-        return co_vec_[id]->GetStatus();
+        return co->GetStatus();
     }
     /*
     * 调度器运行状态
@@ -240,12 +249,52 @@ private:
     {
         return running_;
     }
+private:
+    /*
+    * 保存堆栈
+    */
+    static void SaveStack(Coroutine *co, char* top)
+    {
+        char dummy = 0;
+        auto diff = top - &dummy;
+        if(diff > (int32_t)STACK_SIZE)
+        {
+            return;
+        }
+        if(co->GetCap() < diff )
+        {
+            co->SetCap(diff);
+            co->ReNewStack();
+        }
+        co->SetSize(diff);
+        memmove(co->GetStack(), &dummy, co->GetSize());
+    }
+    
     /*
     * 删除协程
     */
-    void CoroutineDelete(Coroutine *co)
+    void CoroutineDelete(int32_t id)
     {
+        auto* co = GetCoroutine(id);
+        if(nullptr == co)
+        {
+            return;
+        }
         delete(co);
+        co_vec_[id] = nullptr;
+        nco_--;
+        running_ = running_init_;
+    }
+    /*
+    * 根据 id 获取协程
+    */
+    Coroutine* GetCoroutine(int32_t id)
+    {
+        if(id < 0 || id > (int32_t)co_vec_.size())
+        {
+            return nullptr;
+        }
+        return co_vec_[id];
     }
 
 private:
