@@ -1,13 +1,12 @@
 #pragma once
 
+// 改编自云峰大佬的实现方式
+
 #include <ucontext.h>
 #include <functional>
 #include <stddef.h>
 #include <vector>
 #include <string.h>
-
-constexpr size_t STACK_SIZE = 1024 * 1024;
-constexpr size_t DEFAULT_COROUTINE = 16;
 
 using  CoroutineFunc = std::function< void (class Schedule*, void *ud) >; 
 
@@ -188,7 +187,7 @@ public:
                 auto& ucontext = co->GetUcontext();
                 getcontext(&ucontext);
                 ucontext.uc_stack.ss_sp = stack_;
-                ucontext.uc_stack.ss_size = STACK_SIZE;
+                ucontext.uc_stack.ss_size = stack_size_;
                 ucontext.uc_link = &main_;
                 running_ = id;
                 co->SetStatus(COROUTINE_STATUS::COROUTINE_RUNNING);
@@ -199,7 +198,7 @@ public:
             }
         case COROUTINE_STATUS::COROUTINE_SUSPEND:
         {
-            memmove(stack_ + STACK_SIZE - co->GetSize(), co->GetStack(), co->GetSize());
+            memmove(stack_ + stack_size_ - co->GetSize(), co->GetStack(), co->GetSize());
             running_ = id;
             co->SetStatus(COROUTINE_STATUS::COROUTINE_RUNNING);
             auto &ucontext = co->GetUcontext();
@@ -225,7 +224,7 @@ public:
         {
             return;
         }
-        SaveStack(co, stack_ + STACK_SIZE);
+        SaveStack(co, stack_ + stack_size_);
         co->SetStatus(COROUTINE_STATUS::COROUTINE_SUSPEND);
         running_ = running_init_;
         swapcontext(&co->GetUcontext(), &main_);
@@ -257,7 +256,7 @@ private:
     {
         char dummy = 0;
         auto diff = top - &dummy;
-        if(diff > (int32_t)STACK_SIZE)
+        if(diff > (int32_t)stack_size_)
         {
             return;
         }
@@ -299,12 +298,11 @@ private:
 
 private:
 private:
-    char stack_[STACK_SIZE];         // 运行时栈，此栈即是共享栈
+    constexpr static int32_t stack_size_ = 1024 * 1024;
+    constexpr static int32_t running_init_ = -1;
+    char stack_[stack_size_];         // 运行时栈，此栈即是共享栈
     ucontext_t main_;                // 主协程的上下文
     size_t nco_;                    // 当前存活的协程个数
     int32_t running_;                // 正在运行的协程ID
     std::vector<Coroutine*> co_vec_;     // 一个一维数组,用于存放所有协程。其长度等于cap
-    constexpr static int32_t  defalut_coroutine_ = 16;
-    constexpr static int32_t stack_size_ = 1024 * 1024;
-    constexpr static int32_t running_init_ = -1;
 };
