@@ -1,5 +1,7 @@
 # pragma once
 #include <stdint.h>
+#include <functional>
+
 // 实现五层时间轮算法
 
 using HTIMER = uint64_t;
@@ -32,13 +34,38 @@ public:
     virtual ~IArgs(){}
 };
 
+using TMethod = std::function<bool(IArgs*, void*)>;
+#define DelegateCombination(T_, Func_, Instance_) (XDelegate::RegisterMethod<T_, TMethod>(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
+
 /*
 * 定义定时器事件
 */
 class XDelegate
 {
 public:
-    XDelegate(){}
+    XDelegate()
+    : stub_ptr_(nullptr)
+    {}
+    
+    template<class TMethod>
+    XDelegate RegisterMethod(TMethod method)
+    {
+        XDelegate xd;
+        // xd.object_ptr_ = object_ptr;
+        xd.stub_ptr_ = method;
+        return xd;
+    }
+
+private:
+   
+    template<class TMethod>
+    bool MethodStub(IArgs* pargs, void* arg)
+    {
+        return stub_ptr_(pargs, arg);
+    }
+private:
+    // using StubType = std::function<bool(void* object_ptr, IArgs*, void* arg)>;
+    TMethod stub_ptr_;
 
 };
 
