@@ -5,7 +5,18 @@
 // 实现五层时间轮算法
 
 using HTIMER = uint64_t;
+#define TVN_BITS 6                                                  // 6位二进制
+#define TVR_BITS 8                                                  // 8位二进制
+#define TVN_SIZE (1 << TVN_BITS)                                    // 64 外层时间轮的slot数目
+#define TVR_SIZE (1 << TVN_SIZE)                                    // 256 一层时间轮的slot数目
+#define TVN_MASK (TVN_SIZE - 1)                                     // 63-->00111111 外层时间轮slot的最大索引值 掩码
+#define TVR_MASK (TVR_SIZE - 1)                                     // 255-->11111111 一层时间轮slot的最大索引值 掩码
+#define OFFSET(N) (TVR_SIZE + (N) * TVN_SIZE)                       // 第N+1层时间轮在数组中的起始位置 N>=0
+#define INDEX(V,N) ((V >> (TVR_BITS + (N) * TVN_BITS)) & TVN_MASK)  // 定时器节点在当前层级的数组位置 N>=0
+#define MAX_SLOT 256 + 4 * 64                                       // 数组大小
 #define INVALID_HTIMER 0
+
+
 
 /*
 * 定义定时器任务接口
@@ -38,7 +49,7 @@ using TMethod = std::function<bool(IArgs*, void*)>;
 #define DelegateCombination(T_, Func_, Instance_) (XDelegate::RegisterMethod<T_, TMethod>(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
 
 /*
-* 定义定时器事件
+* 定义类函数绑定接口
 */
 class XDelegate
 {
@@ -51,23 +62,276 @@ public:
     XDelegate RegisterMethod(TMethod method)
     {
         XDelegate xd;
-        // xd.object_ptr_ = object_ptr;
         xd.stub_ptr_ = method;
         return xd;
     }
 
-private:
-   
-    template<class TMethod>
-    bool MethodStub(IArgs* pargs, void* arg)
+    bool operator()(IArgs* pargs, void* arg) const
     {
         return stub_ptr_(pargs, arg);
     }
 private:
-    // using StubType = std::function<bool(void* object_ptr, IArgs*, void* arg)>;
     TMethod stub_ptr_;
-
 };
+
+/*
+* 定义定时器节点
+*/
+struct TimerNode
+{
+    TimerNode* prev = nullptr;      // 前置节点
+    TimerNode* next = nullptr;      // 后置节点
+    XDelegate delegate;             // 委托事件
+    IArgs* delegate_args = nullptr;  // 委托事件参数
+    void* args = nullptr;           // 透传参数
+    int64_t expire_time = 0;        // 超时时间
+    HTIMER guid = 0;                // 唯一标识
+    int32_t interval = 0;           // 间隔
+    int32_t total_count = 0;        // 计数器
+    int32_t curr_count = 0;         // 当前次数
+
+    std::string file;               // 文件名
+    int32_t line = 0;               // 行号
+
+    /*
+    * 析构
+    */
+    ~TimerNode()
+    {
+        Reset();
+    }
+    /*
+    * 重置数据
+    */
+    void Reset()
+    {
+        if(delegate_args)
+        {
+            delete delegate_args;
+            delegate_args = nullptr;
+        }
+        prev = nullptr;
+        next = nullptr;
+        args = nullptr;
+        guid = 0;
+        interval = 0;
+        total_count = 0;
+        curr_count = 0;
+        file="";
+        line = 0;
+        expire_time = 0;
+    }
+    /*
+    * @brief 初始化链表
+    * @param  node 哨兵节点
+    * @return void
+    */
+    inline void ListInit(TimerNode* node)
+    {
+        if(nullptr == node)
+        {
+            return;
+        }
+        node->prev = nullptr;
+        node->next = nullptr;
+    }
+    /*
+    * @brief 添加节点
+    * @param cur_node 添加节点位置
+    * @param new_node 待添加的节点
+    * @return void
+    */
+   inline void ListAdd(TimerNode* cur_node, TimerNode* new_node)
+   {
+       if(nullptr == cur_node || nullptr == new_node)
+       {
+           return;
+       }
+       new_node -> next = cur_node -> next;
+       new_node -> prev = cur_node;
+       cur_node -> next -> prev = new_node;
+       cur_node -> next = new_node;
+   }
+   /*
+   * @brief 删除节点
+   * @param node 要被删除的节点
+   * @param void
+   */
+   inline void ListRemove(TimerNode* node)
+   {
+       if(nullptr == node)
+       {
+           return;
+       }
+       node -> next -> prev = node -> prev;
+       node -> prev -> next = node -> next;
+   }
+};
+
+/*
+* 定时时间轮
+*/
+class TimerWheel
+{
+public:
+    /*
+    * 构造
+    */
+    TimerWheel()
+    {
+        Init();
+    }
+    /*
+    * 析构
+    */
+    ~TimerWheel()
+    {
+        UnInit();
+    }
+    /*
+    * @brief 添加定时器 
+    * @param delegate 类函数接口委托
+    * @param delegate_args 委托参数
+    * @param args 透传参数
+    * @param interval 间隔时间
+    * @param count 触发次数
+    * @param file 文件名
+    * @param line 文件号
+    */
+    HTIMER AddTimer(const XDelegate& delegate, IArgs* delegate_args, void* args, int32_t interval, int32_t count, const string file, int32_t line)
+    {
+
+    }
+
+private:
+    using TimersMap = std::unordered_map<HTIMER, TimerNode*>;
+    using FreeNode = std::deque<TimerNode*>;
+    using TimersArray = std::array<TimerNode, MAX_SLOT>;
+    /*
+    * @brief 初始化时间轮
+    * @return void
+    */
+    void Init()
+    {
+        for(auto &iter : timer_nodes_)
+        {
+            auto* head = &iter;
+            head -> next = head;
+            head -> prev = head;
+        }
+    }
+    /*
+    * @brief 释放时间轮
+    * @return void
+    */
+    void UnInit()
+    {
+        for(auto& iter : TimerWheel)
+        {
+            auto* node = &iter;
+            while(node -> next != node)
+            {
+                auto* node_to_del = node -> next;
+                ListRemove(node);
+                AddFreeNode(node);
+            }
+        }
+        for(auto &p : free_nodes)
+        {
+            delete p;
+            p = nullptr;
+        }
+        all_timers_.clear();
+        free_nodes_.clear();
+    }
+    /*
+    * @brief 获取空闲的节点
+    */
+    TimerNode* GetFreeNode()
+    {
+        if(free_nodes.empty())
+        {
+            return new TimerNode();
+        }
+        auto* node = free_nodes.front();
+        free_nodes.pop_front();
+        return node;
+    }
+    /*
+    * @brief 添加空闲节点
+    */
+    void AddFreeNodew(TimerNode* node)
+    {
+        if(nullptr != node)
+        {
+            return;
+        }
+        node -> Reset();
+        free_nodes.emplace_back(node);
+    }
+    /*
+    * @brief 添加定时器
+    */
+    void AddTimer(TimerNode* node)
+    {
+        if(nullptr != node)
+        {
+            return;
+        }
+        int32_t slot_idx = 0;
+        int64_t delay = node -> expire_time - cur_time_;
+        if(delay < TVR_SIZE)
+        {
+            // 第一层的索引为低8位的值
+            slot_idx = node -> expire_time & TVR_MASK;
+        } else if(delay < (1 << TVR_BITS + TVR_BITS))
+        {
+            // 第二层的索引偏移量+9-14位值
+            slot_idx = OFFSET(0) + INDEX(node->expire_time, 0);
+        } else if(delay < (1 << (TVR_BITS + 2 * TVN_BITS)))
+        {
+            // 第三层的索引为偏移值+15-20位值
+            slot_idx = OFFSET(1) + INDEX(node->expire_time, 1);
+        } else if(delay < (1 << (TVR_BITS + 3 * TVN_BITS)))
+        {
+            // 第四层的索引为偏移量+21-26位值
+            slot_idx = OFFSET(2) + INDEX(node->expire_time, 2);
+        } else if(delay < 0)
+        {
+            // 已经超时的定时器放入最内层时间轮的随机位置
+            slot_idx = cur_time_ & TVR_MASK;
+        } else
+        {
+            // 最外层的索引为偏移量+27-32位值
+            slot_idx = OFFSET(3) + INDEX(node->expire_time,3);
+        }
+        auto* head = &timer_nodes_[slot_idx];
+        if(all_timers_.emplace(node->guid, node).second)
+        {
+            ListAdd(head, node);
+        }
+    }
+    /*
+    * @brief 
+    */
+    int32_t CascadeTime(int32_t off, int32_t index)
+    {
+        int32_t slot_idx = off + index;
+        auto* node = &timer_nodes_[slot_idx];
+        while(node->next != node)
+        {
+            auto* next = node -> next;
+            ListRemove(next);
+            AddTimer(next);
+        }
+    }
+private: 
+    TimersMap all_timers_;              // 可以通过句柄查找所有定时器节点的容器
+    TimersArray timer_nodes_;           // 维护5层时间轮的数组
+    FreeNode free_nodes_;               // 已经删除
+    HTIMER next_id_ = 0;                // 下一个可以使用的句柄
+    int64_t cur_time_ = 0;              // 时间轮当前时间
+}
 
 /*
 * 定义定时器接口
