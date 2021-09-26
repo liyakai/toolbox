@@ -1,43 +1,51 @@
 # pragma once
 #include <stdint.h>
 #include <functional>
+#include <unordered_map>
+#include <deque>
+#include <chrono>
 
-// ÊµÏÖÎå²ãÊ±¼äÂÖËã·¨
+// å®ç°äº”å±‚æ—¶é—´è½®ç®—æ³•
 
+/*
+*  | _ _ _ _ _ _ | _ _ _ _ _ _ | _ _ _ _ _ _ | _ _ _ _ _ _ | _ _ _ _ _ _ _ _ |
+* BITS  TVN(6)        TVN(6)        TVN(6)        TVN(6)          TVR(8)
+* SIZE   64            64            64            64              256
+*/
 using HTIMER = uint64_t;
-#define TVN_BITS 6                                                  // 6Î»¶ş½øÖÆ
-#define TVR_BITS 8                                                  // 8Î»¶ş½øÖÆ
-#define TVN_SIZE (1 << TVN_BITS)                                    // 64 Íâ²ãÊ±¼äÂÖµÄslotÊıÄ¿
-#define TVR_SIZE (1 << TVN_SIZE)                                    // 256 Ò»²ãÊ±¼äÂÖµÄslotÊıÄ¿
-#define TVN_MASK (TVN_SIZE - 1)                                     // 63-->00111111 Íâ²ãÊ±¼äÂÖslotµÄ×î´óË÷ÒıÖµ ÑÚÂë
-#define TVR_MASK (TVR_SIZE - 1)                                     // 255-->11111111 Ò»²ãÊ±¼äÂÖslotµÄ×î´óË÷ÒıÖµ ÑÚÂë
-#define OFFSET(N) (TVR_SIZE + (N) * TVN_SIZE)                       // µÚN+1²ãÊ±¼äÂÖÔÚÊı×éÖĞµÄÆğÊ¼Î»ÖÃ N>=0
-#define INDEX(V,N) ((V >> (TVR_BITS + (N) * TVN_BITS)) & TVN_MASK)  // ¶¨Ê±Æ÷½ÚµãÔÚµ±Ç°²ã¼¶µÄÊı×éÎ»ÖÃ N>=0
-#define MAX_SLOT 256 + 4 * 64                                       // Êı×é´óĞ¡
-#define INVALID_HTIMER 0
+constexpr uint32_t TVN_BITS = 6;                                        // 6ä½äºŒè¿›åˆ¶
+constexpr uint32_t TVR_BITS = 8;                                        // 8ä½äºŒè¿›åˆ¶
+constexpr uint32_t TVN_SIZE = 1 << TVN_BITS;                            // 64 å¤–å±‚æ—¶é—´è½®çš„slotæ•°ç›®
+constexpr uint32_t TVR_SIZE = 1 << TVR_BITS;                            // 256 ä¸€å±‚æ—¶é—´è½®çš„slotæ•°ç›®
+constexpr uint32_t TVN_MASK = TVN_SIZE - 1;                             // 63-->00111111 å¤–å±‚æ—¶é—´è½®slotçš„æœ€å¤§ç´¢å¼•å€¼ æ©ç 
+constexpr uint32_t TVR_MASK = TVR_SIZE - 1;                             // 255-->11111111 ä¸€å±‚æ—¶é—´è½®slotçš„æœ€å¤§ç´¢å¼•å€¼ æ©ç 
+#define OFFSET(N) (TVR_SIZE + (N) * TVN_SIZE)                           // ç¬¬N+1å±‚æ—¶é—´è½®åœ¨æ•°ç»„ä¸­çš„èµ·å§‹ä½ç½® N>=0
+#define INDEX(V,N) ((V >> (TVR_BITS + (N) * TVN_BITS)) & TVN_MASK)      // å®šæ—¶å™¨èŠ‚ç‚¹åœ¨å½“å‰å±‚çº§çš„æ•°ç»„ä½ç½® N>=0
+constexpr uint32_t MAX_SLOT = 256 + 4 * 64;                             // æ•°ç»„å¤§å°
+constexpr uint32_t INVALID_HTIMER = 0;
 
 
 
 /*
-* ¶¨Òå¶¨Ê±Æ÷ÈÎÎñ½Ó¿Ú
+* å®šä¹‰å®šæ—¶å™¨ä»»åŠ¡æ¥å£
 */
 class ITimer
 {
 public:
     /*
-    * ĞéÎö¹¹
+    * è™šææ„
     */
     virtual ~ITimer(){}
     /*
-    * @brief ´¥·¢º¯Êı
-    * @param id ¶¨Ê±Æ÷ID
-    * @param count µ±Ç°´¥·¢´ÎÊı
+    * @brief è§¦å‘å‡½æ•°
+    * @param id å®šæ—¶å™¨ID
+    * @param count å½“å‰è§¦å‘æ¬¡æ•°
     */
     virtual void OnTimer(uint32_t id, uint32_t count) = 0;
 };
 
 /*
-* ¶¨Òå²ÎÊı½Ó¿Ú
+* å®šä¹‰å‚æ•°æ¥å£
 */
 class IArgs
 {
@@ -46,10 +54,10 @@ public:
 };
 
 using TMethod = std::function<bool(IArgs*, void*)>;
-#define DelegateCombination(T_, Func_, Instance_) (XDelegate::RegisterMethod<T_, TMethod>(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
+#define DelegateCombination(T_, Func_, Instance_) (XDelegate::RegisterMethod(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
 
 /*
-* ¶¨ÒåÀàº¯Êı°ó¶¨½Ó¿Ú
+* å®šä¹‰ç±»å‡½æ•°ç»‘å®šæ¥å£
 */
 class XDelegate
 {
@@ -58,8 +66,7 @@ public:
     : stub_ptr_(nullptr)
     {}
     
-    template<class TMethod>
-    XDelegate RegisterMethod(TMethod method)
+    static XDelegate RegisterMethod(TMethod method)
     {
         XDelegate xd;
         xd.stub_ptr_ = method;
@@ -74,34 +81,87 @@ private:
     TMethod stub_ptr_;
 };
 
+
 /*
-* ¶¨Òå¶¨Ê±Æ÷½Úµã
+* å®šä¹‰å®šæ—¶å™¨æ¥å£
+*/
+class ITimerWheel
+{
+public:
+    /*
+    * è™šææ„
+    */
+    virtual ~ITimerWheel(){}
+    /*
+    * @brief å¢åŠ å®šæ—¶å™¨
+    * @param timer å®šæ—¶å™¨å›è°ƒæ¥å£
+    * @param id å®šæ—¶å™¨ID
+    * @param interval å®šæ—¶é—´éš”,æ¯«ç§’ä¸ºå•ä½
+    * @param count è§¦å‘æ¬¡æ•°, -1ä¸ºæ°¸è¿œè§¦å‘
+    * @return æˆåŠŸè¿”å› Timerçš„å¥æŸ„,å¤±è´¥è¿”å› INVALID_HTIMER
+    */
+    virtual HTIMER AddTimer(ITimer* timer, int32_t id, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
+    /*
+    * @brief å¢åŠ å®šæ—¶å™¨
+    * @param delegate å®šæ—¶å™¨å§”æ‰˜
+    * @param args å®šæ—¶ä»»åŠ¡æ‰§è¡Œå¯¹è±¡å‚æ•°
+    * @param arg å®šæ—¶ä»»åŠ¡å‚æ•°
+    * @param interval å®šæ—¶é—´éš”,æ¯«ç§’ä¸ºå•ä½
+    * @param count è§¦å‘æ¬¡æ•°, -1ä¸ºæ°¸è¿œè§¦å‘
+    * @return æˆåŠŸè¿”å› Timerçš„å¥æŸ„,å¤±è´¥è¿”å› INVALID_HTIMER
+    */
+    virtual HTIMER AddTimer(const XDelegate& delegate, IArgs *args, void *arg, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
+
+    /*
+    * @brief Timerè¿‡å¤šé•¿æ—¶é—´åä¼šè§¦å‘
+    * @param timer å¥æŸ„
+    */
+    virtual int32_t GetTimeLeft(HTIMER timer) = 0;
+    /*
+    * @brief å…³é—­å®šæ—¶å™¨
+    */
+    virtual void KillTimer(HTIMER timer) = 0;
+    /*
+    * @brief ä¸»å¾ªç¯é‡Œé¢éœ€è¦ä¸åœçš„è°ƒç”¨Update
+    */
+    virtual void Update(int32_t delta) = 0;
+    /*
+    * @brief é‡Šæ”¾
+    */
+    virtual void Release() = 0;
+};
+
+/*
+* å®šä¹‰å®šæ—¶å™¨èŠ‚ç‚¹
 */
 struct TimerNode
 {
-    TimerNode* prev = nullptr;      // Ç°ÖÃ½Úµã
-    TimerNode* next = nullptr;      // ºóÖÃ½Úµã
-    XDelegate delegate;             // Î¯ÍĞÊÂ¼ş
-    IArgs* delegate_args = nullptr;  // Î¯ÍĞÊÂ¼ş²ÎÊı
-    void* args = nullptr;           // Í¸´«²ÎÊı
-    int64_t expire_time = 0;        // ³¬Ê±Ê±¼ä
-    HTIMER guid = 0;                // Î¨Ò»±êÊ¶
-    int32_t interval = 0;           // ¼ä¸ô
-    int32_t total_count = 0;        // ¼ÆÊıÆ÷
-    int32_t curr_count = 0;         // µ±Ç°´ÎÊı
+    TimerNode* prev = nullptr;      // å‰ç½®èŠ‚ç‚¹
+    TimerNode* next = nullptr;      // åç½®èŠ‚ç‚¹
+    ITimer* timer = nullptr;        // å®šæ—¶å™¨æ¥å£
+    uint32_t identifier = 0;        // é€ä¼ å®šæ—¶å™¨ID
+    XDelegate delegate;             // å§”æ‰˜äº‹ä»¶
+    IArgs* delegate_args = nullptr;  // å§”æ‰˜äº‹ä»¶å‚æ•°
+    void* args = nullptr;           // é€ä¼ å‚æ•°
+    int64_t expire_time = 0;        // è¶…æ—¶æ—¶é—´
+    HTIMER guid = 0;                // å”¯ä¸€æ ‡è¯†
+    int32_t interval = 0;           // é—´éš”
+    int64_t next_tick_time = 0;     // ä¸‹ä¸€æ¬¡è§¦å‘æ—¶é—´
+    int32_t total_count = 0;        // è®¡æ•°å™¨
+    int32_t curr_count = 0;         // å½“å‰æ¬¡æ•°
 
-    std::string file;               // ÎÄ¼şÃû
-    int32_t line = 0;               // ĞĞºÅ
+    std::string file;               // æ–‡ä»¶å
+    int32_t line = 0;               // è¡Œå·
 
     /*
-    * Îö¹¹
+    * ææ„
     */
     ~TimerNode()
     {
         Reset();
     }
     /*
-    * ÖØÖÃÊı¾İ
+    * é‡ç½®æ•°æ®
     */
     void Reset()
     {
@@ -112,6 +172,7 @@ struct TimerNode
         }
         prev = nullptr;
         next = nullptr;
+        timer = nullptr;
         args = nullptr;
         guid = 0;
         interval = 0;
@@ -122,8 +183,8 @@ struct TimerNode
         expire_time = 0;
     }
     /*
-    * @brief ³õÊ¼»¯Á´±í
-    * @param  node ÉÚ±ø½Úµã
+    * @brief åˆå§‹åŒ–é“¾è¡¨
+    * @param  node å“¨å…µèŠ‚ç‚¹
     * @return void
     */
     inline void ListInit(TimerNode* node)
@@ -136,12 +197,12 @@ struct TimerNode
         node->next = nullptr;
     }
     /*
-    * @brief Ìí¼Ó½Úµã
-    * @param cur_node Ìí¼Ó½ÚµãÎ»ÖÃ
-    * @param new_node ´ıÌí¼ÓµÄ½Úµã
+    * @brief æ·»åŠ èŠ‚ç‚¹
+    * @param cur_node æ·»åŠ èŠ‚ç‚¹ä½ç½®
+    * @param new_node å¾…æ·»åŠ çš„èŠ‚ç‚¹
     * @return void
     */
-   inline void ListAdd(TimerNode* cur_node, TimerNode* new_node)
+   static void ListAdd(TimerNode* cur_node, TimerNode* new_node)
    {
        if(nullptr == cur_node || nullptr == new_node)
        {
@@ -153,11 +214,11 @@ struct TimerNode
        cur_node -> next = new_node;
    }
    /*
-   * @brief É¾³ı½Úµã
-   * @param node Òª±»É¾³ıµÄ½Úµã
+   * @brief åˆ é™¤èŠ‚ç‚¹
+   * @param node è¦è¢«åˆ é™¤çš„èŠ‚ç‚¹
    * @param void
    */
-   inline void ListRemove(TimerNode* node)
+   static void ListRemove(TimerNode* node)
    {
        if(nullptr == node)
        {
@@ -169,46 +230,207 @@ struct TimerNode
 };
 
 /*
-* ¶¨Ê±Ê±¼äÂÖ
+* å®šæ—¶æ—¶é—´è½®
 */
-class TimerWheel
+class TimerWheel : public ITimerWheel
 {
 public:
     /*
-    * ¹¹Ôì
+    * æ„é€ 
     */
     TimerWheel()
     {
         Init();
     }
     /*
-    * Îö¹¹
+    * ææ„
     */
-    ~TimerWheel()
+    virtual ~TimerWheel()
     {
         UnInit();
     }
     /*
-    * @brief Ìí¼Ó¶¨Ê±Æ÷ 
-    * @param delegate Ààº¯Êı½Ó¿ÚÎ¯ÍĞ
-    * @param delegate_args Î¯ÍĞ²ÎÊı
-    * @param args Í¸´«²ÎÊı
-    * @param interval ¼ä¸ôÊ±¼ä
-    * @param count ´¥·¢´ÎÊı
-    * @param file ÎÄ¼şÃû
-    * @param line ÎÄ¼şºÅ
+    * @brief æ·»åŠ å®šæ—¶å™¨ä»»åŠ¡
+    * @param timer å®šæ—¶å™¨æ¥å£
+    * @param id identifier
+    * @param interval é—´éš”æ—¶é—´
+    * @param count è§¦å‘æ¬¡æ•°
+    * @param file æ–‡ä»¶å
+    * @param line æ–‡ä»¶å·
     */
-    HTIMER AddTimer(const XDelegate& delegate, IArgs* delegate_args, void* args, int32_t interval, int32_t count, const string file, int32_t line)
+    HTIMER AddTimer(ITimer* timer, int32_t id, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override
     {
+        if(nullptr == timer)
+        {
+            return INVALID_HTIMER;
+        }
 
+        auto* node = GetFreeNode();
+        if(nullptr == node)
+        {
+            return INVALID_HTIMER;
+        }
+        node->timer = timer;
+        node->identifier = id;
+        node->interval = interval;
+        node->next_tick_time = GetMilliSecond() + interval;
+        node->total_count = count;
+        node->file = file;
+        node->line = line;
+        if(node->interval >= UINT32_MAX)
+        {
+            node->interval = UINT32_MAX;
+        }
+        node->expire_time = cur_time_ + node->interval;
+        node->guid = GetNewTimerID();
+        AddTimer(node);
+        return node->guid;
+    }
+    /*
+    * @brief æ·»åŠ å®šæ—¶å™¨ä»»åŠ¡ 
+    * @param callback å®šæ—¶å™¨å›è°ƒ
+    * @param delegate_args å§”æ‰˜å‚æ•°
+    * @param args é€ä¼ å‚æ•°
+    * @param interval é—´éš”æ—¶é—´
+    * @param count è§¦å‘æ¬¡æ•°
+    * @param file æ–‡ä»¶å
+    * @param line æ–‡ä»¶å·
+    */
+    HTIMER AddTimer(const std::function<bool(IArgs*, void*)>& callback, IArgs* delegate_args, void* args, int32_t interval, int32_t count, const std::string file = "", int32_t line = 0)
+    {
+        if(nullptr == callback)
+        {
+            return INVALID_HTIMER;
+        }
+        return AddTimer(XDelegate::RegisterMethod(callback), delegate_args, args, interval, count, file, line);
+    }
+    /*
+    * @brief æ·»åŠ å®šæ—¶å™¨ä»»åŠ¡ 
+    * @param delegate ç±»å‡½æ•°æ¥å£å§”æ‰˜
+    * @param delegate_args å§”æ‰˜å‚æ•°
+    * @param args é€ä¼ å‚æ•°
+    * @param interval é—´éš”æ—¶é—´
+    * @param count è§¦å‘æ¬¡æ•°
+    * @param file æ–‡ä»¶å
+    * @param line æ–‡ä»¶å·
+    */
+    HTIMER AddTimer(const XDelegate& delegate, IArgs* delegate_args, void* args, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override
+    {
+        auto* node = GetFreeNode();
+        if(nullptr == node)
+        {
+            return INVALID_HTIMER;
+        }
+        node->timer = nullptr;
+        node->delegate = delegate;
+        node->delegate_args = delegate_args;
+        node->args = args;
+        node->interval = interval;
+        node->next_tick_time = GetMilliSecond() + interval;
+        node->total_count = count;
+        node->file = file;
+        node->line = line;
+        if(node->interval >= UINT32_MAX)
+        {
+            node->interval = UINT32_MAX;
+        }
+        node->expire_time = cur_time_ + node->interval;
+        node->guid = GetNewTimerID();
+        AddTimer(node);
+        return node->guid;
+    }
+    /*
+    * @brief Timerè¿‡å¤šé•¿æ—¶é—´åä¼šè§¦å‘
+    * @param timer å¥æŸ„
+    * @return è¿”å›å‰©ä½™æ¯«ç§’æ•°
+    */
+    int32_t GetTimeLeft(HTIMER timer)
+    {
+        auto iter = all_timers_.find(timer);
+        if(iter == all_timers_.end())
+        {
+            return 0;
+        }
+        return static_cast<uint32_t>(iter->second->next_tick_time - GetMilliSecond());
+    }
+    /*
+    * @brief åˆ é™¤ä¸€ä¸ªå®šæ—¶å™¨èŠ‚ç‚¹
+    * @return timer å®šæ—¶å™¨å¥æŸ„
+    */
+    void KillTimer(HTIMER timer)
+    {
+        auto iter = all_timers_.find(timer);
+        if(iter == all_timers_.end())
+        {
+            return;
+        }
+        auto* node = iter->second;
+        if(nullptr == node)
+        {
+            return;
+        }
+        TimerNode::ListRemove(node);
+        all_timers_.erase(iter);
+        AddFreeNode(node);
+    }
+    /*
+    * @brief é‡Šæ”¾å®šæ—¶å™¨
+    * @return void
+    */
+    void Release()
+    {
+        UnInit();
+    }
+    /*
+    * @brief æ‰§è¡Œä¸€æ¬¡æ›´æ–°
+    * @param delta è·ç¦»ä¸Šæ¬¡è°ƒç”¨è¿‡å»çš„æ—¶é—´
+    * @return void
+    */
+    void Update(int32_t delta)
+    {
+        int64_t now_time = cur_time_ + delta;
+        while(cur_time_ < now_time)
+        {
+            int32_t idx = cur_time_ & TVR_MASK;
+            // å½“å‰æ—¶é—´ä½8ä½å¦‚æœä¸º0,åˆ™æŠŠå¤–å±‚æ—¶é—´è½®ä¸Šçš„æ—¶é—´èŠ‚ç‚¹å¾€å†…å±‚è½¬ç§»
+            if(0 == idx
+                && 0 == CascadeTime(OFFSET(0), INDEX(cur_time_, 0))
+                && 0 == CascadeTime(OFFSET(1), INDEX(cur_time_, 1))
+                && 0 == CascadeTime(OFFSET(2), INDEX(cur_time_, 2)))
+                {
+                    CascadeTime(OFFSET(3), INDEX(cur_time_, 3));
+                }
+            auto* node = &timer_nodes_[idx];
+            while(node -> next != node)
+            {
+                auto* next = node->next;
+                ++next->curr_count;
+                if(nullptr != next->timer)
+                {
+                    next->timer->OnTimer(next->identifier, next->curr_count);
+                } else{
+                    next->delegate(next -> delegate_args, next -> args);
+                }
+                
+                TimerNode::ListRemove(next);
+                if(next -> total_count < 0 || next -> curr_count < next -> total_count)
+                {
+                    next -> next_tick_time = cur_time_ + next -> interval;
+                    AddTimer(next);
+                } else
+                {
+                    all_timers_.erase(next->guid);
+                    AddFreeNode(next);
+                }
+            }
+            cur_time_++;
+        }
     }
 
+
 private:
-    using TimersMap = std::unordered_map<HTIMER, TimerNode*>;
-    using FreeNode = std::deque<TimerNode*>;
-    using TimersArray = std::array<TimerNode, MAX_SLOT>;
     /*
-    * @brief ³õÊ¼»¯Ê±¼äÂÖ
+    * @brief åˆå§‹åŒ–æ—¶é—´è½®
     * @return void
     */
     void Init()
@@ -221,22 +443,22 @@ private:
         }
     }
     /*
-    * @brief ÊÍ·ÅÊ±¼äÂÖ
+    * @brief é‡Šæ”¾æ—¶é—´è½®
     * @return void
     */
     void UnInit()
     {
-        for(auto& iter : TimerWheel)
+        for(auto& iter : timer_nodes_)
         {
             auto* node = &iter;
             while(node -> next != node)
             {
                 auto* node_to_del = node -> next;
-                ListRemove(node);
-                AddFreeNode(node);
+                TimerNode::ListRemove(node_to_del);
+                AddFreeNode(node_to_del);
             }
         }
-        for(auto &p : free_nodes)
+        for(auto &p : free_nodes_)
         {
             delete p;
             p = nullptr;
@@ -245,32 +467,40 @@ private:
         free_nodes_.clear();
     }
     /*
-    * @brief »ñÈ¡¿ÕÏĞµÄ½Úµã
+    * @brief è·å–ä¸€ä¸ªæ–°çš„ID
+    * @return HTIMER
+    */
+    HTIMER GetNewTimerID()
+    {
+        return ++next_id_;
+    }
+    /*
+    * @brief è·å–ç©ºé—²çš„èŠ‚ç‚¹
     */
     TimerNode* GetFreeNode()
     {
-        if(free_nodes.empty())
+        if(free_nodes_.empty())
         {
             return new TimerNode();
         }
-        auto* node = free_nodes.front();
-        free_nodes.pop_front();
+        auto* node = free_nodes_.front();
+        free_nodes_.pop_front();
         return node;
     }
     /*
-    * @brief Ìí¼Ó¿ÕÏĞ½Úµã
+    * @brief æ·»åŠ ç©ºé—²èŠ‚ç‚¹
     */
-    void AddFreeNodew(TimerNode* node)
+    void AddFreeNode(TimerNode* node)
     {
         if(nullptr != node)
         {
             return;
         }
         node -> Reset();
-        free_nodes.emplace_back(node);
+        free_nodes_.emplace_back(node);
     }
     /*
-    * @brief Ìí¼Ó¶¨Ê±Æ÷
+    * @brief æ·»åŠ å®šæ—¶å™¨
     */
     void AddTimer(TimerNode* node)
     {
@@ -280,39 +510,39 @@ private:
         }
         int32_t slot_idx = 0;
         int64_t delay = node -> expire_time - cur_time_;
-        if(delay < TVR_SIZE)
+        if(delay < 0)
         {
-            // µÚÒ»²ãµÄË÷ÒıÎªµÍ8Î»µÄÖµ
+            // å·²ç»è¶…æ—¶çš„å®šæ—¶å™¨æ”¾å…¥æœ€å†…å±‚æ—¶é—´è½®çš„éšæœºä½ç½®
+            slot_idx = cur_time_ & TVR_MASK;
+        } else if(delay < TVR_SIZE)
+        {
+            // ç¬¬ä¸€å±‚çš„ç´¢å¼•ä¸ºä½8ä½çš„å€¼
             slot_idx = node -> expire_time & TVR_MASK;
-        } else if(delay < (1 << TVR_BITS + TVR_BITS))
+        } else if(delay < (1 << (TVR_BITS + TVN_BITS)))
         {
-            // µÚ¶ş²ãµÄË÷ÒıÆ«ÒÆÁ¿+9-14Î»Öµ
+            // ç¬¬äºŒå±‚çš„ç´¢å¼•åç§»é‡+9-14ä½å€¼
             slot_idx = OFFSET(0) + INDEX(node->expire_time, 0);
         } else if(delay < (1 << (TVR_BITS + 2 * TVN_BITS)))
         {
-            // µÚÈı²ãµÄË÷ÒıÎªÆ«ÒÆÖµ+15-20Î»Öµ
+            // ç¬¬ä¸‰å±‚çš„ç´¢å¼•ä¸ºåç§»å€¼+15-20ä½å€¼
             slot_idx = OFFSET(1) + INDEX(node->expire_time, 1);
         } else if(delay < (1 << (TVR_BITS + 3 * TVN_BITS)))
         {
-            // µÚËÄ²ãµÄË÷ÒıÎªÆ«ÒÆÁ¿+21-26Î»Öµ
+            // ç¬¬å››å±‚çš„ç´¢å¼•ä¸ºåç§»é‡+21-26ä½å€¼
             slot_idx = OFFSET(2) + INDEX(node->expire_time, 2);
-        } else if(delay < 0)
-        {
-            // ÒÑ¾­³¬Ê±µÄ¶¨Ê±Æ÷·ÅÈë×îÄÚ²ãÊ±¼äÂÖµÄËæ»úÎ»ÖÃ
-            slot_idx = cur_time_ & TVR_MASK;
         } else
         {
-            // ×îÍâ²ãµÄË÷ÒıÎªÆ«ÒÆÁ¿+27-32Î»Öµ
+            // æœ€å¤–å±‚çš„ç´¢å¼•ä¸ºåç§»é‡+27-32ä½å€¼
             slot_idx = OFFSET(3) + INDEX(node->expire_time,3);
         }
         auto* head = &timer_nodes_[slot_idx];
         if(all_timers_.emplace(node->guid, node).second)
         {
-            ListAdd(head, node);
+            TimerNode::ListAdd(head, node);
         }
     }
     /*
-    * @brief 
+    * @brief å¤–å±‚çš„æ—¶é—´èŠ‚ç‚¹å‘å†…å±‚è½¬ç§».
     */
     int32_t CascadeTime(int32_t off, int32_t index)
     {
@@ -321,67 +551,37 @@ private:
         while(node->next != node)
         {
             auto* next = node -> next;
-            ListRemove(next);
+            TimerNode::ListRemove(next);
             AddTimer(next);
         }
+        return index;
+    }
+    /*
+    * @brief è·å–æ¯«ç§’æ•°
+    */
+    uint64_t GetMilliSecond()
+    {
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch());
+
+        return ms.count();
     }
 private: 
-    TimersMap all_timers_;              // ¿ÉÒÔÍ¨¹ı¾ä±ú²éÕÒËùÓĞ¶¨Ê±Æ÷½ÚµãµÄÈİÆ÷
-    TimersArray timer_nodes_;           // Î¬»¤5²ãÊ±¼äÂÖµÄÊı×é
-    FreeNode free_nodes_;               // ÒÑ¾­É¾³ı
-    HTIMER next_id_ = 0;                // ÏÂÒ»¸ö¿ÉÒÔÊ¹ÓÃµÄ¾ä±ú
-    int64_t cur_time_ = 0;              // Ê±¼äÂÖµ±Ç°Ê±¼ä
-}
+    using TimersMap = std::unordered_map<HTIMER, TimerNode*>;
+    using FreeNode = std::deque<TimerNode*>;
+    using TimersArray = std::array<TimerNode, MAX_SLOT>;
 
-/*
-* ¶¨Òå¶¨Ê±Æ÷½Ó¿Ú
-*/
-class ITimerManager
-{
-public:
-    /*
-    * ĞéÎö¹¹
-    */
-    virtual ~ITimerManager(){}
-    /*
-    * @brief Ôö¼Ó¶¨Ê±Æ÷
-    * @param timer ¶¨Ê±Æ÷»Øµ÷½Ó¿Ú
-    * @param id ¶¨Ê±Æ÷ID
-    * @param interval ¶¨Ê±¼ä¸ô,ºÁÃëÎªµ¥Î»
-    * @param count ´¥·¢´ÎÊı, -1ÎªÓÀÔ¶´¥·¢
-    * @return ³É¹¦·µ»Ø TimerµÄ¾ä±ú,Ê§°Ü·µ»Ø INVALID_HTIMER
-    */
-    virtual HTIMER SetTimer(ITimer* timer, uint32_t id, uint32_t interval, uint32_t count, const char* filename, int32_t lineno) = 0;
-    /*
-    * @brief Ôö¼Ó¶¨Ê±Æ÷
-    * @param delegate ¶¨Ê±Æ÷Î¯ÍĞ
-    * @param args ¶¨Ê±ÈÎÎñÖ´ĞĞ¶ÔÏó²ÎÊı
-    * @param arg ¶¨Ê±ÈÎÎñ²ÎÊı
-    * @param interval ¶¨Ê±¼ä¸ô,ºÁÃëÎªµ¥Î»
-    * @param count ´¥·¢´ÎÊı, -1ÎªÓÀÔ¶´¥·¢
-    * @return ³É¹¦·µ»Ø TimerµÄ¾ä±ú,Ê§°Ü·µ»Ø INVALID_HTIMER
-    */
-    virtual HTIMER SetTimer(const XDelegate& delegate, IArgs *args, void *arg, uint32_t interval, uint32_t count,const char* filename, int32_t lineno) = 0;
-
-    /*
-    * @brief Timer¹ı¶à³¤Ê±¼äºó»á´¥·¢
-    * @param timer ¾ä±ú
-    */
-    virtual uint32_t GetTimeLeft(HTIMER timer) = 0;
-    /*
-    * @brief ¹Ø±Õ¶¨Ê±Æ÷
-    */
-    virtual void KillTimer(HTIMER timer) = 0;
-    /*
-    * @brief Ö÷Ñ­»·ÀïÃæĞèÒª²»Í£µÄµ÷ÓÃUpdate
-    */
-    virtual void Update() = 0;
-    /*
-    * @brief ÊÍ·Å
-    */
-    virtual void Release() = 0;
+    TimersMap all_timers_;              // å¯ä»¥é€šè¿‡å¥æŸ„æŸ¥æ‰¾æ‰€æœ‰å®šæ—¶å™¨èŠ‚ç‚¹çš„å®¹å™¨
+    TimersArray timer_nodes_;           // ç»´æŠ¤5å±‚æ—¶é—´è½®çš„æ•°ç»„
+    FreeNode free_nodes_;               // å·²ç»åˆ é™¤
+    HTIMER next_id_ = 0;                // ä¸‹ä¸€ä¸ªå¯ä»¥ä½¿ç”¨çš„å¥æŸ„
+    int64_t cur_time_ = 0;              // æ—¶é—´è½®å½“å‰æ—¶é—´
 };
 
+/*
+* å®šä¹‰å®šæ—¶å™¨ç®¡ç†å™¨å•ä»¶
+*/
+#define TimerMgr Singleton<TimerWheel>::Instance()
 
 
 
@@ -396,14 +596,14 @@ public:
 
 
 
-// Kafka ÖĞ TimingWheel Ô´Âë¹ØÓÚÊ±¼äÂÖµÄ½²½â
+// Kafka ä¸­ TimingWheel æºç å…³äºæ—¶é—´è½®çš„è®²è§£
 /*
  * Hierarchical Timing Wheels
  *
  * A simple timing wheel is a circular list of buckets of timer tasks. Let u be the time unit.
  * A timing wheel with size n has n buckets and can hold timer tasks in n * u time interval.
  * Each bucket holds timer tasks that fall into the corresponding time range. At the beginning,
- * the first bucket holds tasks for [0, u), the second bucket holds tasks for [u, 2u), ¡­,
+ * the first bucket holds tasks for [0, u), the second bucket holds tasks for [u, 2u), â€¦,
  * the n-th bucket for [u * (n -1), u * n). Every interval of time unit u, the timer ticks and
  * moved to the next bucket then expire all timer tasks in it. So, the timer never insert a task
  * into the bucket for the current time since it is already expired. The timer immediately runs
