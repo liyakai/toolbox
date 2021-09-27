@@ -23,13 +23,7 @@ public:
     }
     void ProcessUpdate()
     {
-        int64_t delta = GetDeltaTimeMillSeconds();
-        delta_time += delta;
-        if(delta_time >= frame)
-        {
-            delta_time = delta < frame ? delta_time - frame : 0;
-            TimerMgr->Update(delta);
-        }
+        TimerMgr->Update();
     }
 
 private:
@@ -39,15 +33,23 @@ private:
     uint64_t last_frame_time = 0;
 };
 
-
+class TestTimer : public ITimer
+{
+public:
+    void OnTimer(uint32_t id, uint32_t count) override
+    {
+        fprintf(stderr,"触发定时器,当前定时器id:%u,count:%u\n",id, count);
+    }
+};
 
 
 CASE(TimerCase1){
     FrameTime frame_time;
-    TimerMgr->AddTimer();
+    TestTimer timer;
+    TimerMgr->AddTimer(&timer, 10086, 2000, 10, __FILE__, __LINE__);
     while(true)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         frame_time.UpdateFrameTime();
         frame_time.ProcessUpdate();
     }

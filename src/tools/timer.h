@@ -124,7 +124,7 @@ public:
     /*
     * @brief 主循环里面需要不停的调用Update
     */
-    virtual void Update(int32_t delta) = 0;
+    virtual void Update() = 0;
     /*
     * @brief 释放
     */
@@ -283,6 +283,7 @@ public:
         }
         node->expire_time = cur_time_ + node->interval;
         node->guid = GetNewTimerID();
+        fprintf(stderr,"[debug] AddTimer(ITimer* timer 添加定时器\n");
         AddTimer(node);
         return node->guid;
     }
@@ -337,6 +338,7 @@ public:
         node->expire_time = cur_time_ + node->interval;
         node->guid = GetNewTimerID();
         AddTimer(node);
+        fprintf(stderr,"[debug] AddTimer(const XDelegate& delegate 添加定时器\n");
         return node->guid;
     }
     /*
@@ -383,12 +385,21 @@ public:
     }
     /*
     * @brief 执行一次更新
-    * @param delta 距离上次调用过去的时间
     * @return void
     */
-    void Update(int32_t delta)
+    void Update()
     {
-        int64_t now_time = cur_time_ + delta;
+        int64_t now_time = GetMilliSecond();
+        if(0 == cur_time_)
+        {
+            cur_time_ = now_time;
+            return;
+        }
+        int64_t time_diff = now_time - cur_time_;
+        if(0 == time_diff)
+        {
+            return;
+        }
         while(cur_time_ < now_time)
         {
             int32_t idx = cur_time_ & TVR_MASK;
@@ -403,6 +414,7 @@ public:
             auto* node = &timer_nodes_[idx];
             while(node -> next != node)
             {
+                fprintf(stderr,"[debug] Update 处理定时器\n");
                 auto* next = node->next;
                 ++next->curr_count;
                 if(nullptr != next->timer)
@@ -417,6 +429,7 @@ public:
                 {
                     next -> next_tick_time = cur_time_ + next -> interval;
                     AddTimer(next);
+                    fprintf(stderr,"[debug] Update 添加定时器\n");
                 } else
                 {
                     all_timers_.erase(next->guid);
@@ -492,7 +505,7 @@ private:
     */
     void AddFreeNode(TimerNode* node)
     {
-        if(nullptr != node)
+        if(nullptr == node)
         {
             return;
         }
@@ -504,7 +517,7 @@ private:
     */
     void AddTimer(TimerNode* node)
     {
-        if(nullptr != node)
+        if(nullptr == node)
         {
             return;
         }
@@ -535,11 +548,10 @@ private:
             // 最外层的索引为偏移量+27-32位值
             slot_idx = OFFSET(3) + INDEX(node->expire_time,3);
         }
+        all_timers_[node->guid] = node;
         auto* head = &timer_nodes_[slot_idx];
-        if(all_timers_.emplace(node->guid, node).second)
-        {
-            TimerNode::ListAdd(head, node);
-        }
+        TimerNode::ListAdd(head, node);
+        fprintf(stderr,"[debug] AddTimer(TimerNode* node) 添加定时器,位置:%d\n", slot_idx);
     }
     /*
     * @brief 外层的时间节点向内层转移.
@@ -552,6 +564,7 @@ private:
         {
             auto* next = node -> next;
             TimerNode::ListRemove(next);
+            fprintf(stderr,"[debug] 挪动定时器 off:%d,index:%d\n", off, index);
             AddTimer(next);
         }
         return index;
