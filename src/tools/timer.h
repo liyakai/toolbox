@@ -146,7 +146,6 @@ struct TimerNode
     int64_t expire_time = 0;        // 超时时间
     HTIMER guid = 0;                // 唯一标识
     int32_t interval = 0;           // 间隔
-    int64_t next_tick_time = 0;     // 下一次触发时间
     int32_t total_count = 0;        // 计数器
     int32_t curr_count = 0;         // 当前次数
 
@@ -273,7 +272,6 @@ public:
         node->timer = timer;
         node->identifier = id;
         node->interval = interval;
-        node->next_tick_time = GetMilliSecond() + interval;
         node->total_count = count;
         node->file = file;
         node->line = line;
@@ -283,7 +281,6 @@ public:
         }
         node->expire_time = cur_time_ + node->interval;
         node->guid = GetNewTimerID();
-        fprintf(stderr,"[debug] AddTimer(ITimer* timer 添加定时器\n");
         AddTimer(node);
         return node->guid;
     }
@@ -327,7 +324,6 @@ public:
         node->delegate_args = delegate_args;
         node->args = args;
         node->interval = interval;
-        node->next_tick_time = GetMilliSecond() + interval;
         node->total_count = count;
         node->file = file;
         node->line = line;
@@ -338,7 +334,6 @@ public:
         node->expire_time = cur_time_ + node->interval;
         node->guid = GetNewTimerID();
         AddTimer(node);
-        fprintf(stderr,"[debug] AddTimer(const XDelegate& delegate 添加定时器\n");
         return node->guid;
     }
     /*
@@ -353,7 +348,7 @@ public:
         {
             return 0;
         }
-        return static_cast<uint32_t>(iter->second->next_tick_time - GetMilliSecond());
+        return static_cast<uint32_t>(iter->second->expire_time - cur_time_);
     }
     /*
     * @brief 删除一个定时器节点
@@ -389,18 +384,25 @@ public:
     */
     void Update()
     {
+        // 获取现在的毫秒数
         int64_t now_time = GetMilliSecond();
-        if(0 == cur_time_)
+        if(0 == last_update_time_)
         {
-            cur_time_ = now_time;
+            // 第一次 Update 只更新 last_update_time_
+            last_update_time_ = now_time;
             return;
         }
-        int64_t time_diff = now_time - cur_time_;
-        if(0 == time_diff)
+        // 时间流逝的毫秒数
+        int64_t time_delta = now_time - last_update_time_;
+        if(0 == time_delta)
         {
             return;
         }
-        while(cur_time_ < now_time)
+        // 用"现在的毫秒数" 更新 "上次更新时间"
+        last_update_time_ = now_time;   
+        // 设置时间轮时钟的最新值
+        int64_t new_time = cur_time_ + time_delta;
+        while(cur_time_ < new_time)
         {
             int32_t idx = cur_time_ & TVR_MASK;
             // 当前时间低8位如果为0,则把外层时间轮上的时间节点往内层转移
@@ -414,7 +416,6 @@ public:
             auto* node = &timer_nodes_[idx];
             while(node -> next != node)
             {
-                fprintf(stderr,"[debug] Update 处理定时器\n");
                 auto* next = node->next;
                 ++next->curr_count;
                 if(nullptr != next->timer)
@@ -427,9 +428,8 @@ public:
                 TimerNode::ListRemove(next);
                 if(next -> total_count < 0 || next -> curr_count < next -> total_count)
                 {
-                    next -> next_tick_time = cur_time_ + next -> interval;
+                    next -> expire_time = cur_time_ + next -> interval;
                     AddTimer(next);
-                    fprintf(stderr,"[debug] Update 添加定时器\n");
                 } else
                 {
                     all_timers_.erase(next->guid);
@@ -548,10 +548,10 @@ private:
             // 最外层的索引为偏移量+27-32位值
             slot_idx = OFFSET(3) + INDEX(node->expire_time,3);
         }
+        
         all_timers_[node->guid] = node;
         auto* head = &timer_nodes_[slot_idx];
         TimerNode::ListAdd(head, node);
-        fprintf(stderr,"[debug] AddTimer(TimerNode* node) 添加定时器,位置:%d\n", slot_idx);
     }
     /*
     * @brief 外层的时间节点向内层转移.
@@ -564,7 +564,6 @@ private:
         {
             auto* next = node -> next;
             TimerNode::ListRemove(next);
-            fprintf(stderr,"[debug] 挪动定时器 off:%d,index:%d\n", off, index);
             AddTimer(next);
         }
         return index;
@@ -589,6 +588,7 @@ private:
     FreeNode free_nodes_;               // 已经删除
     HTIMER next_id_ = 0;                // 下一个可以使用的句柄
     int64_t cur_time_ = 0;              // 时间轮当前时间
+    int64_t last_update_time_ = 0;      // 上次更新时间
 };
 
 /*
