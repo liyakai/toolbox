@@ -277,7 +277,7 @@ public:
     * @brief 更新节点
     * @param key
     * @param val
-    * @return SkipListNode<K, V>*
+    * @return 更新成功,则为更新节点的指针,更新失败则为空指针.
     */
     SkipListNode<K, V>* UpdateNode(K key, V val)
     {
@@ -326,11 +326,35 @@ public:
     /*
     * @brief 获取排名
     * @param val
-    * @return uint64_t
+    * @return uint64_t 排名,如果没有则返回-1.
     */
     uint64_t Rank(const V& val)
     {
-return 0;
+        auto iter = rank_map_.find(val);
+        if(iter == rank_map_.end() || !iter->second)
+        {
+            return -1;
+        }
+        K& cur_key = iter->second->key;
+        SkipListNode<K, V>* tmpNode = skip_list_.header;
+        uint64_t rank = 0;
+        for(int32_t i = skip_list_.level -1; i >= 0; i--)
+        {
+            while (tmpNode->levels[i].next
+                    && (tmpNode->levels[i].next->key > cur_key
+                        || (tmpNode->levels[i].next->key == cur_key
+                            && tmpNode->levels[i].next->value > val)))
+            {
+                rank += tmpNode->levels[i].span;
+                tmpNode = tmpNode->levels[i].next;
+            }
+
+            if(tmpNode->value == val)
+            {
+                return rank;
+            }
+        }
+        return -1;
     }
     /*
     * @brief 获取积分
@@ -349,11 +373,27 @@ return 0;
     /*
     * @brief 通过排名获取节点
     * @param rank
-    * @return SkiplistNode<K, V>*
+    * @return 如果找到则返回节点指针,否则返回空指针
     */
     SkipListNode<K,V>* GetNodeByRank(uint64_t rank)
     {
+        SkipListNode<K, V>* tmpNode = skip_list_.header;
+        uint64_t traversed = 0;
+        for(int32_t i = skip_list_.level -1; i >= 0; i--)
+        {
+            while (tmpNode->levels[i].next
+                    && (traversed + tmpNode->levels[i].span) <= rank)
+            {
+                traversed += tmpNode->levels[i].span;
+                tmpNode = tmpNode->levels[i].next;
+            }
 
+            if(traversed == rank)
+            {
+                return tmpNode;
+            }
+        }
+        return nullptr;
     }
     /*
     * @brief 通过排名区间获取节点列表
@@ -363,7 +403,34 @@ return 0;
     */
     std::list<SkipListNode<K, V>*> GetNodesByRange(uint64_t start, uint64_t end)
     {
+        if(start == 0)
+        {
+            start = 1;
+        }
+        if(start > end)
+        {
+            return {};
+        }
+        std::list<SkipListNode<K, V>*> nodes{};
+        auto* cur_node = GetNodeByRank(start);
+        if(nullptr == cur_node)
+        {
+            return {};
+        }
+        nodes.emplace_back(cur_node);
+        start++;
+        while(start <= end)
+        {
+            cur_node = cur_node->levels[0].next;
+            if(nullptr != cur_node)
+            {
+                break;
+            }
+            nodes.emplace_back(cur_node);
+            start++;
+        }
 
+        return nodes;
     }
     /*
     * @brief 是否已经存在
