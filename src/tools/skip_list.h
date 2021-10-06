@@ -42,7 +42,7 @@ struct SkipListNode
 };
 
 /*
-* @brief 定义链表
+* @brief 定义跳表的链表
 */
 template<class K, class V>
 struct SkipList
@@ -189,7 +189,7 @@ public:
         // 长度超出删除末尾元素
         if(max_len_ > 0 && skip_list_.length > max_len_)
         {
-            DeleteNodeByRange(max_len_, max_len_ + 1);
+            DeleteNodeByRank(max_len_ + 1);
         }
         return tmpNode;
     }
@@ -211,7 +211,7 @@ public:
         K& key = iter->second->key;
         for (int32_t i = skip_list_.level - 1; i >= 0; i--)
         {
-            while (tmpNode->levels[i]
+            while (tmpNode->levels[i].next
                     && (tmpNode->levels[i].next->key > key
                         || (tmpNode->levels[i].next->key == key
                             && tmpNode->levels[i].next->value > val)))
@@ -326,9 +326,9 @@ public:
     /*
     * @brief 获取排名
     * @param val
-    * @return uint64_t 排名,如果没有则返回-1.
+    * @return int64_t 排名,如果没有则返回-1.
     */
-    uint64_t Rank(const V& val)
+    int64_t Rank(const V& val)
     {
         auto iter = rank_map_.find(val);
         if(iter == rank_map_.end() || !iter->second)
@@ -338,7 +338,7 @@ public:
         K& cur_key = iter->second->key;
         SkipListNode<K, V>* tmpNode = skip_list_.header;
         uint64_t rank = 0;
-        for(int32_t i = skip_list_.level -1; i >= 0; i--)
+        for(int32_t i = skip_list_.level - 1; i >= 0; i--)
         {
             while (tmpNode->levels[i].next
                     && (tmpNode->levels[i].next->key > cur_key
@@ -348,9 +348,9 @@ public:
                 rank += tmpNode->levels[i].span;
                 tmpNode = tmpNode->levels[i].next;
             }
-
-            if(tmpNode->value == val)
+            if(nullptr != tmpNode->levels[i].next && tmpNode->levels[i].next->value == val)
             {
+                rank += tmpNode->levels[i].span;
                 return rank;
             }
         }
@@ -422,7 +422,7 @@ public:
         while(start <= end)
         {
             cur_node = cur_node->levels[0].next;
-            if(nullptr != cur_node)
+            if(nullptr == cur_node)
             {
                 break;
             }
@@ -440,6 +440,14 @@ public:
     bool IsAlreadyexists(const V& val)
     {
         return rank_map_.find(val) != rank_map_.end();
+    }
+    /*
+    * @brief 跳表长度
+    * @return unint64_t
+    */
+    uint64_t Length()
+    {
+        return skip_list_.length;
     }
 private:
     /*
