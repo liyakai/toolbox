@@ -348,6 +348,7 @@ public:
                 rank += tmpNode->levels[i].span;
                 tmpNode = tmpNode->levels[i].next;
             }
+            
             if(nullptr != tmpNode->levels[i].next && tmpNode->levels[i].next->value == val)
             {
                 rank += tmpNode->levels[i].span;
@@ -361,14 +362,14 @@ public:
     * @param val
     * @return K
     */
-    K Score(const V& val)
+    K* Score(const V& val)
     {
         auto iter = rank_map_.find(val);
         if(iter == rank_map_.end() || !iter->second)
         {
-            return K();
+            return nullptr;
         }
-        return iter->second->key;
+        return &(iter->second->key);
     }
     /*
     * @brief 通过排名获取节点

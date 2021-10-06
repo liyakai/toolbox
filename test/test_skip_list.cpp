@@ -161,11 +161,29 @@ CASE(SkipListCase){
 // 测试其他零碎的功能
 CASE(SkipListCase2){
     // 创建一个长度为100的排行榜跳表
-    RankSkipList<Score,int32_t>* rank_skip_list = new RankSkipList<Score, int32_t>(100);
+    RankSkipList<Score,int32_t>* rank_skip_list = new RankSkipList<Score, int32_t>(10);
     // 随机插入十万条数据
     for(int32_t i = 15; i <= 100000; i++)
     {
         rank_skip_list->InsertOrUpdate(Score(i, std::rand() % 100 + 1, std::rand() % 100 + 1, std::rand() % 100 + 1), i);
+    }
+    rank_skip_list->InsertOrUpdate(Score(1,100,99,100), 1);
+    if(!rank_skip_list->IsAlreadyexists(1))
+    {
+        SetError("[跳表排行榜] IsAlreadyexists 功能异常.\n");
+    }
+    if(rank_skip_list->IsAlreadyexists(2))
+    {
+        SetError("[跳表排行榜] IsAlreadyexists 功能异常.\n");
+    }
+    auto* score  = rank_skip_list->Score(1);
+    if(nullptr == score)
+    {
+        SetError("[跳表排行榜] Score 功能异常.\n");
+    } else 
+    {
+        fprintf(stderr,"[跳表排行榜] 通过 value 找到 key rank=%ld id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
+        rank_skip_list->Rank(score->id), score->id, score->Sum(),score->chinese, score->math, score->english);
     }
 
     // 打印排行榜
@@ -175,7 +193,7 @@ CASE(SkipListCase2){
         if(nullptr != node)
         {
             Score score = node->key;
-            fprintf(stderr,"[跳表排行榜] rank=%ld, id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
+            fprintf(stderr,"[跳表排行榜] rank=%ld, id=%d, sum=%d, chinese=%d, math=%d, english=%d \n",
                 rank_skip_list->Rank(score.id), score.id, score.Sum(),score.chinese, score.math, score.english);
                 i++;
                 node = rank_skip_list->GetNodeByRank(i);
