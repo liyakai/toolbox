@@ -60,7 +60,7 @@ private:
 };
 
 /*
-* @brief 使用互斥锁和条件变量实现读写锁 [没有通过单元测试,切勿使用!!!!!!]
+* @brief 使用互斥锁和条件变量实现读写锁
 */
 class CRWLock
 {
@@ -69,7 +69,7 @@ public:
     * 构造
     */
     CRWLock()
-        :m_cnt_(0)
+        :read_cnt_(0)
     {
 
     }
@@ -79,13 +79,25 @@ public:
     void ReadLock()
     {
         std::unique_lock<std::mutex> lck(mtx_);
-        if(m_cnt_ < 0)
+        cond_var_.wait(lck, std::bind(&CRWLock::IsReadCond, this));
+        read_cnt_++;
+    }
+    /*
+    * @brief 尝试获取读锁
+    */
+    bool TryReadLock()
+    {
+        std::unique_lock<std::mutex> lck(mtx_);
+        if(cond_var_.wait_for(lck, std::chrono::seconds(0)) == std::cv_status::timeout)
         {
-            cond_var_.wait(lck);
+            return false;
         }
-        fprintf(stderr, "ReadLock m_cnt_:%d\n", m_cnt_.load());
-        m_cnt_++;
-        fprintf(stderr, "ReadLock m_cnt_:%d\n", m_cnt_.load());
+        if(IsReadCond())
+        {
+            read_cnt_++;
+            return true;
+        }
+        return false;
     }
     /*
     * @brief 解除读锁
@@ -93,12 +105,8 @@ public:
     void ReadUnlock()
     {
         std::unique_lock<std::mutex> lck(mtx_);
-        if(--m_cnt_ == 0)
-        {
-            fprintf(stderr, "ReadUnlock notify_one m_cnt_:%d\n", m_cnt_.load());
-            cond_var_.notify_one();
-        }
-        fprintf(stderr, "ReadUnlock m_cnt_:%d\n", m_cnt_.load());
+        read_cnt_--;
+        cond_var_.notify_all();
     }
     /*
     * @brief 添加写锁
@@ -106,14 +114,25 @@ public:
     void WriteLock()
     {
         std::unique_lock<std::mutex> lck(mtx_);
-        
-        while(m_cnt_ != 0)
+        cond_var_.wait(lck, std::bind(&CRWLock::IsWriteCond, this));
+        is_write_ = true;
+    }
+        /*
+    * @brief 尝试获取写锁
+    */
+    bool TryWriteLock()
+    {
+        std::unique_lock<std::mutex> lck(mtx_);
+        if(cond_var_.wait_for(lck, std::chrono::seconds(0)) == std::cv_status::timeout)
         {
-            fprintf(stderr, "WriteLock wait m_cnt_:%d\n", m_cnt_.load());
-            cond_var_.wait(lck);
+            return false;
         }
-        m_cnt_ = -1;
-        fprintf(stderr, "WriteLock m_cnt_:%d  [-1]\n", m_cnt_.load());
+        if(IsWriteCond())
+        {
+            is_write_ = true;
+            return true;
+        }
+        return false;
     }
     /*
     * @brief 解除写锁
@@ -121,12 +140,27 @@ public:
     void WriteUnlock()
     {
         std::unique_lock<std::mutex> lck(mtx_);
-        m_cnt_ = 0;
-        fprintf(stderr, "WriteUnlock m_cnt_:%d\n", m_cnt_.load());
+        is_write_ = false;
         cond_var_.notify_all();                 // 叫醒所有等待的读和写操作
+    }
+private:
+    /*
+    * @brief 读条件
+    */
+    bool IsReadCond() const
+    {
+        return false == is_write_;
+    }
+    /*
+    * @brief 写条件
+    */
+    bool IsWriteCond() const
+    {
+        return false == is_write_ && 0 == read_cnt_;
     }
 private:
     std::mutex mtx_;                            // 保护计数资源
     std::condition_variable cond_var_;          // 条件变量
-    std::atomic<int32_t> m_cnt_;                // 计数, ==0无读写, >0读数量, <0在写
+    std::size_t read_cnt_;                      // 读者数量
+    bool is_write_ = false;                     // 是否在写
 };

@@ -5,7 +5,7 @@ FIXTURE_BEGIN(TestRWLock)
 
 RWLock rw_lock;
 CRWLock crw_lock;
-constexpr int32_t target_num = 1000*1000;
+constexpr int32_t target_num = 1000;
 
 void ReadThread_RWLock(int32_t& n)
 {
@@ -26,11 +26,11 @@ void ReadThread_CRWLock(int32_t& n)
     while(n < target_num)
     {
         //std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        fprintf(stderr, "before ReadThread_CRWLock read n:%d \n", n);
+        //fprintf(stderr, "before ReadThread_CRWLock read n:%d \n", n);
         crw_lock.ReadLock();
         fprintf(stderr, "ReadThread_CRWLock read n:%d \n", n);
         crw_lock.ReadUnlock();
-        fprintf(stderr, "after ReadThread_CRWLock read n:%d \n\n", n);
+        //fprintf(stderr, "after ReadThread_CRWLock read n:%d \n\n", n);
         std::this_thread::yield();
     }
 }
@@ -52,42 +52,51 @@ void WriteThread_CRWLock(int32_t& n)
     while(n < target_num)
     {
         //std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        fprintf(stderr, "before WriteThread_CRWLock change n:%d \n", n);
+        //fprintf(stderr, "before WriteThread_CRWLock change n:%d \n", n);
         crw_lock.WriteLock();
         fprintf(stderr, "WriteThread_CRWLock change n:%d \n", ++n);
         crw_lock.WriteUnlock();
-        fprintf(stderr, "after WriteThread_CRWLock change n:%d \n\n", n);
+        //fprintf(stderr, "after WriteThread_CRWLock change n:%d \n\n", n);
         //std::this_thread::yield();
     }     
 }
 
 // 测试由互斥锁实现的读写锁
 CASE(TestRWLockCase){
+    //return;
     int32_t n = 0;
     std::thread t1(ReadThread_RWLock, std::ref(n));
-    // std::thread t2(ReadThread_RWLock, std::ref(n));
+    std::thread t2(ReadThread_RWLock, std::ref(n));
     std::thread t3(WriteThread_RWLock, std::ref(n));
-    // std::thread t4(WriteThread_RWLock, std::ref(n));
+    std::thread t4(WriteThread_RWLock, std::ref(n));
     t1.join();
-    //t2.join();
+    t2.join();
     t3.join();
-    //t4.join();
+    t4.join();
     fprintf(stderr, "n:%d \n", n);
+    if(n != target_num + 1)
+    {
+        SetError("测试由互斥锁实现的读写锁 失败!");
+    }
 }
 
 // 测试由互斥锁和条件变量实现的读写锁
 CASE(CTestRWLockCase){
-    return;
+    
     int32_t n = 0;
     std::thread t1(ReadThread_CRWLock, std::ref(n));
-    //std::thread t2(ReadThread_RWLock, std::ref(n));
+    std::thread t2(ReadThread_RWLock, std::ref(n));
     std::thread t3(WriteThread_CRWLock, std::ref(n));
-    //std::thread t4(WriteThread_CRWLock, std::ref(n));
+    std::thread t4(WriteThread_CRWLock, std::ref(n));
     t1.join();
-    //t2.join();
+    t2.join();
     t3.join();
-    //t4.join();
+    t4.join();
     fprintf(stderr, "n:%d \n", n);
+    if(n != target_num + 1)
+    {
+        SetError("测试由互斥锁和条件变量实现的读写锁 失败!");
+    }
 }
 
 
