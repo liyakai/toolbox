@@ -400,20 +400,6 @@ void EpollSocket::Send(const char* data, size_t len)
     {
         return;
     }
-    if(1412 != len && 1 == GetConnID())
-    {
-        fprintf(stderr,"1412 != len:%zu conn_id:%u\n", len, GetConnID());
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
-    }
-    uint32_t send_data_size = 0;  
-    memmove(&send_data_size, data,  sizeof(uint32_t));  // buff len
-    if(1412 != send_data_size && 1 == GetConnID())
-    {
-        fprintf(stderr,"EpollSocket::Send 1412 != send_data_size:%u conn_id:%u\n", send_data_size, GetConnID());
-        DebugPrint::PrintfData(data,32);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
-    }
-
 
     if(false == send_ring_buffer_.Empty())
     {

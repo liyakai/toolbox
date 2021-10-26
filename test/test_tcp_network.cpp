@@ -93,13 +93,6 @@ public:
             memmove(send_data + sizeof(uint32_t) + sizeof(uint64_t), data + sizeof(uint32_t), size - sizeof(uint32_t)); // data
             // Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
             //PrintData(send_data, 16);
-
-            if(1404 == send_data_size)
-            {
-                fprintf(stderr,"换头后发送给 echo 1412 != send_data_size:%u conn_id:%lu\n", send_data_size, echo_conn_id_);
-                DebugPrint::PrintfData(data,32);
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000000));
-            }
             Send(NT_TCP, echo_conn_id_, send_data, send_data_size);
 
             MemPoolMgr->GiveBack(send_data, "test_send_data2");
@@ -118,7 +111,7 @@ FIXTURE_BEGIN(TCPNetWork)
 
 CASE(test_tcp_echo)
 {
-    // return;
+    //return;
     ProfilerStart("test_tcp_echo.prof");
     fprintf(stderr,"网络库测试用例: test_tcp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
@@ -134,7 +127,7 @@ CASE(test_tcp_echo)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 120*1000;
+    uint32_t run_mill_seconds = 24*3600*1000;
     while(true)
     {
         if(used_time > run_mill_seconds) break;
@@ -160,7 +153,7 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    return;
+    // return;
     ProfilerStart("test_tcp_forward.prof");
     fprintf(stderr,"网络库测试用例: test_tcp_forward \n");
     Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
@@ -177,7 +170,7 @@ CASE(test_tcp_forward)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 120*1000;
+    uint32_t run_mill_seconds = 24*3600*1000;
     while(true)
     {
         if(used_time > run_mill_seconds) break;
