@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <string.h>
+#include <atomic>
 #include "debug_print.h"
 /*
 * 非线程安全的环形队列
@@ -293,9 +294,75 @@ private:
         return n < 0 ? 1 : n + 1;
     }
 private:
-    size_t buffer_size_ = 0;    // 缓冲区最大长度
+    size_t buffer_size_ = 0;    // 缓冲区的长度
     size_t write_pos_ = 0;      // 可写入位置
     size_t read_pos_ = 0;       // 可读取位置
     char* buffer_ = nullptr;    // 缓冲区
     double ratio_ = 0;          // 警戒值
+};
+
+/*
+* 无锁循环队列 [single producer-single consumer]
+*/
+template<typename Type, std::size_t Size>
+class RingBufferSPSC 
+{
+public:
+    /*
+    * 构造
+    */
+    RingBufferSPSC()
+        : read_pos_(0), write_pos_(0), count_(0)
+    {}
+    /*
+    * 析构
+    */
+    ~RingBufferSPSC(){}
+    /*
+    * 判空,读线程调用
+    */
+    bool Empty() const
+    {
+        return (0 == count_);
+    }
+    /*
+    * 判满,写线程调用
+    */
+    bool Full() const
+    {
+        return (Size == count_);
+    }
+    /*
+    * 出队列,读线程调用
+    */
+    Type Pop()
+    {
+        auto type = array_[read_pos_];
+        read_pos_ = (read_pos_ + 1) % Size;
+        count_.fetch_sub(1);
+        return type;
+    }
+    /*
+    * 入队列,写线程调用
+    */
+    void Push(Type&& type)
+    {
+        array_[write_pos_] = type;
+        write_pos_ = (write_pos_ + 1) % Size;
+        count_.fetch_add(1);
+    }
+    /*
+    * 清空
+    */
+    void Clear()
+    {
+        read_pos_ = 0;
+        write_pos_ = 0;
+        count_ = 0;
+    }
+private:
+    std::array<Type, Size> array_;      // 数据存储
+    std::size_t read_pos_;              // 读位置
+    std::size_t write_pos_;             // 写位置
+    std::atomic<std::size_t> count_;    // 元素数量
 };

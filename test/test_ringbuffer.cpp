@@ -128,5 +128,69 @@ CASE(ringbuffer_copy_write)
     }
 }
 
+std::vector<int32_t> product;
+std::vector<int32_t> result;
+RingBufferSPSC<int32_t, 17> ring_buffer;
+bool stop = false;
+void WriteThread()
+{
+    for(int32_t val : product)
+    {
+        while(true)
+        {
+            if(ring_buffer.Empty())
+            {
+                ring_buffer.Push(std::move(val));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    }
+    stop = true;
+}
+void ReadThread()
+{
+    while (true)
+    {
+        if(!ring_buffer.Empty())
+        {
+            result.emplace_back(ring_buffer.Pop());
+        } else if (stop)
+        {
+            break;
+        }
+    }
+    
+}
+
+
+CASE(ringbuffer_spsc)
+{
+    /*
+    * 测试单生产者单消费者队列
+    */
+    for(std::size_t i = 0; i < 10000; i++)
+    {
+        product.emplace_back(i);
+    }
+    std::thread write(WriteThread);
+    std::thread read(ReadThread);
+    write.join();
+    read.join();
+    if(result.size() != product.size())
+    {
+        SetError("ringbuffer_spsc 结果与原始数据大小不一致");
+    }
+    for(std::size_t i = 0; i < result.size(); i++)
+    {
+        if(result[i] != product[i])
+        {
+            SetError("ringbuffer_spsc 结果与原始数据不一致");
+            break;
+        }
+    }
+}
+
 
 FIXTURE_END(RingBuffer)
