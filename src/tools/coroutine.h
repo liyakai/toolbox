@@ -224,7 +224,7 @@ public:
         {
             return;
         }
-        SaveStack(co, stack_ + stack_size_);
+        SaveStack(co, stack_ + stack_size_);    // 栈的生长方向是从高地址往低地址，因此栈底的就是内存地址最大的位置，即 S->stack + STACK_SIZE 就是栈底位置。
         co->SetStatus(COROUTINE_STATUS::COROUTINE_SUSPEND);
         running_ = running_init_;
         swapcontext(&co->GetUcontext(), &main_);
