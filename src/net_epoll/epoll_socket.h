@@ -5,7 +5,7 @@
 #include "src/tools/ringbuffer.h"
 #include "network.h"
 
-class TcpNetwork;
+class EpollNetwork;
 class EpollSocketPool;
 /*
 * 定义每一个连接
@@ -77,7 +77,7 @@ public:
     /*
     * 设置 tcp_network
     */
-    void SetTcpNetwork(TcpNetwork* tcp_network){ p_tcp_network_ = tcp_network; }
+    void SetEpollNetwork(EpollNetwork* tcp_network){ p_tcp_network_ = tcp_network; }
     /*
     * 获取 socket 是否执行过 EPOLL_CTL_ADD
     * @return bool
@@ -195,7 +195,7 @@ private:
     std::string ip_;
     uint16_t port_ = 0;
 
-    TcpNetwork* p_tcp_network_ = nullptr;     // 工作线程
+    EpollNetwork* p_tcp_network_ = nullptr;     // 工作线程
     EpollSocketPool *p_sock_pool_ = nullptr;  // socket 池子
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态

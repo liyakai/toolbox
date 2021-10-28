@@ -2,39 +2,39 @@
 #include "epoll_define.h"
 
 
-TcpNetwork::TcpNetwork()
+EpollNetwork::EpollNetwork()
      : epoll_ctrl_(MAX_SOCKET_COUNT)
   
 {
 }
 
-TcpNetwork::~TcpNetwork()
+EpollNetwork::~EpollNetwork()
 {
 
 }
 
-void TcpNetwork::Init(NetworkMaster* master)
+void EpollNetwork::Init(NetworkMaster* master)
 {
     INetwork::Init(master);
     epoll_ctrl_.CreateEpoll();
     sock_mgr_.Init(MAX_SOCKET_COUNT);
 }
 
-void TcpNetwork::UnInit()
+void EpollNetwork::UnInit()
 {
     sock_mgr_.UnInit();
     epoll_ctrl_.Destroy();
     INetwork::UnInit();
 }
 
-void TcpNetwork::Update()
+void EpollNetwork::Update()
 {
     INetwork::Update();
     epoll_ctrl_.RunOnce();
 }
 
 
-uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+uint64_t EpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     auto new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
@@ -43,7 +43,7 @@ uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, i
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
-    new_socket->SetTcpNetwork(this);
+    new_socket->SetEpollNetwork(this);
     if(false == new_socket->InitNewAccepter(ip, port, send_buff_size, recv_buff_size))
     {
         return 0;
@@ -51,7 +51,7 @@ uint64_t TcpNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, i
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
 }
-uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+uint64_t EpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     auto new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
@@ -60,7 +60,7 @@ uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, 
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
-    new_socket->SetTcpNetwork(this);
+    new_socket->SetEpollNetwork(this);
     if(false == new_socket->InitNewConnecter(ip, port, send_buff_size, recv_buff_size))
     {
         return 0;
@@ -68,7 +68,7 @@ uint64_t TcpNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, 
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return 0;
 }
-void TcpNetwork::OnClose(uint64_t connect_id)
+void EpollNetwork::OnClose(uint64_t connect_id)
 {
     auto socket = sock_mgr_.GetEpollSocket((uint32_t)connect_id);
     if(nullptr == socket)
@@ -78,7 +78,7 @@ void TcpNetwork::OnClose(uint64_t connect_id)
     socket->Close(ENetErrCode::NET_NO_ERROR);
 }
 
-void TcpNetwork::OnSend(uint64_t connect_id, const char* data, uint32_t size)
+void EpollNetwork::OnSend(uint64_t connect_id, const char* data, uint32_t size)
 {
     auto socket = sock_mgr_.GetEpollSocket(connect_id);
     if(nullptr == socket)

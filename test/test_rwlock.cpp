@@ -5,7 +5,7 @@ FIXTURE_BEGIN(TestRWLock)
 
 RWLock rw_lock;
 CRWLock crw_lock;
-constexpr int32_t target_num = 1000;
+constexpr int32_t target_num = 100;
 
 void ReadThread_RWLock(int32_t& n)
 {
@@ -14,7 +14,7 @@ void ReadThread_RWLock(int32_t& n)
     {
         //std::this_thread::sleep_for(std::chrono::milliseconds(1));
         rw_lock.ReadLock();
-        fprintf(stderr, "ReadThread_RWLock read n:%d \n", n);
+        //fprintf(stderr, "ReadThread_RWLock read n:%d \n", n);
         rw_lock.ReadUnlock();
         std::this_thread::yield();
     }
@@ -28,7 +28,7 @@ void ReadThread_CRWLock(int32_t& n)
         //std::this_thread::sleep_for(std::chrono::milliseconds(1));
         //fprintf(stderr, "before ReadThread_CRWLock read n:%d \n", n);
         crw_lock.ReadLock();
-        fprintf(stderr, "ReadThread_CRWLock read n:%d \n", n);
+        //fprintf(stderr, "ReadThread_CRWLock read n:%d \n", n);
         crw_lock.ReadUnlock();
         //fprintf(stderr, "after ReadThread_CRWLock read n:%d \n\n", n);
         std::this_thread::yield();

@@ -16,8 +16,8 @@ INetwork::~INetwork()
 {
     while (!event2worker_.Empty())
     {
-        NetEventWorker* event;
-        if(event2worker_.Read<NetEventWorker*>(event))
+        NetEventWorker* event = event2worker_.Pop();
+        if(!event)
         {
             GiveBackObject(event, "INetwork::~INetwork");
         }
@@ -43,7 +43,7 @@ void INetwork::Update()
 
 void INetwork::PushEvent(NetEventWorker* event)
 {
-    event2worker_.Write<NetEventWorker*>(event);
+    event2worker_.Push(std::move(event));
 }
 
 void INetwork::OnAccepted(uint64_t connect_id)
@@ -141,9 +141,8 @@ void INetwork::HandleEvents_()
 {
     while(!event2worker_.Empty())
     {
-        NetEventWorker* event = nullptr;
-        if(true == event2worker_.Read<NetEventWorker*>(event) 
-        && nullptr != event)
+        NetEventWorker* event = event2worker_.Pop();
+        if(nullptr != event)
         {
             HandleEvent(event);
             GiveBackObject(event, "INetwork::HandleEvents_");

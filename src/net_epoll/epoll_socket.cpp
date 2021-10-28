@@ -85,7 +85,7 @@ void EpollSocket::InitAccpetSocket(EpollSocket *socket, int32_t socket_fd, std::
 {
     socket->Init(send_buff_size, recv_buff_size);
     socket->SetSocketMgr(p_sock_pool_);
-    socket->SetTcpNetwork(p_tcp_network_);
+    socket->SetEpollNetwork(p_tcp_network_);
     socket->SetSocketID(socket_fd);
     socket->SetIP(ip);
     socket->SetPort(port);

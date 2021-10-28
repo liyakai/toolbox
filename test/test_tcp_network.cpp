@@ -107,11 +107,11 @@ private:
     uint64_t echo_conn_id_ = 0;
 };
 
-FIXTURE_BEGIN(TCPNetWork)
+FIXTURE_BEGIN(EpollNetwork)
 
 CASE(test_tcp_echo)
 {
-    //return;
+    return;
     ProfilerStart("test_tcp_echo.prof");
     fprintf(stderr,"网络库测试用例: test_tcp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
@@ -153,7 +153,7 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    // return;
+    return;
     ProfilerStart("test_tcp_forward.prof");
     fprintf(stderr,"网络库测试用例: test_tcp_forward \n");
     Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
@@ -194,4 +194,4 @@ CASE(test_tcp_forward)
     return;
 }
 
-FIXTURE_END(TCPNetWork)
+FIXTURE_END(EpollNetwork)

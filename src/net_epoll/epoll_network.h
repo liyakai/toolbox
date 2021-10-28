@@ -7,17 +7,17 @@
 /*
 * 定义 Tcp网络
 */
-class TcpNetwork : public INetwork
+class EpollNetwork : public INetwork
 {
 public:
     /*
     * 构造
     */
-    TcpNetwork();
+    EpollNetwork();
     /*
     * 析构
     */
-    virtual ~TcpNetwork();
+    virtual ~EpollNetwork();
     /*
     * 初始化
     */

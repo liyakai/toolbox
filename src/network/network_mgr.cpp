@@ -44,12 +44,7 @@ void NetworkMaster::StopWait()
     }
     while (!event2main_.Empty())
     {
-        NetEventWorker* event;
-        if(event2main_.Read<NetEventWorker*>(event)
-        && nullptr != event)
-        {
-            GiveBackObject(event,"NetworkMaster::StopWait");
-        }
+        GiveBackObject(event2main_.Pop(),"NetworkMaster::StopWait");
     }
     for(auto& network : networks_)
     {
@@ -104,7 +99,7 @@ void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
 }
 void NetworkMaster::NotifyMain(NetEventMain* event)
 {
-    event2main_.Write<NetEventMain*>(event);
+    event2main_.Push(std::move(event));
 }
 
 
@@ -113,9 +108,8 @@ void NetworkMaster::DispatchMainEvent_()
 {
     while(!event2main_.Empty())
     {
-        NetEventMain* event;
-        if(!event2main_.Read<NetEventMain*>(event)
-        || nullptr == event)
+        NetEventMain* event = event2main_.Pop();
+        if(nullptr == event)
         {
             OnErrored(0, ENetErrCode::NET_INVALID_SOCKET, 0);
             continue;
@@ -162,10 +156,14 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     {
     case NT_TCP:
     {
-        auto* tcp_network = new TcpNetwork();
+        auto* tcp_network = new EpollNetwork();
         tcp_network->Init(this);
         return tcp_network;
         break;
+    }
+    case NT_UDP:
+    {
+
     }
     case Unknown:
     case NT_MAX:

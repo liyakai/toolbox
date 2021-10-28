@@ -4,6 +4,7 @@
 #include "src/tools/ringbuffer.h"
 #include "event.h"
 #include "network.h"
+#include "network_def.h"
 
 class INetwork;
 
@@ -12,10 +13,11 @@ enum NetworkType
 {
     Unknown = 0,
     NT_TCP,
+    NT_UDP,
     NT_MAX,
 };
 
-using Event2Main = RingBuffer<NetEventMain*, 1024>;
+using Event2Main = RingBufferSPSC<NetEventMain*, NETWORK_EVENT_QUEUE_MAX_COUNT>;
 /*
 * 定义网络主线程
 */

@@ -4,6 +4,7 @@
 #include "src/tools/ringbuffer.h"
 #include "src/tools/memory_pool.h"
 #include "network_mgr.h"
+#include "network_def.h"
 
 class NetworkMaster;
 
@@ -29,7 +30,7 @@ enum class ENetErrCode
 };
 
 /// 事件队列
-using Event2Worker = RingBuffer<NetEventWorker *, 1024>;
+using Event2Worker = RingBufferSPSC<NetEventWorker *, NETWORK_EVENT_QUEUE_MAX_COUNT>;
 /// 事件处理函数
 using EventHandler = std::function<void(Event *event)>;
 /*
