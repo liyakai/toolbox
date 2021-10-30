@@ -57,7 +57,7 @@ bool EpollCtrl::DelEvent(int socket_fd)
     return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
 }
 
-bool EpollCtrl::OperEvent(EpollSocket &socket, EpollOperType op_type, int32_t event_type)
+bool EpollCtrl::OperEvent(TcpSocket &socket, EpollOperType op_type, int32_t event_type)
 {
     epoll_event event;
     memset(&event, 0, sizeof(event));
@@ -124,7 +124,7 @@ bool EpollCtrl::RunOnce()
     for (int i = 0; i < count; i++)
     {
         epoll_event &event = events_[i];
-        EpollSocket *socket = static_cast<EpollSocket *>(event.data.ptr);
+        TcpSocket *socket = static_cast<TcpSocket *>(event.data.ptr);
         if(nullptr == socket) continue;
         if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
         {

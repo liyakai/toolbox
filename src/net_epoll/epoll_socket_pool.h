@@ -4,7 +4,7 @@
 #include <vector>
 #include "epoll_socket.h"
 
-class EpollSocket;
+class TcpSocket;
 /*
 * socket 池子
 */
@@ -33,15 +33,15 @@ public:
     * @param conn_id 连接ID
     * @return socket
     */
-    EpollSocket* GetEpollSocket(uint32_t conn_id);
+    TcpSocket* GetEpollSocket(uint32_t conn_id);
     /*
-    * 分配新的 EpollSocket
+    * 分配新的 EpTcpSocket
     */
-    EpollSocket* Alloc();
+    TcpSocket* Alloc();
     /*
     * 归还用过的 socket
     */
-    void Free(EpollSocket* socket);
+    void Free(TcpSocket* socket);
 private:
     /*
     * 生成新的 index
@@ -66,8 +66,8 @@ private:
     uint16_t curr_index_ = 0;       // 当前用到的索引值
     uint16_t curr_cycle_ = 0;       // 当前用到的第几轮
 
-    using EpollSocketVector = std::vector<EpollSocket*>;
-    using EpollSocketList = std::deque<EpollSocket*>;
+    using EpollSocketVector = std::vector<TcpSocket*>;
+    using EpollSocketList = std::deque<TcpSocket*>;
     using SlotIndexList = std::deque<uint16_t>;
 
     EpollSocketVector socket_vector_;   // socket 管理容器

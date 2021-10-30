@@ -157,7 +157,7 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     case NT_TCP:
     {
         auto* tcp_network = new EpollNetwork();
-        tcp_network->Init(this);
+        tcp_network->Init(this, NT_TCP);
         return tcp_network;
         break;
     }

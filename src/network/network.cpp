@@ -26,9 +26,10 @@ INetwork::~INetwork()
     event2worker_.Clear();
 }
 
-void INetwork::Init(NetworkMaster* master)
+void INetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
     master_ = master;
+    network_type_ = network_type;
 }
 void INetwork::UnInit()
 {

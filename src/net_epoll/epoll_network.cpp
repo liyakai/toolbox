@@ -13,9 +13,9 @@ EpollNetwork::~EpollNetwork()
 
 }
 
-void EpollNetwork::Init(NetworkMaster* master)
+void EpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
-    INetwork::Init(master);
+    INetwork::Init(master, network_type);
     epoll_ctrl_.CreateEpoll();
     sock_mgr_.Init(MAX_SOCKET_COUNT);
 }

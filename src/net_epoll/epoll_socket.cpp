@@ -10,20 +10,20 @@
 #include "epoll_socket_pool.h"
 #include "epoll_network.h"
 
-EpollSocket::EpollSocket()
+TcpSocket::TcpSocket()
 {
 }
 
-EpollSocket::~EpollSocket()
+TcpSocket::~TcpSocket()
 {
 }
-bool EpollSocket::Init(int32_t send_buff_len, int32_t recv_buff_len)
+bool TcpSocket::Init(int32_t send_buff_len, int32_t recv_buff_len)
 {
     send_buff_len_ = 0 == send_buff_len ? DEFAULT_TCP_BUFFER_SIZE : send_buff_len;
     recv_buff_len_ = 0 == recv_buff_len ? DEFAULT_TCP_BUFFER_SIZE : recv_buff_len;
     return true;
 }
-void EpollSocket::UnInit()
+void TcpSocket::UnInit()
 {
     conn_id_ = INVALID_CONN_ID;
     socket_id_ = -1;
@@ -41,16 +41,16 @@ void EpollSocket::UnInit()
     is_ctrl_add_ = false;
 }
 
-void EpollSocket::Reset()
+void TcpSocket::Reset()
 {
     UnInit();
 }
 
-void EpollSocket::SetCtrlAdd(bool value)
+void TcpSocket::SetCtrlAdd(bool value)
 {
     is_ctrl_add_ = value;
 }
-void EpollSocket::UpdateAccept()
+void TcpSocket::UpdateAccept()
 {
     int32_t client_fd = 0; // 客户端套接字
     sockaddr_in addr;
@@ -65,7 +65,7 @@ void EpollSocket::UpdateAccept()
         {
             break;
         }
-        EpollSocket *new_socket = p_sock_pool_->Alloc();
+        TcpSocket *new_socket = p_sock_pool_->Alloc();
         if (nullptr == new_socket)
         {
             close(client_fd);
@@ -81,7 +81,7 @@ void EpollSocket::UpdateAccept()
     event_type_ = SOCKET_EVENT_RECV;
 }
 
-void EpollSocket::InitAccpetSocket(EpollSocket *socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+void TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     socket->Init(send_buff_size, recv_buff_size);
     socket->SetSocketMgr(p_sock_pool_);
@@ -99,7 +99,7 @@ void EpollSocket::InitAccpetSocket(EpollSocket *socket, int32_t socket_fd, std::
     socket->SetTcpBuffSize(socket_fd);
 }
 
-void EpollSocket::UpdateRecv()
+void TcpSocket::UpdateRecv()
 {
     while (size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
     {
@@ -137,7 +137,7 @@ void EpollSocket::UpdateRecv()
     }
 }
 
-int32_t EpollSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
+int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
 {
     int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
     if (recv_bytes > 0)
@@ -161,7 +161,7 @@ int32_t EpollSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
     }
 }
 
-ErrCode EpollSocket::ProcessRecvData()
+ErrCode TcpSocket::ProcessRecvData()
 {
     auto data_size = recv_ring_buffer_.ReadableSize();
     // 这里暂时采用 len|buff 的方式[len包含len自身的长度]分割数据.可重构为传入解包方法
@@ -185,7 +185,7 @@ ErrCode EpollSocket::ProcessRecvData()
     return ErrCode::ERR_SUCCESS;
 }
 
-void EpollSocket::UpdateConnect()
+void TcpSocket::UpdateConnect()
 {
     event_type_ |= SOCKET_EVENT_RECV;
     p_tcp_network_->GetEpollCtrl().OperEvent(*this, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
@@ -193,7 +193,7 @@ void EpollSocket::UpdateConnect()
     p_tcp_network_->OnConnected(GetConnID());
 }
 
-void EpollSocket::UpdateSend()
+void TcpSocket::UpdateSend()
 {
     while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
     {
@@ -211,7 +211,7 @@ void EpollSocket::UpdateSend()
     }
 }
 
-int32_t EpollSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
+int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 {
     int32_t send_bytes = send(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
     if (send_bytes < 0)
@@ -232,7 +232,7 @@ int32_t EpollSocket::SocketSend(int32_t socket_fd, const char *data, size_t size
     return send_bytes;
 }
 
-void EpollSocket::UpdateError()
+void TcpSocket::UpdateError()
 {
     if(SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
     {
@@ -243,7 +243,7 @@ void EpollSocket::UpdateError()
     }
 }
 
-int32_t EpollSocket::GetSocketError()
+int32_t TcpSocket::GetSocketError()
 {
     int32_t error = 0;
     socklen_t len = sizeof(error);
@@ -254,7 +254,7 @@ int32_t EpollSocket::GetSocketError()
     return error;
 }
 
-void EpollSocket::Close(ENetErrCode net_err, int32_t sys_err)
+void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (-1 != socket_id_)
     {
@@ -267,7 +267,7 @@ void EpollSocket::Close(ENetErrCode net_err, int32_t sys_err)
     }
 }
 
-void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
+void TcpSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
 {
     if (SocketState::SOCK_STATE_INVALIED == socket_state_)
     {
@@ -305,7 +305,7 @@ void EpollSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
     }
 }
 
-bool EpollSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     if (SocketState::SOCK_STATE_LISTENING == socket_state_)
     {
@@ -351,7 +351,7 @@ bool EpollSocket::InitNewAccepter(const std::string &ip, const uint16_t port, in
     return true;
 }
 
-bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
     {
@@ -394,7 +394,7 @@ bool EpollSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t
     return true;
 }
 
-void EpollSocket::Send(const char* data, size_t len)
+void TcpSocket::Send(const char* data, size_t len)
 {
     if(nullptr == data || 0 == len)
     {
@@ -426,26 +426,26 @@ void EpollSocket::Send(const char* data, size_t len)
     {
         send_ring_buffer_.Write(data + sended, len - sended);
     }   
-    // MemPoolMgr->GiveBack(const_cast<char*>(data), "EpollSocket::Send");
+    // MemPoolMgr->GiveBack(const_cast<char*>(data), "TcpSocket::Send");
 }
 
-int32_t EpollSocket::SetNonBlocking(int32_t fd)
+int32_t TcpSocket::SetNonBlocking(int32_t fd)
 {
     int32_t flags = fcntl(fd, F_GETFL, 0);
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
-int32_t EpollSocket::SetKeepaliveOff(int32_t fd)
+int32_t TcpSocket::SetKeepaliveOff(int32_t fd)
 {
     int32_t keepalive = 0;
     return setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
 }
-int32_t EpollSocket::SetNagleOff(int32_t fd)
+int32_t TcpSocket::SetNagleOff(int32_t fd)
 {
     int32_t nodelay = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
 }
 // SOCKET在close时候不等待缓冲区发送完成
-int32_t EpollSocket::SetLingerOff(int32_t fd)
+int32_t TcpSocket::SetLingerOff(int32_t fd)
 {
     linger so_linger;
     so_linger.l_onoff = 0;
@@ -455,19 +455,19 @@ int32_t EpollSocket::SetLingerOff(int32_t fd)
 这个套接字选项通知内核，如果端口忙，但TCP状态位于 TIME_WAIT ，可以重用端口。如果端口忙，而TCP状态位于其他状态，重用端口时依旧得到一个错误信息，指明"地址已经使用中"。
 如果你的服务程序停止后想立即重启，而新套接字依旧使用同一端口，此时SO_REUSEADDR 选项非常有用
 */
-int32_t EpollSocket::SetReuseAddrOn(int32_t fd)
+int32_t TcpSocket::SetReuseAddrOn(int32_t fd)
 {
     int32_t reuse_addr = 1;
     return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse_addr, sizeof(reuse_addr));
 }
 
-int32_t EpollSocket::SetDeferAccept(int32_t fd)
+int32_t TcpSocket::SetDeferAccept(int32_t fd)
 {
     int32_t secs = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &secs, sizeof(secs));
 }
 
-int32_t EpollSocket::SetTcpBuffSize(int32_t fd)
+int32_t TcpSocket::SetTcpBuffSize(int32_t fd)
 {
     if(send_buff_len_ > static_cast<int32_t>(DEFAULT_TCP_BUFFER_SIZE))
     {

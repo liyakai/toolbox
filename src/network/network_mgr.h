@@ -8,15 +8,6 @@
 
 class INetwork;
 
-// 网络类型
-enum NetworkType
-{
-    Unknown = 0,
-    NT_TCP,
-    NT_UDP,
-    NT_MAX,
-};
-
 using Event2Main = RingBufferSPSC<NetEventMain*, NETWORK_EVENT_QUEUE_MAX_COUNT>;
 /*
 * 定义网络主线程

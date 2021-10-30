@@ -46,7 +46,7 @@ void EpollSocketPool::UnInit()
     socket_vector_.clear();
 }
 
-EpollSocket* EpollSocketPool::GetEpollSocket(uint32_t conn_id)
+TcpSocket* EpollSocketPool::GetEpollSocket(uint32_t conn_id)
 {
     uint16_t index = GetLoWord(conn_id);
     if(index < max_socket_count_)
@@ -56,21 +56,21 @@ EpollSocket* EpollSocketPool::GetEpollSocket(uint32_t conn_id)
     return nullptr;
 }
 
-EpollSocket* EpollSocketPool::Alloc()
+TcpSocket* EpollSocketPool::Alloc()
 {
     uint32_t conn_id = NewID();
     if(INVALID_CONN_ID == conn_id)
     {
         return nullptr;
     }
-    EpollSocket *socket = nullptr;
+    TcpSocket *socket = nullptr;
     if(!free_list_.empty())
     {
         socket = free_list_.front();
         free_list_.pop_front();
     } else 
     {
-        socket = new EpollSocket;
+        socket = new TcpSocket;
     }
     socket->SetConnID(conn_id);
     uint16_t index = GetLoWord(conn_id);
@@ -78,7 +78,7 @@ EpollSocket* EpollSocketPool::Alloc()
     return socket;
 }
 
-void EpollSocketPool::Free(EpollSocket* socket)
+void EpollSocketPool::Free(TcpSocket* socket)
 {
     if(nullptr == socket)
     {

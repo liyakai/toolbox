@@ -5,7 +5,7 @@
 #include "epoll_socket_pool.h"
 
 /*
-* 定义 Tcp网络
+* 定义 Epoll网络
 */
 class EpollNetwork : public INetwork
 {
@@ -21,7 +21,7 @@ public:
     /*
     * 初始化
     */
-    virtual void Init(NetworkMaster* master) override;
+    virtual void Init(NetworkMaster* master, NetworkType network_type) override;
     /*
     * 逆初始化网络
     */
@@ -50,10 +50,9 @@ protected:
     * 工作线程内工作线程内发送
     */
     virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) override;
+
 private:
-    void OnReceive_(EpollSocket* socket);
-private:
-    NetworkMaster *network_master_;
-    EpollCtrl epoll_ctrl_;
-    EpollSocketPool sock_mgr_;
+    NetworkMaster *network_master_;     // 主线程网络管理器
+    EpollCtrl epoll_ctrl_;              // epoll控制器
+    EpollSocketPool sock_mgr_;          // socket池
 };

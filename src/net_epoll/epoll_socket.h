@@ -10,17 +10,17 @@ class EpollSocketPool;
 /*
 * 定义每一个连接
 */
-class EpollSocket
+class TcpSocket
 {
 public:
     /*
     * 构造
     */
-    EpollSocket();
+    TcpSocket();
     /*
     * 析构
     */
-    ~EpollSocket();
+    ~TcpSocket();
     /*
     * 初始化
     */
@@ -127,7 +127,7 @@ private:
     /*
     *  初始化从accpet函数接收得来的socket
     */
-    void InitAccpetSocket(EpollSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+    void InitAccpetSocket(TcpSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
     /*
     * 处理客户端数据的情况
     */
