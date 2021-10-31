@@ -1,4 +1,4 @@
-#include "epoll_socket.h"
+#include "tcp_socket.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -7,8 +7,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/tcp.h> // TCP_NODELAY
-#include "epoll_socket_pool.h"
-#include "epoll_network.h"
+#include "socket_pool.h"
+#include "tcp_epoll_network.h"
 
 TcpSocket::TcpSocket()
 {
@@ -19,37 +19,30 @@ TcpSocket::~TcpSocket()
 }
 bool TcpSocket::Init(int32_t send_buff_len, int32_t recv_buff_len)
 {
-    send_buff_len_ = 0 == send_buff_len ? DEFAULT_TCP_BUFFER_SIZE : send_buff_len;
-    recv_buff_len_ = 0 == recv_buff_len ? DEFAULT_TCP_BUFFER_SIZE : recv_buff_len;
+    send_buff_len_ = 0 == send_buff_len ? DEFAULT_CONN_BUFFER_SIZE : send_buff_len;
+    recv_buff_len_ = 0 == recv_buff_len ? DEFAULT_CONN_BUFFER_SIZE : recv_buff_len;
     return true;
 }
 void TcpSocket::UnInit()
 {
-    conn_id_ = INVALID_CONN_ID;
-    socket_id_ = -1;
-    port_ = 0;
+    Reset();
+}
 
-    p_tcp_network_ = nullptr;
+void TcpSocket::Reset()
+{
+        p_tcp_network_ = nullptr;
     p_sock_pool_ = nullptr;
 
     socket_state_ = SocketState::SOCK_STATE_INVALIED;
-    event_type_ = SOCKET_EVENT_INVALID;
+    send_buff_len_ = 0;
     recv_buff_len_ = 0;
     recv_ring_buffer_.Clear();
     send_ring_buffer_.Clear();
     last_recv_ts_ = 0;
     is_ctrl_add_ = false;
+    BaseSocket::Reset();
 }
 
-void TcpSocket::Reset()
-{
-    UnInit();
-}
-
-void TcpSocket::SetCtrlAdd(bool value)
-{
-    is_ctrl_add_ = value;
-}
 void TcpSocket::UpdateAccept()
 {
     int32_t client_fd = 0; // 客户端套接字
@@ -87,8 +80,8 @@ void TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
     socket->SetSocketMgr(p_sock_pool_);
     socket->SetEpollNetwork(p_tcp_network_);
     socket->SetSocketID(socket_fd);
-    socket->SetIP(ip);
-    socket->SetPort(port);
+    // socket->SetIP(ip);
+    // socket->SetPort(port);
     socket->SetState(SocketState::SOCK_STATE_ESTABLISHED);
     socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
 
@@ -256,12 +249,11 @@ int32_t TcpSocket::GetSocketError()
 
 void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
-    if (-1 != socket_id_)
+    if (IsSocketValid())
     {
+        BaseSocket::Close();
         // 通知主线程 socket 关闭
         p_tcp_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
-        close(socket_id_);
-        socket_id_ = -1;
         socket_state_ = SocketState::SOCK_STATE_INVALIED;
         p_sock_pool_->Free(this);
     }
@@ -369,10 +361,10 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
         return false;
     }
 
-    // 设置对端地址
-    ip_ = ip;
-    // 设置对端端口
-    port_ = port;
+    // // 设置对端地址
+    // ip_ = ip;
+    // // 设置对端端口
+    // port_ = port;
     struct sockaddr_in sa;
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
@@ -469,15 +461,15 @@ int32_t TcpSocket::SetDeferAccept(int32_t fd)
 
 int32_t TcpSocket::SetTcpBuffSize(int32_t fd)
 {
-    if(send_buff_len_ > static_cast<int32_t>(DEFAULT_TCP_BUFFER_SIZE))
+    if(send_buff_len_ > static_cast<int32_t>(DEFAULT_CONN_BUFFER_SIZE))
     {
-        int32_t snd_size = DEFAULT_TCP_BUFFER_SIZE;
+        int32_t snd_size = DEFAULT_CONN_BUFFER_SIZE;
         socklen_t optlen = sizeof(snd_size);
         setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (char*)&snd_size, optlen);
     }
-    if(recv_buff_len_ > static_cast<int32_t>(DEFAULT_TCP_BUFFER_SIZE))
+    if(recv_buff_len_ > static_cast<int32_t>(DEFAULT_CONN_BUFFER_SIZE))
     {
-        int32_t rcv_size = DEFAULT_TCP_BUFFER_SIZE;
+        int32_t rcv_size = DEFAULT_CONN_BUFFER_SIZE;
         socklen_t optlen = sizeof(rcv_size);
         setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char*)&rcv_size, optlen);
     }

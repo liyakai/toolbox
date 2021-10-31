@@ -1,14 +1,25 @@
 #pragma once
+#include <cstdint>
 
+#if (defined(WIN32) || defined(_WIN64))
+include <Winsock2.h>
+#else
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif  // #if (defined(WIN32) || defined(_WIN64))
 
-constexpr size_t MAX_SOCKET_COUNT           =   40000;
-constexpr size_t MAXEVENTS                  =   8192; /* epoll_create参数 */
-constexpr size_t EPOLL_WAIT_MSECONDS        =   2;
-constexpr size_t INVALID_CONN_ID	 	    =   UINT32_MAX;
-constexpr size_t DEFAULT_TCP_BUFFER_SIZE    =   256 * 1024;        /* 256 k */
-constexpr size_t DEFAULT_RING_BUFF_SIZE     =   256 * 1024;        /* 256 k */
-constexpr size_t DEFAULT_BACKLOG_SIZE       =   256;    
+constexpr std::size_t MAX_SOCKET_COUNT           =   40000;
+constexpr std::size_t MAXEVENTS                  =   8192; /* epoll_create参数 */
+constexpr std::size_t EPOLL_WAIT_MSECONDS        =   2;
+constexpr std::size_t INVALID_CONN_ID	 	     =   UINT32_MAX;
+constexpr std::size_t DEFAULT_CONN_BUFFER_SIZE   =   256 * 1024;        /* 256 k */
+constexpr std::size_t DEFAULT_RING_BUFF_SIZE     =   256 * 1024;        /* 256 k */
+constexpr std::size_t DEFAULT_BACKLOG_SIZE       =   256;   
+constexpr std::size_t INVALID_SOCKET             =   -1;
 
+using SocketAddress = struct sockaddr_in;
 /*
 * 错误码
 */
@@ -55,4 +66,14 @@ enum SockEventType
     SOCKET_EVENT_RECV = 1,
     SOCKET_EVENT_SEND = 2,
     SOCKET_EVENT_ERR = 4,
+};
+
+/*
+* UDP socket 类型
+*/
+enum class UdpType
+{
+    UNKNOWN = 0,
+    ACCEPTOR = 1,
+    CONNECTOR = 2,
 };

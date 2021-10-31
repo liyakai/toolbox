@@ -1,5 +1,5 @@
 #include "network_mgr.h"
-#include "src/net_epoll/epoll_network.h"
+#include "src/net_epoll/tcp_epoll_network.h"
 #include "src/tools/object_pool.h"
 NetworkMaster::NetworkMaster()
 {
@@ -156,7 +156,7 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     {
     case NT_TCP:
     {
-        auto* tcp_network = new EpollNetwork();
+        auto* tcp_network = new TcpEpollNetwork();
         tcp_network->Init(this, NT_TCP);
         return tcp_network;
         break;

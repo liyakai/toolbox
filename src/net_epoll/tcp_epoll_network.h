@@ -2,22 +2,22 @@
 
 #include "src/network/network.h"
 #include "epoll_ctrl.h"
-#include "epoll_socket_pool.h"
+#include "socket_pool.h"
 
 /*
-* 定义 Epoll网络
+* 定义基于 TCP 和 Epoll 的网络
 */
-class EpollNetwork : public INetwork
+class TcpEpollNetwork : public INetwork
 {
 public:
     /*
     * 构造
     */
-    EpollNetwork();
+    TcpEpollNetwork();
     /*
     * 析构
     */
-    virtual ~EpollNetwork();
+    virtual ~TcpEpollNetwork();
     /*
     * 初始化
     */
@@ -49,10 +49,10 @@ protected:
     /*
     * 工作线程内工作线程内发送
     */
-    virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) override;
+    virtual void OnSend(uint64_t connect_id, const char* data, std::size_t size) override;
 
 private:
     NetworkMaster *network_master_;     // 主线程网络管理器
     EpollCtrl epoll_ctrl_;              // epoll控制器
-    EpollSocketPool sock_mgr_;          // socket池
+    SocketPool<TcpSocket> sock_mgr_;    // socket池
 };

@@ -1,40 +1,40 @@
-#include "epoll_network.h"
+#include "tcp_epoll_network.h"
 #include "epoll_define.h"
 
 
-EpollNetwork::EpollNetwork()
+TcpEpollNetwork::TcpEpollNetwork()
      : epoll_ctrl_(MAX_SOCKET_COUNT)
   
 {
 }
 
-EpollNetwork::~EpollNetwork()
+TcpEpollNetwork::~TcpEpollNetwork()
 {
 
 }
 
-void EpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
+void TcpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
     INetwork::Init(master, network_type);
     epoll_ctrl_.CreateEpoll();
     sock_mgr_.Init(MAX_SOCKET_COUNT);
 }
 
-void EpollNetwork::UnInit()
+void TcpEpollNetwork::UnInit()
 {
     sock_mgr_.UnInit();
     epoll_ctrl_.Destroy();
     INetwork::UnInit();
 }
 
-void EpollNetwork::Update()
+void TcpEpollNetwork::Update()
 {
     INetwork::Update();
     epoll_ctrl_.RunOnce();
 }
 
 
-uint64_t EpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+uint64_t TcpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     auto new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
@@ -51,7 +51,7 @@ uint64_t EpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t port,
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
 }
-uint64_t EpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+uint64_t TcpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     auto new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
@@ -68,7 +68,7 @@ uint64_t EpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t port
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return 0;
 }
-void EpollNetwork::OnClose(uint64_t connect_id)
+void TcpEpollNetwork::OnClose(uint64_t connect_id)
 {
     auto socket = sock_mgr_.GetEpollSocket((uint32_t)connect_id);
     if(nullptr == socket)
@@ -78,7 +78,7 @@ void EpollNetwork::OnClose(uint64_t connect_id)
     socket->Close(ENetErrCode::NET_NO_ERROR);
 }
 
-void EpollNetwork::OnSend(uint64_t connect_id, const char* data, uint32_t size)
+void TcpEpollNetwork::OnSend(uint64_t connect_id, const char* data, std::size_t size)
 {
     auto socket = sock_mgr_.GetEpollSocket(connect_id);
     if(nullptr == socket)

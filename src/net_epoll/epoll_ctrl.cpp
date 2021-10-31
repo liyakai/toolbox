@@ -57,48 +57,6 @@ bool EpollCtrl::DelEvent(int socket_fd)
     return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
 }
 
-bool EpollCtrl::OperEvent(TcpSocket &socket, EpollOperType op_type, int32_t event_type)
-{
-    epoll_event event;
-    memset(&event, 0, sizeof(event));
-    const auto now_event = socket.GetEventType();
-    event.data.ptr = &socket;
-    event.events |= EPOLLET;
-    if (event_type & SOCKET_EVENT_RECV)
-    {
-        if (now_event & SOCKET_EVENT_SEND) // 已经注册写事件
-        {
-            event.events |= EPOLLOUT;
-        }
-        if (EpollOperType::EPOLL_OPER_ADD == op_type)
-        {
-            event.events |= EPOLLIN;
-        }
-    }
-    if (event_type & SOCKET_EVENT_SEND)
-    {
-        if (now_event & SOCKET_EVENT_RECV) // 已经注册读事件
-        {
-            event.events |= EPOLLIN;
-        }
-        if (EpollOperType::EPOLL_OPER_ADD == op_type)
-        {
-            event.events |= EPOLLOUT;
-        }
-    }
-    if (socket.IsCtrlAdd())
-    {
-        epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, socket.GetSocketID(), &event);
-    }
-    else
-    {
-        socket.SetCtrlAdd(true);
-        epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, socket.GetSocketID(), &event);
-    }
-
-    return true;
-}
-
 int EpollCtrl::EpollWait(int msec)
 {
     return epoll_wait(epoll_fd_, events_, max_events_, msec);
