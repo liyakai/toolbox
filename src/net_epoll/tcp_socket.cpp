@@ -236,17 +236,6 @@ void TcpSocket::UpdateError()
     }
 }
 
-int32_t TcpSocket::GetSocketError()
-{
-    int32_t error = 0;
-    socklen_t len = sizeof(error);
-    if(getsockopt(socket_id_, SOL_SOCKET, SO_ERROR, &error, &len) == -1)
-    {
-        return 0;
-    }
-    return error;
-}
-
 void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (IsSocketValid())

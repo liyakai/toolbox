@@ -1,5 +1,6 @@
 #include "network_mgr.h"
 #include "src/net_epoll/tcp_epoll_network.h"
+#include "src/net_epoll/udp_epoll_network.h"
 #include "src/tools/object_pool.h"
 NetworkMaster::NetworkMaster()
 {
@@ -163,7 +164,9 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     }
     case NT_UDP:
     {
-
+        auto* udp_network = new UdpEpollNetwork();
+        udp_network->Init(this, NT_TCP);
+        return udp_network;
     }
     case Unknown:
     case NT_MAX:

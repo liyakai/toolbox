@@ -1,10 +1,12 @@
 #pragma once
 
 #include "src/network/network.h"
+#include <unordered_map>
 #include "epoll_ctrl.h"
 #include "socket_pool.h"
 
 class UdpSocket;
+class UdpAddress;
 /*
 * 定义基于 UDP 和 Epoll 的网络
 */
@@ -33,6 +35,10 @@ public:
     virtual void Update() override;
 public:
     EpollCtrl& GetEpollCtrl(){ return epoll_ctrl_;}
+    /*
+    * @brief UdpAddress 是否存在
+    */
+    bool IsUdpAddressExist(const UdpAddress& udp_address);
    
 protected:
     /*
@@ -56,4 +62,5 @@ private:
     NetworkMaster *network_master_;     // 主线程网络管理器
     EpollCtrl epoll_ctrl_;              // epoll控制器
     SocketPool<UdpSocket> sock_mgr_;    // socket池
+    std::unordered_map<uint64_t, uint32_t> address_to_connect_;      // 地址转换的ID 到 SocketPool管理的连接ID的映射
 };

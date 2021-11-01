@@ -29,3 +29,14 @@ void BaseSocket::Close()
         socket_id_ = -1;
     }
 }
+
+int32_t BaseSocket::GetSocketError()
+{
+    int32_t error = 0;
+    socklen_t len = sizeof(error);
+    if(getsockopt(socket_id_, SOL_SOCKET, SO_ERROR, &error, &len) == -1)
+    {
+        return 0;
+    }
+    return error;
+}

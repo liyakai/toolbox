@@ -66,7 +66,7 @@ uint64_t TcpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
         return 0;
     }
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
-    return 0;
+    return new_socket->GetConnID();
 }
 void TcpEpollNetwork::OnClose(uint64_t connect_id)
 {

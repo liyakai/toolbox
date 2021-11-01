@@ -61,7 +61,7 @@ public:
     * @params event_type 事件类型
     * @params ts 时间戳
     */
-    void UpdateEpollEvent(SockEventType event_type, time_t ts);
+    void UpdateEpollEvent(SockEventType event_type, time_t ts) override;
     /*
     * 初始化新的监听器
     * @param ip 监听IP
@@ -124,10 +124,6 @@ private:
     * 处理错误事件
     */
     void UpdateError();
-    /*
-    * 获取 socket 错误
-    */
-    int32_t GetSocketError();
     /*
     * 设置 非阻塞
     */

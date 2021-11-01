@@ -58,7 +58,7 @@ public:
     /*
     * 取得地址的64位ID
     */
-    uint64_t GetID();
+    uint64_t GetID() const;
 private:
     uint64_t id_ = 0;           // 地址的64位ID
     SocketAddress address_;     // 地址
@@ -82,6 +82,12 @@ public:
     * 重置
     */
     void Reset() override;
+    /*
+    * 更新 epoll 事件
+    * @params event_type 事件类型
+    * @params ts 时间戳
+    */
+    void UpdateEpollEvent(SockEventType event_type, time_t ts) override;
     /*
     * @brief 监听(模拟)
     * @param ip 地址
@@ -129,7 +135,7 @@ public:
     /*
     * @brief 获取远端的地址
     */
-    SocketAddress& GetRemoteAddress(){return remote_address_.GetAddress();};
+    UdpAddress& GetRemoteAddress(){return remote_address_;};
 private:
     /*
     * @brief 绑定ip地址和端口
@@ -138,6 +144,26 @@ private:
     * @return 是否成功
     */
     bool Bind(const std::string& ip, uint16_t port);
+    /*
+    * @brief 处理错误事件
+    */
+    void UpdateError();
+    /*
+    * @brief 处理客户端数据
+    */
+    void UpdateRecv();
+    /*
+    * @brief 处理发送消息
+    */
+    void UpdateSend();
+    /*
+    * @brief 套接字接收数据
+    */
+    bool SocketRecv(int32_t socket_fd, char* data, size_t& size, SocketAddress& address);
+    /*
+    * 套接字发送数据
+    */
+    bool SocketSend(int32_t socket_fd, const char* data, size_t& size, SocketAddress& address);
 private:
     // buff包
     struct Buffer

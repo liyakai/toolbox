@@ -36,7 +36,7 @@ SocketAddress& UdpAddress::GetAddress()
 {
     return address_;
 }
-uint64_t UdpAddress::GetID()
+uint64_t UdpAddress::GetID() const
 {
     return id_;
 }
@@ -81,6 +81,24 @@ void UdpSocket::Reset()
     p_sock_pool_ = nullptr;
     BaseSocket::Reset();
 }
+
+
+void UdpSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
+{
+    if(event_type & SOCKET_EVENT_ERR)
+    {
+        UpdateError();
+    }
+    if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
+    {
+        UpdateRecv();
+    }
+    if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
+    {
+        UpdateSend();
+    }
+}
+
 
 bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port)
 {
@@ -155,5 +173,91 @@ bool UdpSocket::Bind(const std::string& ip, uint16_t port)
         p_udp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, errno);
         return false;
     }
+    return true;
+}
+
+void UdpSocket::UpdateError()
+{
+    Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
+}
+
+void UdpSocket::UpdateRecv()
+{
+    SocketAddress address;
+    std::array<char, DEFAULT_CONN_BUFFER_SIZE> array;
+    auto size = array.size();
+    while(true)
+    {
+        auto success = SocketRecv(socket_id_, array.data(), size, address);
+        if (success && size) {
+            read_buffers_.emplace_back(GetObject<Buffer>(array.data(),size, address));
+            //p_udp_network_->OnReceived(GetConnID(), buff_block, len);
+        } else 
+        {
+            break;
+        }
+    }
+}
+
+void UdpSocket::UpdateSend()
+{
+    for(auto iter = write_buffers_.begin(); iter != write_buffers_.end();)
+    {
+        auto buffer = *iter;
+        size_t size = buffer->size_;
+        auto success = SocketSend(socket_id_, buffer->data_, size, buffer->address_);
+        if(success && size)
+        {
+            if(size == buffer->size_)
+            {
+                dead_buffers_.emplace_back(buffer);
+                iter = write_buffers_.erase(iter);
+            } else 
+            {
+                buffer->size_ -= size;
+                buffer->data_ += size;
+                break;
+            }
+        } else 
+        {
+            break;
+        }
+    }
+}
+
+bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size, SocketAddress& address)
+{
+    socklen_t fromlen = sizeof(address);
+    auto bytes = recvfrom(socket_fd, data, size, 0, (struct sockaddr*)&address, &fromlen);
+    if(bytes < 0)
+    {
+        size = 0;
+        if(EWOULDBLOCK == errno)
+        {
+            return true;
+        } else
+        {
+            return false;
+        }
+    }
+    size = bytes;
+    return true;
+}
+
+bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, SocketAddress& address)
+{
+    auto bytes = sendto(socket_fd, data, size, 0, (struct sockaddr*)&address, sizeof(address));
+    if(bytes < 0)
+    {
+        size = 0;
+        if(EWOULDBLOCK == errno)
+        {
+            return true;
+        } else 
+        {
+            return false;
+        }
+    }
+    size = bytes;
     return true;
 }

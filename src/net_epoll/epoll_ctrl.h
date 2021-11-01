@@ -107,8 +107,6 @@ public:
     * 执行一次 epoll wait
     */
     bool RunOnce();
-
-private:
 private:
     uint32_t max_events_ = 0; // 最大事件数
     int epoll_fd_;            // epoll 文件描述符
