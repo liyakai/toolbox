@@ -26,7 +26,7 @@ public:
     {
         // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         // PrintData(data, 16);
-        Send(NT_TCP, conn_id, data, size);
+        Send(NT_UDP, conn_id, data, size);
     };
     void OnClose(uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) override
     {
@@ -74,8 +74,8 @@ CASE(test_udp_echo)
     }
 
     run = false;
-    t.join();
     Singleton<TestNetworkEcho>::Instance()->StopWait();
+    t.join();
     ProfilerStop();
     return ;
 }

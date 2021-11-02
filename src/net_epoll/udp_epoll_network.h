@@ -34,11 +34,26 @@ public:
     */
     virtual void Update() override;
 public:
+    /*
+    * @brief 获取Epoll
+    */
     EpollCtrl& GetEpollCtrl(){ return epoll_ctrl_;}
     /*
     * @brief UdpAddress 是否存在
+    * @param udp_address udp地址
     */
     bool IsUdpAddressExist(const UdpAddress& udp_address);
+    /*
+    * @brief 增加地址映射
+    * @param udp_address udp地址
+    */
+    void AddUdpAddress(const UdpAddress& udp_address, uint32_t conn_id);
+    /*
+    * @brief 删除地址映射
+    * @param udp_address udp地址
+    */
+    void DeleteUdpAddress(const UdpAddress& udp_address);
+
    
 protected:
     /*

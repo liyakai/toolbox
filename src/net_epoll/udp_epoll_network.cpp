@@ -35,8 +35,7 @@ void UdpEpollNetwork::Update()
 
 bool UdpEpollNetwork::IsUdpAddressExist(const UdpAddress& udp_address)
 {
-    uint64_t address_id = udp_address.GetID();
-    auto iter = address_to_connect_.find(address_id);
+    auto iter = address_to_connect_.find(udp_address.GetID());
     if(iter != address_to_connect_.end())
     {
         return true;
@@ -44,6 +43,15 @@ bool UdpEpollNetwork::IsUdpAddressExist(const UdpAddress& udp_address)
     {
         return false;
     }
+}
+
+void UdpEpollNetwork::AddUdpAddress(const UdpAddress& udp_address, uint32_t conn_id)
+{
+    address_to_connect_[udp_address.GetID()] = conn_id;
+}
+void UdpEpollNetwork::DeleteUdpAddress(const UdpAddress& udp_address)
+{
+    address_to_connect_.erase(udp_address.GetID());
 }
 
 
@@ -62,7 +70,7 @@ uint64_t UdpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t po
         return 0;
     }
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
-    address_to_connect_[new_socket->GetRemoteAddress().GetID()] = new_socket->GetConnID();
+    address_to_connect_[new_socket->GetLocalAddress().GetID()] = new_socket->GetConnID();
     return new_socket->GetConnID();
 }
 uint64_t UdpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)

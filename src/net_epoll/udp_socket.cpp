@@ -105,6 +105,7 @@ bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port)
     Bind(ip,port);
     type_ = UdpType::ACCEPTOR;
     local_address_.SetAddress(ip,port);
+    event_type_ = SOCKET_EVENT_RECV;
     return true;
 }
 bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
@@ -112,12 +113,14 @@ bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
     Bind(ip,port);
     type_ = UdpType::CONNECTOR;
     remote_address_.SetAddress(ip,port);
+    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_SEND;
     return true;
 }
 
 void UdpSocket::SendTo(const char* buffer, std::size_t& length, SocketAddress& address)
 {
     write_buffers_.emplace_back(GetObject<Buffer>(buffer, length, address));
+    fprintf(stderr,"[UdpSocket::SendTo] write_buffers_ size:%zu\n",write_buffers_.size());
 }
 
 bool UdpSocket::RecvFrom(char* buffer, std::size_t& length, SocketAddress& address)
@@ -192,7 +195,9 @@ void UdpSocket::UpdateRecv()
         if (success && size) {
             if(p_udp_network_->IsUdpAddressExist(address))
             {
-                p_udp_network_->OnReceived(GetConnID(), array.data(), size);
+                char *buff_block = MemPoolMgr->GetMemory(size);
+                memcpy(buff_block, array.data(), size);
+                p_udp_network_->OnReceived(GetConnID(), buff_block, size);
             } else if (UdpType::ACCEPTOR == type_)
             {
                 UpdateAccept(address);
@@ -241,7 +246,8 @@ void UdpSocket::UpdateAccept(const SocketAddress& address)
     InitAccpetSocket(new_socket, address);
     // 通知主线程有新的客户端连接进来
     p_udp_network_->OnAccepted(new_socket->GetConnID());
-    p_udp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
+    p_udp_network_->AddUdpAddress(address, new_socket->GetConnID());
+    p_udp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return;
 }
 
@@ -257,7 +263,7 @@ void UdpSocket::InitAccpetSocket(UdpSocket* socket, const SocketAddress& address
 bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size,  const SocketAddress& address)
 {
     socklen_t fromlen = sizeof(address);
-    auto bytes = recvfrom(socket_fd, data, size, 0, (struct sockaddr*)&address, &fromlen);
+    auto bytes = recvfrom(socket_fd, data, size, MSG_DONTWAIT, (struct sockaddr*)&address, &fromlen);
     if(bytes < 0)
     {
         size = 0;
@@ -275,7 +281,7 @@ bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size,  const S
 
 bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, const SocketAddress& address)
 {
-    auto bytes = sendto(socket_fd, data, size, 0, (struct sockaddr*)&address, sizeof(address));
+    auto bytes = sendto(socket_fd, data, size, MSG_DONTWAIT, (struct sockaddr*)&address, sizeof(address));
     if(bytes < 0)
     {
         size = 0;
@@ -287,6 +293,7 @@ bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, co
             return false;
         }
     }
+    fprintf(stderr,"[UdpSocket::SocketSend] 发送字节数:%zu\n", bytes);
     size = bytes;
     return true;
 }

@@ -139,7 +139,11 @@ public:
     /*
     * @brief 获取远端的地址
     */
-    UdpAddress& GetRemoteAddress(){return remote_address_;};
+    UdpAddress& GetRemoteAddress(){ return remote_address_; };
+    /*
+    * @brief 获取本地的地址
+    */
+    UdpAddress& GetLocalAddress(){ return local_address_; };
 private:
     /*
     * @brief 绑定ip地址和端口

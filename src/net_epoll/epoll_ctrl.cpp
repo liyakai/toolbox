@@ -74,12 +74,12 @@ bool EpollCtrl::RunOnce()
 {
     epoll_event evt;
     time_t time_stamp = time(0);    // 时间戳
-    int count = EpollWait(EPOLL_WAIT_MSECONDS);
+    int32_t count = EpollWait(EPOLL_WAIT_MSECONDS);
     if (count < 0)
     {
         return false;
     }
-    for (int i = 0; i < count; i++)
+    for (int32_t i = 0; i < count; i++)
     {
         epoll_event &event = events_[i];
         TcpSocket *socket = static_cast<TcpSocket *>(event.data.ptr);

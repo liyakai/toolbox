@@ -108,7 +108,7 @@ private:
     * 处理需要在工作线程中处理的事件
     */
     void HandleEvents_();
-protected:
+public:
     NetworkType GetNetworkType(){ return network_type_; };
 
 private:

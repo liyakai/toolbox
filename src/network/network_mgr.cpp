@@ -147,6 +147,7 @@ void NetworkMaster::DispatchMainEvent_()
         default:
             break;
         }
+        fprintf(stderr,"NetworkMaster::DispatchMainEvent_:%d\n",event->GetID());
         GiveBackObject(event, "NetworkMaster::DispatchMainEvent_");
     }
 }
@@ -158,14 +159,14 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     case NT_TCP:
     {
         auto* tcp_network = new TcpEpollNetwork();
-        tcp_network->Init(this, NT_TCP);
+        tcp_network->Init(this, type);
         return tcp_network;
         break;
     }
     case NT_UDP:
     {
         auto* udp_network = new UdpEpollNetwork();
-        udp_network->Init(this, NT_TCP);
+        udp_network->Init(this, type);
         return udp_network;
     }
     case Unknown:
