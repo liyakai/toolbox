@@ -70,4 +70,33 @@ epoll_event *EpollCtrl::GetEvent(int index)
     }
     return &events_[index];
 }
-
+bool EpollCtrl::RunOnce()
+{
+    epoll_event evt;
+    time_t time_stamp = time(0);    // 时间戳
+    int count = EpollWait(EPOLL_WAIT_MSECONDS);
+    if (count < 0)
+    {
+        return false;
+    }
+    for (int i = 0; i < count; i++)
+    {
+        epoll_event &event = events_[i];
+        TcpSocket *socket = static_cast<TcpSocket *>(event.data.ptr);
+        if(nullptr == socket) continue;
+        if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
+        {
+            socket->UpdateEpollEvent(SOCKET_EVENT_ERR, time_stamp);
+            epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
+        }
+        else if (event.events & EPOLLIN)
+        {
+            socket->UpdateEpollEvent(SOCKET_EVENT_RECV, time_stamp);
+        }
+        else if (event.events & EPOLLOUT)
+        {
+            socket->UpdateEpollEvent(SOCKET_EVENT_SEND, time_stamp);
+        }
+    }
+    return true;
+}

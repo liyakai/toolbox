@@ -76,4 +76,5 @@ enum class UdpType
     UNKNOWN = 0,
     ACCEPTOR = 1,
     CONNECTOR = 2,
+    REMOTE = 3,
 };

@@ -30,7 +30,7 @@ void TcpSocket::UnInit()
 
 void TcpSocket::Reset()
 {
-        p_tcp_network_ = nullptr;
+    p_tcp_network_ = nullptr;
     p_sock_pool_ = nullptr;
 
     socket_state_ = SocketState::SOCK_STATE_INVALIED;
@@ -166,7 +166,6 @@ ErrCode TcpSocket::ProcessRecvData()
     recv_ring_buffer_.Copy((char *)&len, sizeof(size_t));
     if (len > static_cast<uint32_t>(recv_buff_len_))
     {
-        DebugPrint::PrintfData(recv_ring_buffer_.GetReadPtr(),32);
         return ErrCode::ERR_INVALID_PACKET_SIZE;
     } else if (data_size < len)
     {

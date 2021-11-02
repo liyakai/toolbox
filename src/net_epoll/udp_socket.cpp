@@ -58,10 +58,10 @@ UdpSocket::~UdpSocket()
     {
         GiveBackObject(buffer);
     }
-    for(const auto& buffer : read_buffers_)
-    {
-        GiveBackObject(buffer);
-    }
+    // for(const auto& buffer : read_buffers_)
+    // {
+    //     GiveBackObject(buffer);
+    // }
     for(const auto& buffer : dead_buffers_)
     {
         GiveBackObject(buffer);
@@ -70,7 +70,7 @@ UdpSocket::~UdpSocket()
 
 void UdpSocket::Reset()
 {
-    read_buffers_.clear();
+    // read_buffers_.clear();
     write_buffers_.clear();
     dead_buffers_.clear();
     remote_address_.Reset();
@@ -122,16 +122,16 @@ void UdpSocket::SendTo(const char* buffer, std::size_t& length, SocketAddress& a
 
 bool UdpSocket::RecvFrom(char* buffer, std::size_t& length, SocketAddress& address)
 {
-    if(read_buffers_.empty())
-    {
-        return false;
-    }
-    auto front = read_buffers_.front();
-    memcpy(buffer, front->data_, front->size_);
-    length = front->size_;
-    address = front->address_;
-    read_buffers_.pop_front();
-    dead_buffers_.emplace_back(front);
+    // if(read_buffers_.empty())
+    // {
+    //     return false;
+    // }
+    // auto front = read_buffers_.front();
+    // memcpy(buffer, front->data_, front->size_);
+    // length = front->size_;
+    // address = front->address_;
+    // read_buffers_.pop_front();
+    // dead_buffers_.emplace_back(front);
     return true;
 }
 
@@ -154,7 +154,7 @@ void UdpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 
 bool UdpSocket::Bind(const std::string& ip, uint16_t port)
 {
-    socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_TCP);
+    socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (socket_id_ < 0)
     {
         p_udp_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, errno);
@@ -170,7 +170,7 @@ bool UdpSocket::Bind(const std::string& ip, uint16_t port)
     int32_t error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
     if (error < 0)
     {
-        p_udp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, errno);
+        p_udp_network_->OnErrored(socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
         return false;
     }
     return true;
@@ -190,8 +190,13 @@ void UdpSocket::UpdateRecv()
     {
         auto success = SocketRecv(socket_id_, array.data(), size, address);
         if (success && size) {
-            read_buffers_.emplace_back(GetObject<Buffer>(array.data(),size, address));
-            //p_udp_network_->OnReceived(GetConnID(), buff_block, len);
+            if(p_udp_network_->IsUdpAddressExist(address))
+            {
+                p_udp_network_->OnReceived(GetConnID(), array.data(), size);
+            } else if (UdpType::ACCEPTOR == type_)
+            {
+                UpdateAccept(address);
+            }
         } else 
         {
             break;
@@ -225,7 +230,31 @@ void UdpSocket::UpdateSend()
     }
 }
 
-bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size, SocketAddress& address)
+void UdpSocket::UpdateAccept(const SocketAddress& address)
+{
+    auto new_socket = p_sock_pool_->Alloc();
+    if(nullptr == new_socket)
+    {
+        p_udp_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
+        return ;
+    }
+    InitAccpetSocket(new_socket, address);
+    // 通知主线程有新的客户端连接进来
+    p_udp_network_->OnAccepted(new_socket->GetConnID());
+    p_udp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
+    return;
+}
+
+void UdpSocket::InitAccpetSocket(UdpSocket* socket, const SocketAddress& address)
+{
+    socket->SetSocketID(socket_id_);
+    socket->SetRemoteAddress(UdpAddress(address));
+    socket->SetSocketMgr(p_sock_pool_);
+    socket->SetEpollNetwork(p_udp_network_);
+    socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
+}
+
+bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size,  const SocketAddress& address)
 {
     socklen_t fromlen = sizeof(address);
     auto bytes = recvfrom(socket_fd, data, size, 0, (struct sockaddr*)&address, &fromlen);
@@ -244,7 +273,7 @@ bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size, SocketAd
     return true;
 }
 
-bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, SocketAddress& address)
+bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, const SocketAddress& address)
 {
     auto bytes = sendto(socket_fd, data, size, 0, (struct sockaddr*)&address, sizeof(address));
     if(bytes < 0)

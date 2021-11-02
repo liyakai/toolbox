@@ -121,17 +121,21 @@ public:
     */
     UdpType GetType();
     /*
-    * 设置 socket 池子
+    * @brief 设置 socket 池子
     */
     void SetSocketMgr(UdpSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
     /*
-    * 设置 tcp_network
+    * @brief 设置 tcp_network
     */
     void SetEpollNetwork(UdpEpollNetwork* udp_network){ p_udp_network_ = udp_network; }
     /*
-    * 关闭套接字
+    * @brief 关闭套接字
     */
     void Close(ENetErrCode net_err, int32_t sys_err = 0);
+    /*
+    * @brief 设置远端地址
+    */
+    void SetRemoteAddress(const UdpAddress&& remote_address){ remote_address_ = remote_address; };
     /*
     * @brief 获取远端的地址
     */
@@ -157,13 +161,21 @@ private:
     */
     void UpdateSend();
     /*
+    * 处理接受客户端连接的情况
+    */
+    void UpdateAccept(const SocketAddress& address);
+    /*
+    *  初始化从accpet函数接收得来的socket
+    */
+    void InitAccpetSocket(UdpSocket* socket, const SocketAddress& address);
+    /*
     * @brief 套接字接收数据
     */
-    bool SocketRecv(int32_t socket_fd, char* data, size_t& size, SocketAddress& address);
+    bool SocketRecv(int32_t socket_fd, char* data, size_t& size, const SocketAddress& address);
     /*
     * 套接字发送数据
     */
-    bool SocketSend(int32_t socket_fd, const char* data, size_t& size, SocketAddress& address);
+    bool SocketSend(int32_t socket_fd, const char* data, size_t& size, const SocketAddress& address);
 private:
     // buff包
     struct Buffer

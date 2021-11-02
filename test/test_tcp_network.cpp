@@ -94,7 +94,6 @@ public:
             // Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
             //PrintData(send_data, 16);
             Send(NT_TCP, echo_conn_id_, send_data, send_data_size);
-
             MemPoolMgr->GiveBack(send_data, "test_send_data2");
         }
 
@@ -107,7 +106,7 @@ private:
     uint64_t echo_conn_id_ = 0;
 };
 
-FIXTURE_BEGIN(EpollNetwork)
+FIXTURE_BEGIN(TcpEpollNetwork)
 
 CASE(test_tcp_echo)
 {
@@ -194,4 +193,4 @@ CASE(test_tcp_forward)
     return;
 }
 
-FIXTURE_END(EpollNetwork)
+FIXTURE_END(TcpEpollNetwork)
