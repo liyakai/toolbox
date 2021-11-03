@@ -109,14 +109,6 @@ public:
     */
     void SendTo(const char* buffer, std::size_t& length, SocketAddress& adress);
     /*
-    * @brief 接收
-    * @param buffer 数据指针
-    * @param length 数据长度
-    * @param address 来源地址
-    * @return bool 是否成功
-    */
-    bool RecvFrom(char* buffer, std::size_t& length, SocketAddress& address);
-    /*
     * @brief 获取管道类型
     */
     UdpType GetType();
@@ -141,9 +133,17 @@ public:
     */
     UdpAddress& GetRemoteAddress(){ return remote_address_; };
     /*
+    * @brief 获取远端地址和端口拼成的ID
+    */
+    uint64_t GetRemoteAddressID(){ return remote_address_.GetID(); }
+    /*
     * @brief 获取本地的地址
     */
     UdpAddress& GetLocalAddress(){ return local_address_; };
+    /*
+    * @brief 获取本地地址和端口拼成的ID
+    */
+    uint64_t GetLocalAddressID(){ return local_address_.GetID(); }
 private:
     /*
     * @brief 绑定ip地址和端口

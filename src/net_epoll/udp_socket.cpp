@@ -143,21 +143,6 @@ void UdpSocket::SendTo(const char* buffer, std::size_t& length, SocketAddress& a
     } 
 }
 
-bool UdpSocket::RecvFrom(char* buffer, std::size_t& length, SocketAddress& address)
-{
-    // if(read_buffers_.empty())
-    // {
-    //     return false;
-    // }
-    // auto front = read_buffers_.front();
-    // memcpy(buffer, front->data_, front->size_);
-    // length = front->size_;
-    // address = front->address_;
-    // read_buffers_.pop_front();
-    // dead_buffers_.emplace_back(front);
-    return true;
-}
-
 UdpType UdpSocket::GetType()
 {
     return type_;
@@ -169,7 +154,14 @@ void UdpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     {
         BaseSocket::Close();
         // 通知主线程 socket 关闭
-        p_udp_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
+        if (UdpType::ACCEPTOR == type_)
+        {
+            p_udp_network_->OnClosed(GetLocalAddressID(), net_err, sys_err);
+        }
+        else
+        {
+            p_udp_network_->OnClosed(GetRemoteAddressID(), net_err, sys_err);
+        }
         p_sock_pool_->Free(this);
     }
 }
@@ -213,12 +205,12 @@ void UdpSocket::UpdateRecv()
     {
         auto success = SocketRecv(socket_id_, array.data(), size, address);
         if (success && size) {
-            auto conn_id = p_udp_network_->GetConnIdByUdpAddress(address);
-            if(conn_id >= 0)
+            auto address_id = p_udp_network_->GetConnIdByUdpAddress(address);
+            if(address_id >= 0)
             {
                 char *buff_block = MemPoolMgr->GetMemory(size);
                 memcpy(buff_block, array.data(), size);
-                p_udp_network_->OnReceived(conn_id, buff_block, size);
+                p_udp_network_->OnReceived(UdpAddress(address).GetID(), buff_block, size);
             } else if (UdpType::ACCEPTOR == type_)
             {
                 UpdateAccept(address);
@@ -263,12 +255,12 @@ void UdpSocket::UpdateAccept(const SocketAddress& address)
     auto new_socket = p_sock_pool_->Alloc();
     if(nullptr == new_socket)
     {
-        p_udp_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
+        p_udp_network_->OnErrored(GetLocalAddressID(), ENetErrCode::NET_ALLOC_FAILED, 0);
         return ;
     }
     InitAccpetSocket(new_socket, address);
     // 通知主线程有新的客户端连接进来
-    p_udp_network_->OnAccepted(new_socket->GetConnID());
+    p_udp_network_->OnAccepted(new_socket->GetRemoteAddressID());
     p_udp_network_->AddUdpAddress(address, new_socket->GetConnID());
     p_udp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     return;
