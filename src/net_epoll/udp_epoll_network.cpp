@@ -33,15 +33,15 @@ void UdpEpollNetwork::Update()
     epoll_ctrl_.RunOnce();
 }
 
-bool UdpEpollNetwork::IsUdpAddressExist(const UdpAddress& udp_address)
+int32_t UdpEpollNetwork::GetConnIdByUdpAddress(const UdpAddress& udp_address)
 {
     auto iter = address_to_connect_.find(udp_address.GetID());
     if(iter != address_to_connect_.end())
     {
-        return true;
+        return iter->second;
     } else 
     {
-        return false;
+        return -1;
     }
 }
 

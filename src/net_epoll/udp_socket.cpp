@@ -119,8 +119,28 @@ bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
 
 void UdpSocket::SendTo(const char* buffer, std::size_t& length, SocketAddress& address)
 {
-    write_buffers_.emplace_back(GetObject<Buffer>(buffer, length, address));
-    fprintf(stderr,"[UdpSocket::SendTo] write_buffers_ size:%zu\n",write_buffers_.size());
+    if(nullptr == buffer || 0 == length)
+    {
+        return;
+    }
+    if(false == write_buffers_.empty())
+    {
+        write_buffers_.emplace_back(GetObject<Buffer>(buffer, length, address));
+        UpdateSend();
+        return;
+    }
+    auto send_length = length;
+    auto success = SocketSend(GetSocketID(), buffer, length, address);
+    if(success && length)
+    {
+        if(length < send_length)
+        {
+            write_buffers_.emplace_back(GetObject<Buffer>(buffer + length, send_length - length, address));
+        } 
+    } else 
+    {
+        Close(ENetErrCode::NET_SYS_ERROR, errno);
+    } 
 }
 
 bool UdpSocket::RecvFrom(char* buffer, std::size_t& length, SocketAddress& address)
@@ -193,11 +213,12 @@ void UdpSocket::UpdateRecv()
     {
         auto success = SocketRecv(socket_id_, array.data(), size, address);
         if (success && size) {
-            if(p_udp_network_->IsUdpAddressExist(address))
+            auto conn_id = p_udp_network_->GetConnIdByUdpAddress(address);
+            if(conn_id >= 0)
             {
                 char *buff_block = MemPoolMgr->GetMemory(size);
                 memcpy(buff_block, array.data(), size);
-                p_udp_network_->OnReceived(GetConnID(), buff_block, size);
+                p_udp_network_->OnReceived(conn_id, buff_block, size);
             } else if (UdpType::ACCEPTOR == type_)
             {
                 UpdateAccept(address);
@@ -211,8 +232,10 @@ void UdpSocket::UpdateRecv()
 
 void UdpSocket::UpdateSend()
 {
+    int32_t times = 0;
     for(auto iter = write_buffers_.begin(); iter != write_buffers_.end();)
     {
+        times++;
         auto buffer = *iter;
         size_t size = buffer->size_;
         auto success = SocketSend(socket_id_, buffer->data_, size, buffer->address_);
@@ -293,7 +316,6 @@ bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, co
             return false;
         }
     }
-    fprintf(stderr,"[UdpSocket::SocketSend] 发送字节数:%zu\n", bytes);
     size = bytes;
     return true;
 }

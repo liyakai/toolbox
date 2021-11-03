@@ -389,7 +389,7 @@ void TcpSocket::Send(const char* data, size_t len)
             Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);
             return;
         }
-        send_ring_buffer_.Write(data, len);
+        // send_ring_buffer_.Write(data, len);
         UpdateSend();
         return;
     }

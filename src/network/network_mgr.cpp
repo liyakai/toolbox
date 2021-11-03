@@ -147,7 +147,6 @@ void NetworkMaster::DispatchMainEvent_()
         default:
             break;
         }
-        fprintf(stderr,"NetworkMaster::DispatchMainEvent_:%d\n",event->GetID());
         GiveBackObject(event, "NetworkMaster::DispatchMainEvent_");
     }
 }

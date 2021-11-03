@@ -24,7 +24,7 @@ public:
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
-        // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
+        Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         // PrintData(data, 16);
         Send(NT_UDP, conn_id, data, size);
     };

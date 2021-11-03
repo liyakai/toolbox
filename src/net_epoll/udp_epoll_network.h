@@ -40,9 +40,9 @@ public:
     EpollCtrl& GetEpollCtrl(){ return epoll_ctrl_;}
     /*
     * @brief UdpAddress 是否存在
-    * @param udp_address udp地址
+    * @param int32_t >=0:conn_id; <0 非法值
     */
-    bool IsUdpAddressExist(const UdpAddress& udp_address);
+    int32_t GetConnIdByUdpAddress(const UdpAddress& udp_address);
     /*
     * @brief 增加地址映射
     * @param udp_address udp地址
