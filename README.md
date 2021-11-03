@@ -3,8 +3,8 @@ toolbox
 游戏服务器相关的工具
 # 1.目前实现的功能
 ## 1.1 网络库
-    基于TCP+epoll的Linux网络库
-    基于UDP+epoll的Linux网络库
+    基于TCP+epoll的Linux网络库[reactor模式]
+    基于UDP+epoll的Linux网络库[reactor模式]
 ## 1.2 工具
     1. 基于五层时间轮算法的定时器
     2. 跳表实现
