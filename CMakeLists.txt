@@ -37,6 +37,8 @@ ADD_LIBRARY(toolbox ${DIR_SRCS})
 
 add_subdirectory(test)
 
+option(CMAKE_GPERF_TOOLS "Use Gperf Tools" OFF)
 if(CMAKE_GPERF_TOOLS)
+    add_definitions(-DUSE_GPERF_TOOLS)
     target_link_libraries(${PROJECT_NAME}   profiler.a)
 endif()

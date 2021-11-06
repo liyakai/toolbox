@@ -1,5 +1,6 @@
 #include "src/tools/ringbuffer.h"
 #include "unit_test_frame/unittest.h"
+#include <vector>
 
 
 FIXTURE_BEGIN(RingBuffer)

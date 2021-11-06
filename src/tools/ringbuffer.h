@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <string.h>
 #include <atomic>
+#include <array>
 #include "debug_print.h"
 /*
 * 非线程安全的环形队列

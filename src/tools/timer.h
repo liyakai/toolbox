@@ -275,9 +275,9 @@ public:
         node->total_count = count;
         node->file = file;
         node->line = line;
-        if(node->interval >= UINT32_MAX)
+        if(node->interval >= INT32_MAX)
         {
-            node->interval = UINT32_MAX;
+            node->interval = INT32_MAX;
         }
         node->expire_time = cur_time_ + node->interval;
         node->guid = GetNewTimerID();
@@ -327,9 +327,9 @@ public:
         node->total_count = count;
         node->file = file;
         node->line = line;
-        if(node->interval >= UINT32_MAX)
+        if(node->interval >= INT32_MAX)
         {
-            node->interval = UINT32_MAX;
+            node->interval = INT32_MAX;
         }
         node->expire_time = cur_time_ + node->interval;
         node->guid = GetNewTimerID();

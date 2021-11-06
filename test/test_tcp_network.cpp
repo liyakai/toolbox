@@ -1,7 +1,8 @@
 #include "src/network/network_mgr.h"
 #include "unit_test_frame/unittest.h"
+#ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
-
+#endif // USE_GPERF_TOOLS
 class TestNetworkEcho : public NetworkMaster, public DebugPrint
 {
 public:
@@ -111,7 +112,9 @@ FIXTURE_BEGIN(TcpEpollNetwork)
 CASE(test_tcp_echo)
 {
     return;
+#ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_echo.prof");
+#endif // USE_GPERF_TOOLS
     fprintf(stderr,"网络库测试用例: test_tcp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
     Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, NT_TCP, 10*1024*1024, 10*1024*1024);
@@ -146,14 +149,18 @@ CASE(test_tcp_echo)
     run = false;
     t.join();
     Singleton<TestNetworkEcho>::Instance()->StopWait();
+#ifdef USE_GPERF_TOOLS
     ProfilerStop();
+#endif // USE_GPERF_TOOLS
     return ;
 }
 
 CASE(test_tcp_forward)
 {
     return;
+#ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
+#endif // USE_GPERF_TOOLS
     fprintf(stderr,"网络库测试用例: test_tcp_forward \n");
     Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
     Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, NT_TCP);
@@ -189,7 +196,9 @@ CASE(test_tcp_forward)
     run = false;
     t.join();
     Singleton<TestNetworkForward>::Instance()->StopWait();
+#ifdef USE_GPERF_TOOLS
     ProfilerStop();
+#endif // USE_GPERF_TOOLS
     return;
 }
 

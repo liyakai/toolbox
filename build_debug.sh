@@ -8,5 +8,5 @@ fi
 
 cd build
 
-cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_GPERF_TOOLS=True .. 
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_GPERF_TOOLS=OFF .. 
 make -j8

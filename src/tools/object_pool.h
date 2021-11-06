@@ -12,7 +12,7 @@
 /*
 * 定义对象池
 */
-template<typename ObjectType, size_t Count = 128>
+template<typename ObjectType, std::size_t Count = 128>
 class ObjectPool : public DebugPrint
 {
 public:
@@ -99,7 +99,7 @@ private:
     void Expand()
     {
         std::unique_ptr<char> memory = std::unique_ptr<char>(new char[Count * sizeof(ObjectType)]);
-        for(auto i = 0; i < Count; i++)
+        for(std::size_t i = 0; i < Count; i++)
         {
             free_objects_.emplace_back(reinterpret_cast<ObjectType*>(memory.get() + i * sizeof(ObjectType)));
         }

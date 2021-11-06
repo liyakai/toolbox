@@ -1,7 +1,8 @@
 #include "src/network/network_mgr.h"
 #include "unit_test_frame/unittest.h"
+#ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
-
+#endif // USE_GPERF_TOOLS
 
 class TestNetworkEcho : public NetworkMaster, public DebugPrint
 {
@@ -41,7 +42,9 @@ FIXTURE_BEGIN(UdpEpollNetwork)
 CASE(test_udp_echo)
 {
     //return;
-    // ProfilerStart("test_udp_echo.prof");
+#ifdef USE_GPERF_TOOLS
+    ProfilerStart("test_udp_echo.prof");
+#endif // USE_GPERF_TOOLS
     fprintf(stderr,"网络库测试用例: test_udp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
     Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9700, NT_UDP, 10*1024*1024, 10*1024*1024);
@@ -76,7 +79,9 @@ CASE(test_udp_echo)
     run = false;
     Singleton<TestNetworkEcho>::Instance()->StopWait();
     t.join();
+#ifdef USE_GPERF_TOOLS
     ProfilerStop();
+#endif // USE_GPERF_TOOLS
     return ;
 }
 

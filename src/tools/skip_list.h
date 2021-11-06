@@ -532,6 +532,6 @@ private:
     // 最大长度
     uint64_t max_len_ = 0;
     // 链表最大层数
-    constexpr static uint32_t SKIPLIST_MAX_LEVEL = 32;
+    constexpr static int32_t SKIPLIST_MAX_LEVEL = 32;
     constexpr static double SKIPLIST_P = 0.25;
 };
