@@ -5,6 +5,7 @@
 #include "epoll_define.h"
 #include "socket_pool.h"
 #include "udp_epoll_network.h"
+#include "kcp/ikcp.h"
 
 class UdpSocket;
 using UdpSocketPool = SocketPool<UdpSocket>;
@@ -107,7 +108,7 @@ public:
     * @param length 数据长度
     * @param address 目标地址
     */
-    void SendTo(const char* buffer, std::size_t& length, SocketAddress& adress);
+    void SendTo(const char* buffer, std::size_t length);
     /*
     * @brief 获取管道类型
     */
@@ -144,6 +145,15 @@ public:
     * @brief 获取本地地址和端口拼成的ID
     */
     uint64_t GetLocalAddressID(){ return local_address_.GetID(); }
+public:
+    /*
+    * @brief 开启Kcp模式
+    */
+    void OpenKcpMode();
+    /*
+    * @brief 获取kcp句柄
+    */
+    ikcpcb* GetKcp(){ return kcp_; }
 private:
     /*
     * @brief 绑定ip地址和端口
@@ -180,6 +190,10 @@ private:
     * 套接字发送数据
     */
     bool SocketSend(int32_t socket_fd, const char* data, size_t& size, const SocketAddress& address);
+    /*
+    * @brief kcp 用来执行发送的回调函数
+    */
+    static int32_t Output(const char* buf, int32_t len, ikcpcb* kcp, void*user);
 private:
     // buff包
     struct Buffer
@@ -196,9 +210,10 @@ private:
     BufferList dead_buffers_;   // 需要销毁的缓冲区
     UdpAddress remote_address_; // 远端地址
     UdpAddress local_address_;  // 本地地址
-    UdpType type_ = UdpType::UNKNOWN;              // 管道类型
+    UdpType type_ = UdpType::UNKNOWN;               // 管道类型
+    ikcpcb* kcp_ = nullptr;     // kcp实例
+    static const uint32_t KCP_CONV_ = 0x01020304;   // kcp会话ID
 
     UdpEpollNetwork* p_udp_network_ = nullptr;      // 工作线程
     UdpSocketPool *p_sock_pool_ = nullptr;          // socket 池子
-
 };

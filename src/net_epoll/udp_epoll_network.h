@@ -53,7 +53,10 @@ public:
     * @param udp_address udp地址
     */
     void DeleteUdpAddress(const UdpAddress& udp_address);
-
+    /*
+    * @brief 开启Kcp模式
+    */
+    void OpenKcpMode();
    
 protected:
     /*
@@ -78,4 +81,5 @@ private:
     EpollCtrl epoll_ctrl_;              // epoll控制器
     SocketPool<UdpSocket> sock_mgr_;    // socket池
     std::unordered_map<uint64_t, uint32_t> address_to_connect_;      // 地址转换的ID 到 SocketPool管理的连接ID的映射
+    bool is_kcp_open_ = false;      // KCP是否开启
 };

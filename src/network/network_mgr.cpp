@@ -167,6 +167,14 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
         auto* udp_network = new UdpEpollNetwork();
         udp_network->Init(this, type);
         return udp_network;
+        break;
+    }
+    case NT_KCP:
+    {
+        auto* udp_network = new UdpEpollNetwork();
+        udp_network->Init(this, type);
+        udp_network->OpenKcpMode();
+        return udp_network;
     }
     case Unknown:
     case NT_MAX:

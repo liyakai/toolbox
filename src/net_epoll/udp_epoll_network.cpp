@@ -1,6 +1,7 @@
 #include "udp_epoll_network.h"
 #include "epoll_define.h"
 #include "udp_socket.h"
+#include "time_util.h"
 
 UdpEpollNetwork::UdpEpollNetwork()
      : epoll_ctrl_(MAX_SOCKET_COUNT)
@@ -31,6 +32,20 @@ void UdpEpollNetwork::Update()
 {
     INetwork::Update();
     epoll_ctrl_.RunOnce();
+    if(is_kcp_open_)
+    {
+        auto current = GetMillSecondTimeStamp();
+        // 更新 kcp [TODO: 这里的update存在优化空间]
+        for(auto iter : address_to_connect_)
+        {
+            auto socket = sock_mgr_.GetEpollSocket(iter.second);
+            if(nullptr == socket)
+            {
+                continue;
+            }
+            ikcp_update(socket->GetKcp(),current);
+        }
+    }
 }
 
 int32_t UdpEpollNetwork::GetConnIdByUdpAddress(const UdpAddress& udp_address)
@@ -54,6 +69,11 @@ void UdpEpollNetwork::DeleteUdpAddress(const UdpAddress& udp_address)
     address_to_connect_.erase(udp_address.GetID());
 }
 
+void UdpEpollNetwork::OpenKcpMode()
+{
+    is_kcp_open_ = true;
+}
+
 
 uint64_t UdpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
@@ -68,6 +88,11 @@ uint64_t UdpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t po
     if(false == new_socket->InitNewAccepter(ip, port))
     {
         return 0;
+    }
+    // KCP
+    if(is_kcp_open_)
+    {
+        new_socket->OpenKcpMode();
     }
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     address_to_connect_[new_socket->GetLocalAddressID()] = new_socket->GetConnID();
@@ -86,6 +111,11 @@ uint64_t UdpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
     if(false == new_socket->InitNewConnecter(ip, port))
     {
         return 0;
+    }
+    // KCP
+    if(is_kcp_open_)
+    {
+        new_socket->OpenKcpMode();
     }
     epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
     address_to_connect_[new_socket->GetRemoteAddressID()] = new_socket->GetConnID();
@@ -119,5 +149,13 @@ void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, std::size_t 
     {
         return;
     }
-    socket->SendTo(data, size, socket->GetRemoteAddress().GetAddress());
+    // KCP
+    if(is_kcp_open_)
+    {
+        socket->SendTo(data, size);
+    } else 
+    {
+        ikcp_send(socket->GetKcp(), data, size);
+    }
+    
 }

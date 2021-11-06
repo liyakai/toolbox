@@ -18,6 +18,7 @@ INCLUDE_DIRECTORIES(
     ./src/tools
     ./src/net_epoll
     ./src/network
+    ./src/thirdparty
 )
 
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
@@ -26,6 +27,7 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 AUX_SOURCE_DIRECTORY(./src/tools DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/net_epoll DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./src/thirdparty/kcp DIR_SRCS)
 
 # set environment variable
 

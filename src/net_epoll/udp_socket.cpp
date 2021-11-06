@@ -54,31 +54,30 @@ UdpSocket::UdpSocket()
 }
 UdpSocket::~UdpSocket()
 {
-    for(const auto& buffer : write_buffers_)
-    {
-        GiveBackObject(buffer);
-    }
-    // for(const auto& buffer : read_buffers_)
-    // {
-    //     GiveBackObject(buffer);
-    // }
-    for(const auto& buffer : dead_buffers_)
-    {
-        GiveBackObject(buffer);
-    }
+    Reset();
 }
 
 void UdpSocket::Reset()
 {
-    // read_buffers_.clear();
+    for(const auto& buffer : write_buffers_)
+    {
+        GiveBackObject(buffer);
+    }
+    for(const auto& buffer : dead_buffers_)
+    {
+        GiveBackObject(buffer);
+    }
     write_buffers_.clear();
     dead_buffers_.clear();
     remote_address_.Reset();
     local_address_.Reset();
     type_ = UdpType::UNKNOWN;
+    ikcp_release(kcp_);
+    kcp_ = nullptr;
 
     p_udp_network_ = nullptr;
     p_sock_pool_ = nullptr;
+
     BaseSocket::Reset();
 }
 
@@ -117,25 +116,26 @@ bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
     return true;
 }
 
-void UdpSocket::SendTo(const char* buffer, std::size_t& length, SocketAddress& address)
+void UdpSocket::SendTo(const char* buffer, std::size_t length)
 {
     if(nullptr == buffer || 0 == length)
     {
         return;
     }
+    auto target_address = remote_address_.GetAddress();
     if(false == write_buffers_.empty())
     {
-        write_buffers_.emplace_back(GetObject<Buffer>(buffer, length, address));
+        write_buffers_.emplace_back(GetObject<Buffer>(buffer, length, target_address));
         UpdateSend();
         return;
     }
     auto send_length = length;
-    auto success = SocketSend(GetSocketID(), buffer, length, address);
+    auto success = SocketSend(GetSocketID(), buffer, length, target_address);
     if(success && length)
     {
         if(length < send_length)
         {
-            write_buffers_.emplace_back(GetObject<Buffer>(buffer + length, send_length - length, address));
+            write_buffers_.emplace_back(GetObject<Buffer>(buffer + length, send_length - length, target_address));
         } 
     } else 
     {
@@ -191,6 +191,16 @@ bool UdpSocket::Bind(const std::string& ip, uint16_t port)
     return true;
 }
 
+void UdpSocket::OpenKcpMode()
+{
+    kcp_ = ikcp_create(KCP_CONV_, this);
+    ikcp_setoutput(kcp_, &UdpSocket::Output);
+    // 设置 MTU
+    ikcp_setmtu(kcp_, KCP_TRANSPORT_MTU);
+    // 极速模式,官方推荐
+    ikcp_nodelay(kcp_, 1, 10, 2, 1);
+}
+
 void UdpSocket::UpdateError()
 {
     Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
@@ -206,14 +216,28 @@ void UdpSocket::UpdateRecv()
         auto success = SocketRecv(socket_id_, array.data(), size, address);
         if (success && size) {
             auto address_id = p_udp_network_->GetConnIdByUdpAddress(address);
-            if(address_id >= 0)
+            if(address_id < 0 && UdpType::ACCEPTOR == type_)
+            {
+                UpdateAccept(address);
+            }
+            if(nullptr == kcp_)     // 原始 udp 模式
             {
                 char *buff_block = MemPoolMgr->GetMemory(size);
                 memcpy(buff_block, array.data(), size);
                 p_udp_network_->OnReceived(UdpAddress(address).GetID(), buff_block, size);
-            } else if (UdpType::ACCEPTOR == type_)
+            } else                  // 开启了kcp
             {
-                UpdateAccept(address);
+                // 将收到的数据输入到 kcp
+                ikcp_input(kcp_, array.data(), size);
+                // 从 KCP 返回可靠包
+                char buffer[DEFAULT_CONN_BUFFER_SIZE];
+                auto bytes_size = ikcp_recv(kcp_, buffer, sizeof(buffer));
+                if(bytes_size > 0)
+                {
+                    char *buff_block = MemPoolMgr->GetMemory(bytes_size);
+                    memcpy(buff_block, buffer, bytes_size);
+                    p_udp_network_->OnReceived(UdpAddress(address).GetID(), buff_block, bytes_size);
+                }
             }
         } else 
         {
@@ -310,4 +334,11 @@ bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, co
     }
     size = bytes;
     return true;
+}
+
+int32_t UdpSocket::Output(const char* buf, int32_t len, ikcpcb* kcp, void*user)
+{
+    auto socket = reinterpret_cast<UdpSocket*>(user);
+    socket->SendTo(buf, len);
+    return 0;
 }

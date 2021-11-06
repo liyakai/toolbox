@@ -6,6 +6,7 @@ enum NetworkType
     Unknown = 0,
     NT_TCP,
     NT_UDP,
+    NT_KCP,
     NT_MAX,
 };
 

@@ -18,6 +18,7 @@ constexpr std::size_t DEFAULT_CONN_BUFFER_SIZE   =   256 * 1024;        /* 256 k
 constexpr std::size_t DEFAULT_RING_BUFF_SIZE     =   256 * 1024;        /* 256 k */
 constexpr std::size_t DEFAULT_BACKLOG_SIZE       =   256;   
 constexpr std::size_t INVALID_SOCKET             =   -1;
+constexpr int32_t KCP_TRANSPORT_MTU              = 1000;
 
 using SocketAddress = struct sockaddr_in;
 /*
