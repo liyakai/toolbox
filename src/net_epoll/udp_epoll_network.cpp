@@ -43,7 +43,18 @@ void UdpEpollNetwork::Update()
             {
                 continue;
             }
-            ikcp_update(socket->GetKcp(),current);
+            auto kcp = socket->GetKcp();
+            if(nullptr == kcp)
+            {
+                fprintf(stderr, "UdpEpollNetwork::Update kcp=null socket:%lu is_kcp_open_:%d \n", socket->GetRemoteAddressID(), is_kcp_open_);
+                sleep(1000000);
+                fprintf(stderr, "UdpEpollNetwork::Update sleep end. \n");
+            } else 
+            {
+                //fprintf(stderr, "UdpEpollNetwork::Update kcp!=null socket:%lu \n", socket->GetRemoteAddressID());
+                ikcp_update(kcp,current);
+            }
+            
         }
     }
 }
@@ -152,10 +163,12 @@ void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, std::size_t 
     // KCP
     if(is_kcp_open_)
     {
-        socket->SendTo(data, size);
+        fprintf(stderr, "[UdpEpollNetwork::OnSend] socket romote address id :%lu\n", socket->GetRemoteAddressID());
+        socket->KcpSendTo(data,size);
+        
     } else 
     {
-        ikcp_send(socket->GetKcp(), data, size);
+        socket->SendTo(data, size);
     }
     
 }

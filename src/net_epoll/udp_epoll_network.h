@@ -57,6 +57,11 @@ public:
     * @brief 开启Kcp模式
     */
     void OpenKcpMode();
+    /*
+    * @brief kcp 模式是否开启
+    * @return bool true:kcp false:udp
+    */
+    bool IsKcpModeOpen(){ return is_kcp_open_; };
    
 protected:
     /*

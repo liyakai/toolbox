@@ -25,9 +25,9 @@ public:
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
-        // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
-        // PrintData(data, 16);
-        Send(NT_UDP, conn_id, data, size);
+        Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
+        PrintData(data, 16);
+        Send(NT_KCP, conn_id, data, size);
     };
     void OnClose(uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) override
     {
@@ -37,17 +37,17 @@ public:
 
 
 
-FIXTURE_BEGIN(UdpEpollNetwork)
+FIXTURE_BEGIN(KcpEpollNetwork)
 
-CASE(test_udp_echo)
+CASE(test_kcp_echo)
 {
-    return;
+    //return;
 #ifdef USE_GPERF_TOOLS
-    ProfilerStart("test_udp_echo.prof");
+    ProfilerStart("test_kcp_echo.prof");
 #endif // USE_GPERF_TOOLS
-    fprintf(stderr,"网络库测试用例: test_udp_echo \n");
+    fprintf(stderr,"网络库测试用例: test_kcp_echo \n");
     Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9700, NT_UDP, 10*1024*1024, 10*1024*1024);
+    Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9700, NT_KCP, 10*1024*1024, 10*1024*1024);
     Singleton<TestNetworkEcho>::Instance()->Start();
     bool run = true;
     std::thread t([&](){

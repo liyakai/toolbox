@@ -103,12 +103,19 @@ public:
     */
     bool InitNewConnecter(const std::string& ip, uint16_t port);
     /*
-    * @brief 发送
+    * @brief 发送 [原生UDP发送接口,不适用于kcp等协议的发送入口]
     * @param buffer 数据指针
     * @param length 数据长度
     * @param address 目标地址
     */
     void SendTo(const char* buffer, std::size_t length);
+    /*
+    * @brief 发送 [KCP发送入口]
+    * @param buffer 数据指针
+    * @param length 数据长度
+    * @param address 目标地址
+    */
+    void KcpSendTo(const char* buffer, std::size_t length);
     /*
     * @brief 获取管道类型
     */
@@ -154,6 +161,10 @@ public:
     * @brief 获取kcp句柄
     */
     ikcpcb* GetKcp(){ return kcp_; }
+    /*
+    * @brief 设置udp类型
+    */
+    void SetType(UdpType type){ type_ = type; };
 private:
     /*
     * @brief 绑定ip地址和端口
@@ -212,7 +223,6 @@ private:
     UdpAddress local_address_;  // 本地地址
     UdpType type_ = UdpType::UNKNOWN;               // 管道类型
     ikcpcb* kcp_ = nullptr;     // kcp实例
-    static const uint32_t KCP_CONV_ = 0x01020304;   // kcp会话ID
 
     UdpEpollNetwork* p_udp_network_ = nullptr;      // 工作线程
     UdpSocketPool *p_sock_pool_ = nullptr;          // socket 池子
