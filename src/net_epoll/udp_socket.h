@@ -165,6 +165,10 @@ public:
     * @brief 设置udp类型
     */
     void SetType(UdpType type){ type_ = type; };
+    /*
+    * @brief KCP update
+    */
+    void KcpUpdate(std::time_t current);
 private:
     /*
     * @brief 绑定ip地址和端口
