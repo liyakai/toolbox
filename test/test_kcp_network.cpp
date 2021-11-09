@@ -41,7 +41,7 @@ FIXTURE_BEGIN(KcpEpollNetwork)
 
 CASE(test_kcp_echo)
 {
-    //return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_kcp_echo.prof");
 #endif // USE_GPERF_TOOLS
@@ -85,5 +85,5 @@ CASE(test_kcp_echo)
     return ;
 }
 
-FIXTURE_END(UdpEpollNetwork)
+FIXTURE_END(KcpEpollNetwork)
 
