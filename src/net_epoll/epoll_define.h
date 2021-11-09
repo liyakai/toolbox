@@ -1,8 +1,8 @@
 #pragma once
 #include <cstdint>
 
-#if (defined(WIN32) || defined(_WIN64))
-include <Winsock2.h>
+#if (defined(_WIN32) || defined(_WIN64))
+#include <cstddef>
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>

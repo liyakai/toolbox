@@ -1,14 +1,18 @@
 #include "tcp_socket.h"
+#ifdef __linux__
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <linux/tcp.h> // TCP_NODELAY
+#endif // __linux__
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/tcp.h> // TCP_NODELAY
 #include "socket_pool.h"
 #include "tcp_epoll_network.h"
+
+#ifdef __linux__
 
 TcpSocket::TcpSocket()
 {
@@ -416,20 +420,26 @@ int32_t TcpSocket::SetNonBlocking(int32_t fd)
 }
 int32_t TcpSocket::SetKeepaliveOff(int32_t fd)
 {
+#ifdef __linux__
     int32_t keepalive = 0;
     return setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
+#endif // __linux__
 }
 int32_t TcpSocket::SetNagleOff(int32_t fd)
 {
+#ifdef __linux__
     int32_t nodelay = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
+#endif // __linux__
 }
 // SOCKET在close时候不等待缓冲区发送完成
 int32_t TcpSocket::SetLingerOff(int32_t fd)
 {
+#ifdef __linux__
     linger so_linger;
     so_linger.l_onoff = 0;
     return setsockopt(fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+#endif // __linux__
 }
 /*
 这个套接字选项通知内核，如果端口忙，但TCP状态位于 TIME_WAIT ，可以重用端口。如果端口忙，而TCP状态位于其他状态，重用端口时依旧得到一个错误信息，指明"地址已经使用中"。
@@ -463,6 +473,8 @@ int32_t TcpSocket::SetTcpBuffSize(int32_t fd)
     }
     return 0;
 }
+
+#endif // __linux__
 
 // TCP之Nagle算法&&延迟ACK
 

@@ -78,6 +78,6 @@ protected:
 protected:
     uint32_t conn_id_ = INVALID_CONN_ID;
     int32_t socket_id_ = -1; // socket_id
-    bool is_ctrl_add_ = false;                      // 是否已经执行过 EPOLL_CTL_ADD
     int32_t event_type_ = SOCKET_EVENT_INVALID;     // 可投递事件类型
+    bool is_ctrl_add_ = false;                      // 是否已经执行过 EPOLL_CTL_ADD
 };

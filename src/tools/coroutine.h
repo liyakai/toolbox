@@ -1,6 +1,7 @@
 #pragma once
 
 // 改编自云峰大佬的实现方式
+#ifdef __linux__
 
 #include <ucontext.h>
 #include <functional>
@@ -306,3 +307,5 @@ private:
     int32_t running_;                // 正在运行的协程ID
     std::vector<Coroutine*> co_vec_;     // 一个一维数组,用于存放所有协程。其长度等于cap
 };
+
+#endif // __linux__

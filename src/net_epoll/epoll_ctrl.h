@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef __linux__
+
 #include "src/tools/singleton.h"
 #include <sys/epoll.h>
 #include "epoll_define.h"
@@ -114,3 +116,5 @@ private:
 };
 
 #define EpollCtrlMgr Singleton<EpollCtrl>::Instance(10240)
+
+#endif // __linux__

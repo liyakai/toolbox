@@ -1,6 +1,8 @@
 #include "src/tools/coroutine.h"
 #include "unit_test_frame/unittest.h"
 
+#ifdef __linux__
+
 FIXTURE_BEGIN(Coroutine)
 
 struct Args
@@ -23,7 +25,10 @@ static void foo(Schedule* sch, void *ud)
     }
 }
 
+
 CASE(CoroutineCase1){
+
+
     Schedule sch;
     Args arg1 = { 0 };
     Args arg2 = { 100 };
@@ -37,7 +42,10 @@ CASE(CoroutineCase1){
         sch.CoroutineResume(co1);
         sch.CoroutineResume(co2);
     }
-    
+
+
 }
 
 FIXTURE_END(Coroutine)
+
+#endif // __linux__

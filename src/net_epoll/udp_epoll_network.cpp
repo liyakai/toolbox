@@ -1,4 +1,7 @@
 #include "udp_epoll_network.h"
+
+#ifdef __linux__
+
 #include "epoll_define.h"
 #include "udp_socket.h"
 #include "time_util.h"
@@ -160,3 +163,5 @@ void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, std::size_t 
     }
     
 }
+
+#endif // __linux__

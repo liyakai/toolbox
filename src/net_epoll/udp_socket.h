@@ -1,4 +1,7 @@
 #pragma once
+
+#ifdef __linux__
+
 #include <list>
 #include <string>
 #include "base_socket.h"
@@ -231,3 +234,5 @@ private:
     UdpEpollNetwork* p_udp_network_ = nullptr;      // 工作线程
     UdpSocketPool *p_sock_pool_ = nullptr;          // socket 池子
 };
+
+#endif // __linux__

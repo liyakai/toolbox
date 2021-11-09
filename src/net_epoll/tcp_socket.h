@@ -1,4 +1,7 @@
 #pragma once
+
+#ifdef __linux__
+
 #include <stdint.h>
 #include <time.h>
 #include "base_socket.h"
@@ -168,3 +171,5 @@ private:
     time_t last_recv_ts_ = 0;                       // 最后一次读到数据的时间戳
 
 };
+
+#endif // __linux__

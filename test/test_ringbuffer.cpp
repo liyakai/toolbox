@@ -181,13 +181,13 @@ CASE(ringbuffer_spsc)
     read.join();
     if(result.size() != product.size())
     {
-        SetError("ringbuffer_spsc 结果与原始数据大小不一致");
+        SetError("ringbuffer_spsc 结果与原始数据大小不一致.");
     }
     for(std::size_t i = 0; i < result.size(); i++)
     {
         if(result[i] != product[i])
         {
-            SetError("ringbuffer_spsc 结果与原始数据不一致");
+            SetError("ringbuffer_spsc 结果与原始数据不一致.");
             break;
         }
     }

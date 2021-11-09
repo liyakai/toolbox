@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef __linux__
+
 #include "src/network/network.h"
 #include "epoll_ctrl.h"
 #include "socket_pool.h"
@@ -56,3 +58,5 @@ private:
     EpollCtrl epoll_ctrl_;              // epoll控制器
     SocketPool<TcpSocket> sock_mgr_;    // socket池
 };
+
+#endif // __linux__

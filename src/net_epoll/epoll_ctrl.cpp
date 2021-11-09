@@ -1,4 +1,7 @@
 #include "epoll_ctrl.h"
+
+#ifdef __linux__
+
 #include <sys/socket.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -100,3 +103,5 @@ bool EpollCtrl::RunOnce()
     }
     return true;
 }
+
+#endif  // __linux__

@@ -1,4 +1,7 @@
 #include "udp_socket.h"
+
+#ifdef __linux__
+
 #include <src/tools/object_pool.h>
 
 
@@ -369,3 +372,5 @@ int32_t UdpSocket::Output(const char* buf, int32_t len, ikcpcb* kcp, void*user)
     }
     return 0;
 }
+
+#endif // __linux__

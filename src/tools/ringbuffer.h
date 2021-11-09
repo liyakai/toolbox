@@ -19,7 +19,7 @@ public:
     * 构造函数
     */
     RingBuffer()
-        :buffer_size_(RebuildNum(Size)),ratio_((double)Ratio/100.0d)
+        :buffer_size_(RebuildNum(Size)),ratio_((double)Ratio/double(100.0))
     {
         buffer_ = new char[buffer_size_];
     }
@@ -367,3 +367,4 @@ private:
     std::size_t write_pos_;             // 写位置
     std::atomic<std::size_t> count_;    // 元素数量
 };
+

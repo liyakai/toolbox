@@ -1,4 +1,7 @@
 #include "tcp_epoll_network.h"
+
+#ifdef __linux__
+
 #include "epoll_define.h"
 
 
@@ -87,3 +90,5 @@ void TcpEpollNetwork::OnSend(uint64_t connect_id, const char* data, std::size_t 
     }
     socket->Send(data, size);
 }
+
+#endif // __linux__
