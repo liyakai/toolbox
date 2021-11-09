@@ -157,24 +157,31 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     {
     case NT_TCP:
     {
+#ifdef __linux__
         auto* tcp_network = new TcpEpollNetwork();
         tcp_network->Init(this, type);
         return tcp_network;
+#endif // __linux__
         break;
     }
     case NT_UDP:
     {
+#ifdef __linux__
         auto* udp_network = new UdpEpollNetwork();
         udp_network->Init(this, type);
         return udp_network;
+#endif // __linux__
         break;
     }
     case NT_KCP:
     {
+#ifdef __linux__
         auto* udp_network = new UdpEpollNetwork();
         udp_network->Init(this, type);
         udp_network->OpenKcpMode();
         return udp_network;
+#endif // __linux__
+        break;
     }
     case Unknown:
     case NT_MAX:
@@ -183,3 +190,5 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     }
     return nullptr;
 }
+
+
