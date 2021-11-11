@@ -27,6 +27,7 @@ public:
     */
     void PrintVirtFunc()
     {
+#ifdef __linux__
         int32_t* vtable = (int32_t*)(*(int32_t*)&object);
         Print("\n虚表地址:%p\n", vtable);
         if (nullptr != vtable)
@@ -51,7 +52,7 @@ public:
             Print("%s 没有虚函数.",typeid(object).name());
         }
         Print("\n");
-
+#endif // __linux__
     }
 private:
     ClassType& object;

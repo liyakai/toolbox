@@ -1,8 +1,8 @@
 #pragma once
 
 #include <list>
-#include "fixture.h"
 #include "src/tools/singleton.h"
+#include "fixture.h"
 
 /*
 * 单元测试框架

@@ -4,6 +4,8 @@
 #include <gperftools/profiler.h>
 #endif // USE_GPERF_TOOLS
 
+#ifdef __linux__
+
 class TestNetworkEcho : public NetworkMaster, public DebugPrint
 {
 public:
@@ -87,3 +89,4 @@ CASE(test_kcp_echo)
 
 FIXTURE_END(KcpEpollNetwork)
 
+#endif // __linux__
