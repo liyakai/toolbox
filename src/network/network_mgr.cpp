@@ -1,6 +1,6 @@
 #include "network_mgr.h"
-#include "src/net_epoll/tcp_epoll_network.h"
-#include "src/net_epoll/udp_epoll_network.h"
+#include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
+#include "src/network/net_imp/net_epoll/udp_epoll_network.h"
 #include "src/tools/object_pool.h"
 NetworkMaster::NetworkMaster()
 {
