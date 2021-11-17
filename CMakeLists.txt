@@ -16,20 +16,23 @@ endif()
 INCLUDE_DIRECTORIES(
     .
     ./src/tools
-    ./src/net_epoll
-	./src/net_iocp
     ./src/network
+    ./src/net_work/network
+    ./src/net_work/network/net_epoll
+	./src/net_work/network/net_iocp
     ./src/thirdparty
 )
-
-SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 # source directory
 AUX_SOURCE_DIRECTORY(./src/tools DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network DIR_SRCS)
-AUX_SOURCE_DIRECTORY(./src/net_work/net_imp/net_epoll DIR_SRCS)
-AUX_SOURCE_DIRECTORY(./src/net_work/net_imp/net_iocp DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/thirdparty/kcp DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./src/network/net_imp DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_epoll DIR_SRCS)
+#AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_iocp DIR_SRCS)
+
+# set output path
+SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 # set environment variable
 
