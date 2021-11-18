@@ -1,18 +1,20 @@
 #include "tcp_socket.h"
-#ifdef __linux__
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+//#include <winsock2.h>
+#pragma comment(lib,"ws2_32.lib")
+#elif defined(__linux__)
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <linux/tcp.h> // TCP_NODELAY
 #endif // __linux__
+
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include "socket_pool.h"
-#include "tcp_epoll_network.h"
-
-#ifdef __linux__
+#include "src/network/net_imp/socket_pool.h"
+#include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
 
 TcpSocket::TcpSocket()
 {
@@ -58,21 +60,31 @@ void TcpSocket::UpdateAccept()
         memset(&addr, 0, addr_len);
         // 接受客户端连接
         client_fd = accept(socket_id_, (sockaddr *)&addr, &addr_len);
-        if (-1 == client_fd && errno != EINTR)
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        if(INVALID_SOCKET == client_fd)
+#elif defined(__linux__)
+        if (client_fd < 0 && errno != EINTR)
+#endif
         {
             break;
         }
         TcpSocket *new_socket = p_sock_pool_->Alloc();
         if (nullptr == new_socket)
         {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
             close(client_fd);
+#endif
             p_tcp_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
             return;
         }
         InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
         // 通知主线程有新的客户端连接进来
         p_tcp_network_->OnAccepted(new_socket->GetConnID());
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
         p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
+#endif
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
     event_type_ = SOCKET_EVENT_RECV;
@@ -82,10 +94,13 @@ void TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
 {
     socket->Init(send_buff_size, recv_buff_size);
     socket->SetSocketMgr(p_sock_pool_);
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     socket->SetEpollNetwork(p_tcp_network_);
+#endif
     socket->SetSocketID(socket_fd);
     // socket->SetIP(ip);
-    // socket->SetPort(port);
+    // socket->SetAddressPort(port);
     socket->SetState(SocketState::SOCK_STATE_ESTABLISHED);
     socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
 
@@ -136,7 +151,11 @@ void TcpSocket::UpdateRecv()
 
 int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, 0);
+#elif defined(__linux__)
     int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
+#endif
     if (recv_bytes > 0)
     {
         return recv_bytes;
@@ -147,7 +166,12 @@ int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
     }
     else // recv_bytes < 0
     {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        int32_t last_errno = GetSocketError();
+        if ((0 == last_errno) || (WSAEINTR == last_errno) || (WSAEINPROGRESS == last_errno) || (WSAEWOULDBLOCK == last_errno))
+#elif defined(__linux__)
         if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
+#endif
         {
             return 0;
         }
@@ -184,8 +208,11 @@ ErrCode TcpSocket::ProcessRecvData()
 void TcpSocket::UpdateConnect()
 {
     event_type_ |= SOCKET_EVENT_RECV;
-    p_tcp_network_->GetEpollCtrl().OperEvent(*this, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
     socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
+    p_tcp_network_->GetEpollCtrl().OperEvent(*this, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
+#endif
     p_tcp_network_->OnConnected(GetConnID());
 }
 
@@ -209,10 +236,19 @@ void TcpSocket::UpdateSend()
 
 int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    int32_t send_bytes = send(socket_fd, data, (int32_t)size, 0);
+#elif defined(__linux__)
     int32_t send_bytes = send(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
+#endif
     if (send_bytes < 0)
     {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        int32_t last_errno = GetSocketError();
+        if((0 == last_errno) || (WSAEINTR == last_errno) || (WSAEINPROGRESS == last_errno) || (WSAEWOULDBLOCK == last_errno))
+#elif defined(__linux__)
         if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
+#endif
         {
             return 0;
         }
@@ -299,11 +335,15 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
 
     send_buff_len_ = send_buff_size;
     recv_buff_len_ = recv_buff_size;
-
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    socket_id_ = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+    if(socket_id_ == INVALID_SOCKET)
+#elif defined(__linux__)
     socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_id_ < 0)
+#endif
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, errno);
+        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
         return false;
     }
 
@@ -311,8 +351,19 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    sa.sin_addr.S_un.S_addr = INADDR_ANY;
+    if (0 != ip.size())
+    {
+        sa.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
+    }
+#elif defined(__linux__)
     sa.sin_addr.s_addr = INADDR_ANY;
-    sa.sin_addr.s_addr = inet_addr(ip.c_str());
+    if (0 != ip.size())
+    {
+        sa.sin_addr.s_addr = inet_addr(ip.c_str());
+    }
+#endif
     SetReuseAddrOn(socket_id_); // 复用端口
     SetLingerOff(socket_id_);   // 立即关闭该连接
     SetDeferAccept(socket_id_); // 1s 之内没有数据发送，则直接关闭连接
@@ -321,13 +372,13 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     int32_t error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
     if (error < 0)
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, errno);
+        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
         return false;
     }
     error = listen(socket_id_, DEFAULT_BACKLOG_SIZE);
     if (error < 0)
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, errno);
+        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
         return false;
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
@@ -361,15 +412,31 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
-    sa.sin_addr.s_addr = inet_addr(ip.c_str());
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    sa.sin_addr.S_un.S_addr = INADDR_ANY;
+    if (0 != ip.size())
+    {
+        sa.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
+    }
+#elif defined(__linux__)
+    sa.sin_addr.s_addr = INADDR_ANY;
+    if (0 != ip.size())
+    {
+        sa.sin_addr.s_addr = inet_addr(ip.c_str());
+    }
+#endif
     SetNonBlocking(socket_id_); // 设置为非阻塞
     SetNagleOff(socket_id_);    // 关闭 Nagle
     SetTcpBuffSize(socket_id_);
     int32_t error = connect(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    if (error < 0 && ((WSAEWOULDBLOCK != GetSysErrNo()) && (WSAEISCONN != GetSysErrNo())))
+#elif defined(__linux__)
     if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
+#endif
     {
         // 通知 主线程连接失败
-        p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_SYS_ERROR, errno);
+        p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
         Close(ENetErrCode::NET_SYS_ERROR, errno);
         return false;
     }
@@ -415,31 +482,42 @@ void TcpSocket::Send(const char* data, size_t len)
 
 int32_t TcpSocket::SetNonBlocking(int32_t fd)
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    u_long nonblocking = 1;
+    if (INVALID_SOCKET == fd)
+    {
+        return 1;
+    }
+    if (SOCKET_ERROR == ioctlsocket(fd, FIONBIO, &nonblocking))
+    {
+        return 1;
+    }
+#elif defined(__linux__)
+    if (fd < 0)
+    {
+        return 1;
+    }
     int32_t flags = fcntl(fd, F_GETFL, 0);
-    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#endif
+    return 0;
 }
 int32_t TcpSocket::SetKeepaliveOff(int32_t fd)
 {
-#ifdef __linux__
     int32_t keepalive = 0;
     return setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
-#endif // __linux__
 }
 int32_t TcpSocket::SetNagleOff(int32_t fd)
 {
-#ifdef __linux__
     int32_t nodelay = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
-#endif // __linux__
 }
 // SOCKET在close时候不等待缓冲区发送完成
 int32_t TcpSocket::SetLingerOff(int32_t fd)
 {
-#ifdef __linux__
     linger so_linger;
     so_linger.l_onoff = 0;
-    return setsockopt(fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
-#endif // __linux__
+    return setsockopt(fd, SOL_SOCKET, SO_LINGER, (char*)&so_linger, sizeof(so_linger));
 }
 /*
 这个套接字选项通知内核，如果端口忙，但TCP状态位于 TIME_WAIT ，可以重用端口。如果端口忙，而TCP状态位于其他状态，重用端口时依旧得到一个错误信息，指明"地址已经使用中"。
@@ -453,8 +531,12 @@ int32_t TcpSocket::SetReuseAddrOn(int32_t fd)
 
 int32_t TcpSocket::SetDeferAccept(int32_t fd)
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    return 0;
+#elif defined(__linux__)
     int32_t secs = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &secs, sizeof(secs));
+#endif
 }
 
 int32_t TcpSocket::SetTcpBuffSize(int32_t fd)
@@ -474,7 +556,14 @@ int32_t TcpSocket::SetTcpBuffSize(int32_t fd)
     return 0;
 }
 
-#endif // __linux__
+int32_t TcpSocket::GetSysErrNo()
+{
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    return GetLastError();
+#elif defined(__linux__)
+    return errno;
+#endif
+}
 
 // TCP之Nagle算法&&延迟ACK
 

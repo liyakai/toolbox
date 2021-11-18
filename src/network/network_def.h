@@ -3,7 +3,7 @@
 // 网络类型
 enum NetworkType
 {
-    Unknown = 0,
+    NT_UNKNOWN = 0,
     NT_TCP,
     NT_UDP,
     NT_KCP,

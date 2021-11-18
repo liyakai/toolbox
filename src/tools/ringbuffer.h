@@ -11,7 +11,7 @@
 * Size 队列长度
 * Ratio 警戒值,超过此容量,队列长度会自动增长一倍
 */
-template <typename Type, size_t Size, size_t Ratio = 75>
+template <typename Type, std::size_t Size, std::size_t Ratio = 75>
 class RingBuffer : public DebugPrint
 {
 public:
@@ -47,7 +47,7 @@ public:
     /*
     * 判断是否需要扩容
     */
-    bool NeedEnlage(size_t new_len = 0)
+    bool NeedEnlage(std::size_t new_len = 0)
     {
         auto ratio = (double)(buffer_size_ - WriteableSize()) / (double)buffer_size_;
         return ratio > ratio_ || WriteableSize() < new_len;
@@ -55,14 +55,14 @@ public:
     /*
     * 可写数据长度[使用一个元素空间来判满]
     */
-    size_t WriteableSize()
+    std::size_t WriteableSize()
     {
         return (read_pos_ - write_pos_ - 1) % buffer_size_;
     }
     /*
     * 连续可写数据长度
     */
-    size_t ContinuouslyWriteableSize()
+    std::size_t ContinuouslyWriteableSize()
     {
         while(NeedEnlage())
         {
@@ -71,12 +71,12 @@ public:
                 return 0;
             }
         }
-        return read_pos_ >= write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : std::min(WriteableSize(), buffer_size_ - write_pos_);
+        return read_pos_ >= write_pos_ + 1 ? read_pos_ - write_pos_ - 1 : (std::min)(WriteableSize(), buffer_size_ - write_pos_);
     }
     /*
     * 调整写位置
     */
-    void AdjustWritePos(size_t size)
+    void AdjustWritePos(std::size_t size)
     {
         write_pos_ = (write_pos_ + size) % buffer_size_;
     }
@@ -90,9 +90,9 @@ public:
     /*
     * 连续可读数据长度
     */
-    size_t ContinuouslyReadableSize()
+    std::size_t ContinuouslyReadableSize()
     {
-        return write_pos_ >= read_pos_ ? write_pos_ - read_pos_ : std::min(ReadableSize(), buffer_size_ - read_pos_);
+        return write_pos_ >= read_pos_ ? write_pos_ - read_pos_ : (std::min)(ReadableSize(), buffer_size_ - read_pos_);
     }
     /*
     * 获取可读位置指针
@@ -104,21 +104,21 @@ public:
     /*
     * 调整读位置
     */
-    void AdjustReadPos(size_t size)
+    void AdjustReadPos(std::size_t size)
     {
         read_pos_ = (read_pos_ + size) % buffer_size_;
     }
     /*
     * 可读数据长度
     */
-    size_t ReadableSize()
+    std::size_t ReadableSize()
     {
         return (write_pos_ - read_pos_) % buffer_size_;
     }
     /*
     * 获取 buffer size
     */
-    size_t GetBufferSize(){ return buffer_size_; }
+    std::size_t GetBufferSize(){ return buffer_size_; }
     /*
     * 判空
     */
@@ -140,7 +140,7 @@ public:
     * @param buffer 读取数组的指针
     * @param len 读取数组的长度
     */
-    size_t Write(const char* buffer, size_t len)
+    std::size_t Write(const char* buffer, std::size_t len)
     {
         while(NeedEnlage(len))
         {
@@ -149,8 +149,8 @@ public:
                 return 0;
             }
         }
-        len = std::min(len, WriteableSize());
-        auto rbytes = std::min(len, buffer_size_ - write_pos_);
+        len = (std::min)(len, WriteableSize());
+        auto rbytes = (std::min)(len, buffer_size_ - write_pos_);
         memmove(buffer_ + (write_pos_ & (buffer_size_ - 1)), buffer, rbytes);
         memmove(buffer_, buffer + rbytes, len - rbytes);
         write_pos_ = (write_pos_ + len) % buffer_size_;
@@ -161,10 +161,10 @@ public:
     * @param buffer 读取数组的指针
     * @param len 读取数组的长度
     */
-    size_t Read(char* buffer, size_t len)
+    std::size_t Read(char* buffer, std::size_t len)
     {
-        len = std::min(len, ReadableSize());
-        auto rbytes = std::min(len, buffer_size_ - read_pos_);
+        len = (std::min)(len, ReadableSize());
+        auto rbytes = (std::min)(len, buffer_size_ - read_pos_);
         memmove(buffer, buffer_ + read_pos_, rbytes);
         memmove(buffer + rbytes, buffer_, len - rbytes);
         read_pos_ = (read_pos_ + len) % buffer_size_;
@@ -175,10 +175,10 @@ public:
     * @param buffer 拷贝的内存指针
     * @param len  拷贝的长度
     */
-    size_t Copy(char* buffer, size_t len)
+    std::size_t Copy(char* buffer, std::size_t len)
     {
-        len = std::min(len, ReadableSize());
-        auto rbytes = std::min(len, buffer_size_ - read_pos_);
+        len = (std::min)(len, ReadableSize());
+        auto rbytes = (std::min)(len, buffer_size_ - read_pos_);
         memmove(buffer, buffer_ + read_pos_, rbytes);
         memmove(buffer + rbytes, buffer_, len - rbytes);
         return len;
@@ -187,9 +187,9 @@ public:
     * 擦除
     * @param len 擦除的长度
     */
-    size_t Remove(size_t len)
+    std::size_t Remove(std::size_t len)
     {
-        len = std::min(len, ReadableSize());
+        len = (std::min)(len, ReadableSize());
         read_pos_ = (read_pos_ + len) % buffer_size_;
         return len;
     }

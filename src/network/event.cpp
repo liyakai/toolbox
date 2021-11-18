@@ -52,7 +52,7 @@ std::string NetEventWorker::GetIP() const
     return NullString;
 }
 
-void NetEventWorker::SetPort(const uint16_t port)
+void NetEventWorker::SetAddressPort(const uint16_t port)
 {
     net_req_.address_.port_ = port;
 }

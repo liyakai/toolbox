@@ -111,7 +111,7 @@ FIXTURE_BEGIN(TcpEpollNetwork)
 
 CASE(test_tcp_echo)
 {
-    return;
+    // return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_echo.prof");
 #endif // USE_GPERF_TOOLS

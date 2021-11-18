@@ -1,5 +1,5 @@
 #pragma once
-#include "epoll_define.h"
+#include "net_define.h"
 #include "network.h"
 
 /*

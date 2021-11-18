@@ -1,10 +1,9 @@
 #pragma once
 
-#ifdef __linux__
 
 #include <stdint.h>
 #include <time.h>
-#include "base_socket.h"
+#include "src/network/net_imp/base_socket.h"
 #include "src/tools/ringbuffer.h"
 #include "socket_pool.h"
 
@@ -45,7 +44,7 @@ public:
     // /*
     // * 设置远端端口
     // */
-    // void SetPort(uint16_t port){ port_ = port; }
+    // void SetAddressPort(uint16_t port){ port_ = port; }
     /*
     * 设置socket状态
     */
@@ -55,10 +54,13 @@ public:
     * 设置 socket 池子
     */
     void SetSocketMgr(TCPSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif
     /*
     * 设置 tcp_network
     */
     void SetEpollNetwork(TcpEpollNetwork* tcp_network){ p_tcp_network_ = tcp_network; }
+#endif
     /*
     * 更新 epoll 事件
     * @params event_type 事件类型
@@ -155,12 +157,16 @@ private:
     * 设置 TCP buffer 的大小
     */
     int32_t SetTcpBuffSize(int32_t fd); 
+    /*
+    * @brief 获取系统错误消息
+    */
+    int32_t GetSysErrNo();
 
 private:
     // std::string ip_;
     // uint16_t port_ = 0;
+    INetwork* p_tcp_network_ = nullptr;      // 工作线程
 
-    TcpEpollNetwork* p_tcp_network_ = nullptr;      // 工作线程
     TCPSocketPool *p_sock_pool_ = nullptr;          // socket 池子
 
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
@@ -171,5 +177,3 @@ private:
     time_t last_recv_ts_ = 0;                       // 最后一次读到数据的时间戳
 
 };
-
-#endif // __linux__

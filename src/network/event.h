@@ -74,7 +74,7 @@ public:
     /*
     * 设置 Port 
     */
-    void SetPort(const uint16_t port);
+    void SetAddressPort(const uint16_t port);
     /*
     * 获取 Port
     */

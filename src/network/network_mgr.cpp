@@ -1,6 +1,10 @@
 #include "network_mgr.h"
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#include "src/network/net_imp/net_iocp/tcp_iocp_network.h"
+#elif __linux__
 #include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
 #include "src/network/net_imp/net_epoll/udp_epoll_network.h"
+#endif
 #include "src/tools/object_pool.h"
 NetworkMaster::NetworkMaster()
 {
@@ -77,7 +81,7 @@ void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType typ
 {
     auto* event = GetObject<NetEventWorker>(EID_MainToWorkerNewAccepter);
     event->SetIP(ip);
-    event->SetPort(port);
+    event->SetAddressPort(port);
     event->SetBuffSize(send_buff_size, recv_buff_size);
     NotifyWorker(event,type);
 }
@@ -85,7 +89,7 @@ void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType ty
 {
     auto* event = GetObject<NetEventWorker>(EID_MainToWorkerNewConnecter);
     event->SetIP(ip);
-    event->SetPort(port);
+    event->SetAddressPort(port);
     event->SetBuffSize(send_buff_size, recv_buff_size);
     NotifyWorker(event, type);
 }
@@ -157,7 +161,11 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     {
     case NT_TCP:
     {
-#ifdef __linux__
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        auto* tcp_network = new TcpIocpNetwork();
+        tcp_network->Init(this, type);
+        return tcp_network;
+#elif __linux__
         auto* tcp_network = new TcpEpollNetwork();
         tcp_network->Init(this, type);
         return tcp_network;
@@ -183,7 +191,7 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
 #endif // __linux__
         break;
     }
-    case Unknown:
+    case NT_UNKNOWN:
     case NT_MAX:
     default:
         break;

@@ -1,4 +1,5 @@
 #include "base_socket.h"
+#include <ioapiset.h>
 
 BaseSocket::BaseSocket()
 {
@@ -25,7 +26,12 @@ void BaseSocket::Close()
 {
     if (IsSocketValid())
     {
-#ifdef __linux__
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        CancelIo((HANDLE)socket_id_);
+        shutdown(socket_id_, 2);
+        closesocket(socket_id_);
+#elif defined(__linux__)
+        shutdown(socket_id_, SHUT_RDWR);
         close(socket_id_);
 #endif // __linux__
         socket_id_ = -1;
