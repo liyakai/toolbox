@@ -287,7 +287,7 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     }
 }
 
-void TcpSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
+void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 {
     if (SocketState::SOCK_STATE_INVALIED == socket_state_)
     {

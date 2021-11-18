@@ -34,7 +34,7 @@ void UdpEpollNetwork::UnInit()
 void UdpEpollNetwork::Update()
 {
     INetwork::Update();
-    epoll_ctrl_.RunOnce();
+    epoll_ctrl_.RunOnce<UdpSocket>();
     if(is_kcp_open_)
     {
         auto current = GetMillSecondTimeStamp();

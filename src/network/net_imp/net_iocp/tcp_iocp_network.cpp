@@ -2,7 +2,7 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 
-#include "src/network/net_imp/net_define.h"
+#include "src/network/net_imp/net_imp_define.h"
 
 
 TcpIocpNetwork::TcpIocpNetwork()
@@ -17,18 +17,21 @@ TcpIocpNetwork::~TcpIocpNetwork()
 void TcpIocpNetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
     INetwork::Init(master, network_type);
+    iocp_ctrl_.CreateIocp();
     sock_mgr_.Init(MAX_SOCKET_COUNT);
 }
 
 void TcpIocpNetwork::UnInit()
 {
     sock_mgr_.UnInit();
+    iocp_ctrl_.Destroy();
     INetwork::UnInit();
 }
 
 void TcpIocpNetwork::Update()
 {
     INetwork::Update();
+    iocp_ctrl_.RunOnce<TcpSocket>();
 }
 
 
@@ -41,7 +44,10 @@ uint64_t TcpIocpNetwork::OnNewAccepter(const std::string& ip, const uint16_t por
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
-    //new_socket->SetEpollNetwork(this);
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
+    new_socket->SetEpollNetwork(this);
+#endif
     if(false == new_socket->InitNewAccepter(ip, port, send_buff_size, recv_buff_size))
     {
         return 0;
@@ -58,7 +64,10 @@ uint64_t TcpIocpNetwork::OnNewConnecter(const std::string& ip, const uint16_t po
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
-    //new_socket->SetEpollNetwork(this);
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
+    new_socket->SetEpollNetwork(this);
+#endif
     if(false == new_socket->InitNewConnecter(ip, port, send_buff_size, recv_buff_size))
     {
         return 0;

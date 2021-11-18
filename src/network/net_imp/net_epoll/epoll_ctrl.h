@@ -108,7 +108,37 @@ public:
     /*
     * 执行一次 epoll wait
     */
-    bool RunOnce();
+    template<typename SocketType>
+    bool RunOnce()
+    {
+        epoll_event evt;
+        time_t time_stamp = time(0);    // 时间戳
+        int32_t count = EpollWait(EPOLL_WAIT_MSECONDS);
+        if (count < 0)
+        {
+            return false;
+        }
+        for (int32_t i = 0; i < count; i++)
+        {
+            epoll_event& event = events_[i];
+            SocketType* socket = static_cast<SocketType*>(event.data.ptr);
+            if (nullptr == socket) continue;
+            if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
+            {
+                socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
+                epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
+            }
+            else if (event.events & EPOLLIN)
+            {
+                socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
+            }
+            else if (event.events & EPOLLOUT)
+            {
+                socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
+            }
+        }
+        return true;
+    }
 private:
     uint32_t max_events_ = 0; // 最大事件数
     int epoll_fd_;            // epoll 文件描述符

@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <stdint.h>
 #include <time.h>
 #include "src/network/net_imp/base_socket.h"
@@ -55,7 +54,7 @@ public:
     */
     void SetSocketMgr(TCPSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#elif
+#elif defined(__linux__)
     /*
     * 设置 tcp_network
     */
@@ -66,7 +65,7 @@ public:
     * @params event_type 事件类型
     * @params ts 时间戳
     */
-    void UpdateEpollEvent(SockEventType event_type, time_t ts) override;
+    void UpdateEvent(SockEventType event_type, time_t ts) override;
     /*
     * 初始化新的监听器
     * @param ip 监听IP

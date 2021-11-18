@@ -1,5 +1,5 @@
 #pragma once
-#include "net_define.h"
+#include "net_imp_define.h"
 #include "network.h"
 
 /*
@@ -21,11 +21,11 @@ public:
     */
     virtual void Reset();
     /*
-    * 更新 epoll 事件
+    * 更新事件
     * @params event_type 事件类型
     * @params ts 时间戳
     */
-    virtual void UpdateEpollEvent(SockEventType event_type, time_t ts) = 0;
+    virtual void UpdateEvent(SockEventType event_type, time_t ts) = 0;
     /*
     * 获取 socket 是否执行过 EPOLL_CTL_ADD
     * @return bool

@@ -91,7 +91,7 @@ public:
     * @params event_type 事件类型
     * @params ts 时间戳
     */
-    void UpdateEpollEvent(SockEventType event_type, time_t ts) override;
+    void UpdateEvent(SockEventType event_type, time_t ts) override;
     /*
     * @brief 监听(模拟)
     * @param ip 地址

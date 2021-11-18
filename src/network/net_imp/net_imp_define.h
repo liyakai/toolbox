@@ -2,15 +2,20 @@
 
 #include <cstdint>
 
-#if (defined(_WIN32) || defined(_WIN64))
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 //#include <windows.h>
 #include <cstddef>
-#include<ws2tcpip.h>
+#include <WinSock2.h>
+#include <ws2tcpip.h>
+#include "Mswsock.h"
+#include "net_iocp/iocp_define.h"
 #elif defined(__linux__)
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "net_epoll/epoll_define.h"
+
 constexpr std::size_t INVALID_SOCKET = -1;
 
 #endif  // #if (defined(WIN32) || defined(_WIN64))
@@ -38,7 +43,7 @@ enum class ErrCode
 
 };
 
-enum class SocketType
+enum class SocketConnType
 {
     SOCK_TYPE_INVALID = 0,
     SOCK_TYPE_CONNECT,

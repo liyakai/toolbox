@@ -33,7 +33,7 @@ void TcpEpollNetwork::UnInit()
 void TcpEpollNetwork::Update()
 {
     INetwork::Update();
-    epoll_ctrl_.RunOnce();
+    epoll_ctrl_.RunOnce<TcpSocket>();
 }
 
 

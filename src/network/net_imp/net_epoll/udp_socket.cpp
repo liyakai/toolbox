@@ -85,7 +85,7 @@ void UdpSocket::Reset()
 }
 
 
-void UdpSocket::UpdateEpollEvent(SockEventType event_type, time_t ts)
+void UdpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 {
     if(event_type & SOCKET_EVENT_ERR)
     {

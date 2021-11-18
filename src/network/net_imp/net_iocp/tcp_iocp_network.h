@@ -5,6 +5,7 @@
 #include "src/network/network.h"
 #include "src/network/net_imp/socket_pool.h"
 #include "src/network/net_imp/tcp_socket.h"
+#include "iocp_ctrl.h"
 
 /*
 * 定义基于 TCP 和 IOCP 的网络
@@ -53,7 +54,8 @@ protected:
 
 private:
     NetworkMaster *network_master_;     // 主线程网络管理器
-    SocketPool<TcpSocket> sock_mgr_;    // socket池
+    IocpCtrl iocp_ctrl_;                // iocp 控制器
+    SocketPool<TcpSocket> sock_mgr_;    // socket 池
 };
 
 #endif // defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
