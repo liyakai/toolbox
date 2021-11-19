@@ -10,6 +10,40 @@ class TcpEpollNetwork;
 class TcpSocket;
 
 using TCPSocketPool = SocketPool<TcpSocket>;
+
+
+
+/*
+* 定义 per-I/O 数据
+*/
+struct PerIO_t
+{
+    OVERLAPPED over_lapped; // windows 重叠I/O数据结构
+    EIOType    io_type;     // 当前的I/O类型
+};
+
+/*
+* 定义 AcceptEx 函数相关
+*/
+struct AcceptEx_t
+{
+    ACCEPTEX accept_ex_fn;      // AcceptEx 函数指针
+    SOCKET   socket_fd;         // 当前未决的客户端套接字  -AcceptEx
+    char     buffer[DEFAULT_CONN_BUFFER_SIZE];           // 参数 AcceptEx
+};
+
+/*
+* 定义 per-socket 数据
+*/
+template<typename SocketType>
+struct PerSock_t
+{
+    SocketType* net_socket;     // socket 指针
+    AcceptEx_t* accept_ex_info; // AcceptEx_t指针
+    PerIO_t   io_recv;
+    PerIO_t   io_send;
+};
+
 /*
 * 定义一个TCP连接
 */
@@ -174,5 +208,10 @@ private:
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
     time_t last_recv_ts_ = 0;                       // 最后一次读到数据的时间戳
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
+    AcceptEx_t  accept_ex_info;
+#endif
 
 };

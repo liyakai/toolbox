@@ -3,47 +3,6 @@
 #include "src/network/net_imp/net_imp_define.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-
-enum EIOType
-{
-    IOT_ACCEPT  = 1,    // 新连接
-    IOT_CONNECT = 2,    // 连接建立
-    IOT_RECV    = 4,    // 接收
-    IOT_SEND    = 8,    // 发送
-    IOT_CLOSE   = 16,   // 关闭
-};
-
-/*
-* 定义 per-I/O 数据
-*/
-struct PerIO_t
-{
-    OVERLAPPED over_lapped; // windows 重叠I/O数据结构
-    EIOType    io_type;     // 当前的I/O类型
-};
-
-/*
-* 定义 AcceptEx 函数相关
-*/
-struct AcceptEx_t
-{
-    ACCEPTEX accept_ex_fn;      // AcceptEx 函数指针
-    SOCKET   socket_fd;         // 当前未决的客户端套接字  -AcceptEx
-    char     buffer[DEFAULT_CONN_BUFFER_SIZE];           // 参数 AcceptEx
-};
-
-/*
-* 定义 per-socket 数据
-*/
-template<typename SocketType>
-struct PerSock_t
-{
-    SocketType* net_socket;     // socket 指针
-    AcceptEx_t* accept_ex_info; // AcceptEx_t指针
-    PerIO_t   io_recv;
-    PerIO_t   io_send;
-};
-
 /*
 * 定义管理 iocp 的类
 */
