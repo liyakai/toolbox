@@ -39,13 +39,18 @@ void TcpSocket::Reset()
     p_tcp_network_ = nullptr;
     p_sock_pool_ = nullptr;
 
-    socket_state_ = SocketState::SOCK_STATE_INVALIED;
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    accept_ex_fn_ = nullptr;      // AcceptEx 函数指针
+    socket_state_ = EIOSocketState::IOCP_CLOSE;
+#elif defined(__linux__)
+    socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
+#endif
+
     send_buff_len_ = 0;
     recv_buff_len_ = 0;
     recv_ring_buffer_.Clear();
     send_ring_buffer_.Clear();
     last_recv_ts_ = 0;
-    is_ctrl_add_ = false;
     BaseSocket::Reset();
 }
 
@@ -83,10 +88,13 @@ void TcpSocket::UpdateAccept()
         p_tcp_network_->OnAccepted(new_socket->GetConnID());
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
-        p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
+        p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
     }
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
+#endif
     event_type_ = SOCKET_EVENT_RECV;
 }
 
@@ -97,11 +105,11 @@ void TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
     socket->SetEpollNetwork(p_tcp_network_);
+    socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
 #endif
     socket->SetSocketID(socket_fd);
     // socket->SetIP(ip);
     // socket->SetAddressPort(port);
-    socket->SetState(SocketState::SOCK_STATE_ESTABLISHED);
     socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
 
     socket->SetNonBlocking(socket_fd);
@@ -208,10 +216,11 @@ ErrCode TcpSocket::ProcessRecvData()
 void TcpSocket::UpdateConnect()
 {
     event_type_ |= SOCKET_EVENT_RECV;
-    socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
-    p_tcp_network_->GetEpollCtrl().OperEvent(*this, EpollOperType::EPOLL_OPER_ADD, SOCKET_EVENT_RECV);
+    socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
+    p_tcp_network_->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
     p_tcp_network_->OnConnected(GetConnID());
 }
@@ -266,7 +275,11 @@ int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 
 void TcpSocket::UpdateError()
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    if (true) // TO DO IOCP
+#elif defined(__linux__)
     if(SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
+#endif
     {
         Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
     } else 
@@ -282,14 +295,20 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
         BaseSocket::Close();
         // 通知主线程 socket 关闭
         p_tcp_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
         socket_state_ = SocketState::SOCK_STATE_INVALIED;
+#endif
         p_sock_pool_->Free(this);
     }
 }
 
 void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     if (SocketState::SOCK_STATE_INVALIED == socket_state_)
+#endif
     {
         // socket 已经关闭
         p_tcp_network_->OnErrored(0, ENetErrCode::NET_INVALID_SOCKET, errno);
@@ -302,7 +321,11 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
     }
     if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
     {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        if (true) // TO DO IOCP
+#elif defined(__linux__)
         if (SocketState::SOCK_STATE_LISTENING == socket_state_)
+#endif
         {
             UpdateAccept();
         }
@@ -314,7 +337,11 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
     }
     if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
     {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        if (true) // TO DO IOCP
+#elif defined(__linux__)
         if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
+#endif
         {
             UpdateConnect();
         }
@@ -327,7 +354,10 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 
 bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     if (SocketState::SOCK_STATE_LISTENING == socket_state_)
+#endif
     {
         p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, 0);
         return false;
@@ -381,14 +411,20 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
         p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
         return false;
     }
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
+#endif
     event_type_ = SOCKET_EVENT_RECV;
     return true;
 }
 
 bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
+#endif
     {
         p_tcp_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, 0);
         return false;
@@ -440,7 +476,10 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
         Close(ENetErrCode::NET_SYS_ERROR, errno);
         return false;
     }
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_CONNECTING;
+#endif
     event_type_ = SOCKET_EVENT_SEND;
     return true;
 }

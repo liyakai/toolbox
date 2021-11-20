@@ -51,7 +51,7 @@ uint64_t TcpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t po
     {
         return 0;
     }
-    epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
+    epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
 }
 uint64_t TcpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
@@ -68,7 +68,7 @@ uint64_t TcpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
     {
         return 0;
     }
-    epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
+    epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
 }
 void TcpEpollNetwork::OnClose(uint64_t connect_id)

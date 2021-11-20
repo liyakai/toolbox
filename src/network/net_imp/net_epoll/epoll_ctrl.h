@@ -49,10 +49,10 @@ public:
     */
     bool DelEvent(int socket_fd);
     /*
-    * 操作事件
+    * 处理事件
     */
     template<typename SocketType>
-    bool OperEvent(SocketType &socket, EpollOperType op_type, int32_t event_type)
+    bool OperEvent(SocketType &socket, EventOperType op_type, int32_t event_type)
     {
         epoll_event event;
         memset(&event, 0, sizeof(event));
@@ -65,7 +65,7 @@ public:
             {
                 event.events |= EPOLLOUT;
             }
-            if (EpollOperType::EPOLL_OPER_ADD == op_type)
+            if (EventOperType::EVENT_OPER_ADD == op_type)
             {
                 event.events |= EPOLLIN;
             }
@@ -76,7 +76,7 @@ public:
             {
                 event.events |= EPOLLIN;
             }
-            if (EpollOperType::EPOLL_OPER_ADD == op_type)
+            if (EventOperType::EVENT_OPER_ADD == op_type)
             {
                 event.events |= EPOLLOUT;
             }

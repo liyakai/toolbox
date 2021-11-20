@@ -14,7 +14,10 @@ void BaseSocket::Reset()
 {
     Close();
     conn_id_ = INVALID_CONN_ID;
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#elif defined(__linux__)
     is_ctrl_add_ = false;
+#endif
     event_type_ = SOCKET_EVENT_INVALID;
 }
 bool BaseSocket::IsSocketValid()

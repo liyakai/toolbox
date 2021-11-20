@@ -24,6 +24,89 @@ public:
     */
     void Destroy();
     /*
+    * 处理事件
+    */
+    template<typename SocketType>
+    bool OperEvent(SocketType& socket, EventOperType op_type, int32_t event_type)
+    {
+        if (EventOperType::EVENT_OPER_ADD == op_type)
+        {
+            if (SOCKET_EVENT_RECV & event_type)
+            {
+                OnRecv(socket);
+            } else if (SOCKET_EVENT_SEND & event_type)
+            {
+                OnSend(socket);
+            }
+        }
+        else if (EventOperType::EVENT_OPER_RDC == op_type)
+        {
+            auto now_event_type = socket.GetEventType();
+            if (SOCKET_EVENT_RECV & event_type)
+            {
+                now_event_type &= ~SOCKET_EVENT_RECV;
+            }
+            else if (SOCKET_EVENT_SEND & event_type)
+            {
+                now_event_type &= ~SOCKET_EVENT_SEND;
+            }
+            socket.SetSockEventType(now_event_type);
+        }
+
+        return true;
+    }
+    /*
+    * @brief 处理接收消息
+    */
+    template<typename SocketType>
+    void OnRecv(SocketType& socket)
+    {
+#if 0
+        if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
+        {
+            auto& socket_accept_ex = socket.GetAcceptEx();
+            if (nullptr == socket_accept_ex)
+            {
+                // 获取 AcceptEx指针
+                DWORD bytes = 0;
+                GUID guid_accept_ex = WSAID_ACCEPTEX;
+                int32_t error_code = WSAIoctl(iocp_fd_, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex),
+                    &socket_accept_ex, sizeof(ACCEPTEX), &bytes, nullptr, nullptr);
+                if (error_code|| nullptr == socket_accept_ex)
+                {
+                    return;
+                }
+            }
+            // 建立一个支持重叠I/O的套接字
+            auto socket_id = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+            if (INVALID_SOCKET == socket_id)
+            {
+                return;
+            }
+            socket.SetSocketID(socket_id);
+            // 投递一个 accept 请求
+            bool result = socket_accept_ex->fn_AcceptEx(iocp_fd_, socket_id, socket.GetBuffer(), 0,
+                            ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, socket.GetOverLapped());
+            if (false == result)
+            {
+                DWORD last_error = GetLastError();
+                if (ERROR_IO_PENDING != last_error)
+                {
+                    Destroy();
+                }
+            }
+
+        }
+#endif
+    }
+    /*
+    * @brief  处理发送消息
+    */
+    template<typename SocketType>
+    void OnSend(SocketType& socket)
+    {
+    }
+    /*
     * 执行一次 iocp
     */
     template<typename SocketType>
@@ -46,10 +129,10 @@ public:
         {
             return false;
         }
-        if ((per_io->io_type & EIOType::IOT_RECV) || (per_io->io_type & EIOType::IOT_ACCEPT))
+        if ((per_io->io_type & EIOSocketState::IOCP_RECV) || (per_io->io_type & EIOSocketState::IOCP_ACCEPT))
         {
             per_sock->net_socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
-        } else if ((per_io->io_type & EIOType::IOT_SEND) || (per_io->io_type & EIOType::IOT_CONNECT))
+        } else if ((per_io->io_type & EIOSocketState::IOCP_SEND) || (per_io->io_type & EIOSocketState::IOCP_CONNECT))
         {
             per_sock->net_socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
         }

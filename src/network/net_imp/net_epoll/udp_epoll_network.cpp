@@ -97,7 +97,7 @@ uint64_t UdpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t po
     {
         new_socket->OpenKcpMode();
     }
-    epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
+    epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     address_to_connect_[new_socket->GetLocalAddressID()] = new_socket->GetConnID();
     return new_socket->GetLocalAddressID();
 }
@@ -120,7 +120,7 @@ uint64_t UdpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
     {
         new_socket->OpenKcpMode();
     }
-    epoll_ctrl_.OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
+    epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     address_to_connect_[new_socket->GetRemoteAddressID()] = new_socket->GetConnID();
     return new_socket->GetRemoteAddressID();
 }

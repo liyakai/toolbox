@@ -311,7 +311,7 @@ void UdpSocket::UpdateAccept(const SocketAddress& address)
     // 通知主线程有新的客户端连接进来
     p_udp_network_->OnAccepted(new_socket->GetRemoteAddressID());
     p_udp_network_->AddUdpAddress(address, new_socket->GetConnID());
-    p_udp_network_->GetEpollCtrl().OperEvent(*new_socket, EpollOperType::EPOLL_OPER_ADD, new_socket->GetEventType());
+    p_udp_network_->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     return;
 }
 

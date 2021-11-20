@@ -1,5 +1,4 @@
 #pragma once
-
 #include <cstdint>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -49,7 +48,9 @@ enum class SocketConnType
     SOCK_TYPE_CONNECT,
     SOCK_TYPE_LISTEN,
 };
-
+/*
+* epoll下socket的状态
+*/
 enum class SocketState
 {
     SOCK_STATE_INVALIED = 1,    // 初始状态
@@ -59,12 +60,24 @@ enum class SocketState
 };
 
 /*
-* epoll 操作
+* IOCP下socket的状态
 */
-enum class EpollOperType
+enum EIOSocketState
 {
-    EPOLL_OPER_ADD = 1,
-    EPOLL_OPER_RDC = 2,
+    IOCP_ACCEPT = 1,    // 新连接
+    IOCP_CONNECT = 2,    // 连接建立
+    IOCP_RECV = 4,    // 接收
+    IOCP_SEND = 8,    // 发送
+    IOCP_CLOSE = 16,   // 关闭
+};
+
+/*
+* Event 操作
+*/
+enum class EventOperType
+{
+    EVENT_OPER_ADD = 1,
+    EVENT_OPER_RDC = 2,
 };
 
 /*

@@ -19,7 +19,7 @@ using TCPSocketPool = SocketPool<TcpSocket>;
 struct PerIO_t
 {
     OVERLAPPED over_lapped; // windows 重叠I/O数据结构
-    EIOType    io_type;     // 当前的I/O类型
+    EIOSocketState    io_type;     // 当前的I/O类型
 };
 
 /*
@@ -78,21 +78,42 @@ public:
     // * 设置远端端口
     // */
     // void SetAddressPort(uint16_t port){ port_ = port; }
-    /*
-    * 设置socket状态
-    */
-    void SetState(SocketState state) { socket_state_ = state; }
+
 
     /*
     * 设置 socket 池子
     */
     void SetSocketMgr(TCPSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    /*
+    * 获取 AcceptEx 指针
+    */
+    ACCEPTEX& GetAcceptEx() { return accept_ex_fn_; }
+    /*
+    * 设置socket状态
+    */
+    void SetSocketState(EIOSocketState state) { socket_state_ = state; }
+    /*
+    * 获取socket状态
+    */
+    EIOSocketState GetSocketState() { return socket_state_; }
+    /*
+    * 获取缓冲区
+    */
+    char* GetBuffer() { return buffer; }
+    /*
+    * 获取重叠结构
+    */
+    OVERLAPPED& GetOverLapped() { return over_lapped_; }
 #elif defined(__linux__)
     /*
     * 设置 tcp_network
     */
     void SetEpollNetwork(TcpEpollNetwork* tcp_network){ p_tcp_network_ = tcp_network; }
+    /*
+    * 设置socket状态
+    */
+    void SetSocketState(SocketState state) { socket_state_ = state; }
 #endif
     /*
     * 更新 epoll 事件
@@ -202,7 +223,6 @@ private:
 
     TCPSocketPool *p_sock_pool_ = nullptr;          // socket 池子
 
-    SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
     int32_t send_buff_len_ = 0;                     // 接收缓冲区大小
     int32_t recv_buff_len_ = 0;                     // 接收缓冲区大小
     RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;
@@ -210,8 +230,12 @@ private:
     time_t last_recv_ts_ = 0;                       // 最后一次读到数据的时间戳
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    ACCEPTEX accept_ex_fn_ = nullptr;      // AcceptEx 函数指针
+    EIOSocketState socket_state_ = EIOSocketState::IOCP_CLOSE;
+    char buffer[DEFAULT_CONN_BUFFER_SIZE];           // 参数 AcceptEx
+    OVERLAPPED over_lapped_; // windows 重叠I/O数据结构
 #elif defined(__linux__)
-    AcceptEx_t  accept_ex_info;
+    SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 #endif
 
 };
