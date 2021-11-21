@@ -73,7 +73,8 @@ uint64_t TcpIocpNetwork::OnNewConnecter(const std::string& ip, const uint16_t po
     {
         return 0;
     }
-    //epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+    new_socket->SetSocketState(EIOSocketState::IOCP_CONNECT);
+    iocp_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
 }
 void TcpIocpNetwork::OnClose(uint64_t connect_id)

@@ -61,7 +61,6 @@ public:
     template<typename SocketType>
     void OnRecv(SocketType& socket)
     {
-#if 1
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
             auto& socket_accept_ex = socket.GetAcceptEx();
@@ -100,7 +99,10 @@ public:
             }
 
         }
-#endif
+        else
+        {
+
+        }
     }
     /*
     * @brief  处理发送消息
