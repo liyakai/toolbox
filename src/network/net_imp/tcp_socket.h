@@ -105,6 +105,10 @@ public:
     * 获取重叠结构
     */
     OVERLAPPED& GetOverLapped() { return over_lapped_; }
+    /*
+    * 设置 当前未决的客户端套接字SocketID 
+    */
+    void SetAcceptExSocketId(SOCKET socket) { accept_ex_socket_id_ = socket; }
 #elif defined(__linux__)
     /*
     * 设置 tcp_network
@@ -231,6 +235,7 @@ private:
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     ACCEPTEX accept_ex_fn_ = nullptr;      // AcceptEx 函数指针
+    SOCKET accept_ex_socket_id_ = 0;                 // 当前未决的客户端套接字
     EIOSocketState socket_state_ = EIOSocketState::IOCP_CLOSE;
     char buffer[DEFAULT_CONN_BUFFER_SIZE];           // 参数 AcceptEx
     OVERLAPPED over_lapped_; // windows 重叠I/O数据结构

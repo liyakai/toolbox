@@ -61,7 +61,7 @@ public:
     template<typename SocketType>
     void OnRecv(SocketType& socket)
     {
-#if 0
+#if 1
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
             auto& socket_accept_ex = socket.GetAcceptEx();
@@ -70,7 +70,7 @@ public:
                 // 获取 AcceptEx指针
                 DWORD bytes = 0;
                 GUID guid_accept_ex = WSAID_ACCEPTEX;
-                int32_t error_code = WSAIoctl(iocp_fd_, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex),
+                int32_t error_code = WSAIoctl(socket.GetSocketID(), SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex),
                     &socket_accept_ex, sizeof(ACCEPTEX), &bytes, nullptr, nullptr);
                 if (error_code|| nullptr == socket_accept_ex)
                 {
@@ -83,13 +83,16 @@ public:
             {
                 return;
             }
-            socket.SetSocketID(socket_id);
+            socket.SetAcceptExSocketId(socket_id);
+            // MSDN: https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-acceptex
             // 投递一个 accept 请求
-            bool result = socket_accept_ex->fn_AcceptEx(iocp_fd_, socket_id, socket.GetBuffer(), 0,
-                            ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, socket.GetOverLapped());
+            bool result = socket_accept_ex(socket.GetSocketID(), socket_id, socket.GetBuffer(), 0,
+                            ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &socket.GetOverLapped());
             if (false == result)
             {
                 DWORD last_error = GetLastError();
+                // MSDN:  If WSAGetLastError returns ERROR_IO_PENDING, 
+                // then the operation was successfully initiated and is still in progress.
                 if (ERROR_IO_PENDING != last_error)
                 {
                     Destroy();
