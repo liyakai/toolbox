@@ -106,6 +106,10 @@ public:
     */
     OVERLAPPED& GetOverLapped() { return over_lapped_; }
     /*
+    * 获取重叠结构指针
+    */
+    OVERLAPPED* GetOverLappedPtr() { return &over_lapped_; }
+    /*
     * 设置 当前未决的客户端套接字SocketID 
     */
     void SetAcceptExSocketId(SOCKET socket) { accept_ex_socket_id_ = socket; }

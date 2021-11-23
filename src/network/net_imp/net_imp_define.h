@@ -64,7 +64,7 @@ enum class SocketState
 */
 enum EIOSocketState
 {
-    IOCP_ACCEPT = 1,    // 新连接
+    IOCP_ACCEPT = 1,    // 监听
     IOCP_CONNECT = 2,    // 连接建立
     IOCP_RECV = 4,    // 接收
     IOCP_SEND = 8,    // 发送

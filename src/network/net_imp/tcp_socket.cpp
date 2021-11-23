@@ -355,6 +355,7 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    if (EIOSocketState::IOCP_ACCEPT == socket_state_)
 #elif defined(__linux__)
     if (SocketState::SOCK_STATE_LISTENING == socket_state_)
 #endif
@@ -412,6 +413,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
         return false;
     }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    socket_state_ = EIOSocketState::IOCP_ACCEPT;
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
 #endif
