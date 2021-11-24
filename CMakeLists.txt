@@ -18,7 +18,7 @@ INCLUDE_DIRECTORIES(
     ./src/tools
     ./src/network
     ./src/net_work/network
-	./src/net_work/network/net_imp/
+	./src/net_work/network/net_imp
     ./src/net_work/network/net_imp/net_epoll
 	./src/net_work/network/net_imp/net_iocp
     ./src/thirdparty

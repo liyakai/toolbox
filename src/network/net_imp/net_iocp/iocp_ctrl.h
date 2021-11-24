@@ -4,27 +4,27 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 /*
-* ¶¨Òå¹ÜÀí iocp µÄÀà
+* å®šä¹‰ç®¡ç† iocp çš„ç±»
 */
 class IocpCtrl
 {
 public:
     /*
-    * ¹¹Ôì
-    * @param max_events ×î´óÊÂ¼şÊıÁ¿
+    * æ„é€ 
+    * @param max_events æœ€å¤§äº‹ä»¶æ•°é‡
     */
     IocpCtrl();
     /*
-    * ´´½¨ iocp
-    * @return ÊÇ·ñ³É¹¦
+    * åˆ›å»º iocp
+    * @return æ˜¯å¦æˆåŠŸ
     */
     bool CreateIocp();
     /*
-    * Ïú»Ù iocp
+    * é”€æ¯ iocp
     */
     void Destroy();
     /*
-    * ´¦ÀíÊÂ¼ş
+    * å¤„ç†äº‹ä»¶
     */
     template<typename SocketType>
     bool OperEvent(SocketType& socket, EventOperType op_type, int32_t event_type)
@@ -56,12 +56,12 @@ public:
         return true;
     }
     /*
-    * @brief ½¨Á¢ socket Óë iocp µÄ¹ØÁª
+    * @brief å»ºç«‹ socket ä¸ iocp çš„å…³è”
     */
     template<typename SocketType>
     bool AddSocketToIocp(SocketType& socket)
     {
-        // ½¨Á¢ socket Óë iocp µÄ¹ØÁª
+        // å»ºç«‹ socket ä¸ iocp çš„å…³è”
         HANDLE iocp = CreateIoCompletionPort((HANDLE)socket.GetSocketID(), iocp_fd_, (ULONG_PTR)&socket, 0);
         if (nullptr == iocp)
         {
@@ -70,14 +70,14 @@ public:
         return true;
     }
     /*
-    * @brief ´¦Àí½ÓÊÕÏûÏ¢
+    * @brief å¤„ç†æ¥æ”¶æ¶ˆæ¯
     */
     template<typename SocketType>
     bool OnRecv(SocketType& socket)
     {
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
-            // ½¨Á¢ socket Óë iocp µÄ¹ØÁª
+            // å»ºç«‹ socket ä¸ iocp çš„å…³è”
             if (!AddSocketToIocp(socket))
             {
                 return false;
@@ -85,7 +85,7 @@ public:
             auto& socket_accept_ex = socket.GetAcceptEx();
             if (nullptr == socket_accept_ex)
             {
-                // »ñÈ¡ AcceptExÖ¸Õë
+                // è·å– AcceptExæŒ‡é’ˆ
                 DWORD bytes = 0;
                 GUID guid_accept_ex = WSAID_ACCEPTEX;
                 int32_t error_code = WSAIoctl(socket.GetSocketID(), SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex),
@@ -95,7 +95,7 @@ public:
                     return false;
                 }
             }
-            // ½¨Á¢Ò»¸öÖ§³ÖÖØµşI/OµÄÌ×½Ó×Ö
+            // å»ºç«‹ä¸€ä¸ªæ”¯æŒé‡å I/Oçš„å¥—æ¥å­—
             auto socket_id = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
             if (INVALID_SOCKET == socket_id)
             {
@@ -103,7 +103,7 @@ public:
             }
             socket.SetAcceptExSocketId(socket_id);
             // MSDN: https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-acceptex
-            // Í¶µİÒ»¸ö accept ÇëÇó
+            // æŠ•é€’ä¸€ä¸ª accept è¯·æ±‚
             bool result = socket_accept_ex(socket.GetSocketID(), socket_id, socket.GetBuffer(), 0,
                             ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &socket.GetOverLapped());
             if (false == result)
@@ -120,7 +120,7 @@ public:
         }
         else if (EIOSocketState::IOCP_RECV == socket.GetSocketState())
         {
-            // Í¶µİÒ»¸ö³¤¶ÈÎª0µÄÇëÇó
+            // æŠ•é€’ä¸€ä¸ªé•¿åº¦ä¸º0çš„è¯·æ±‚
             WSABUF  sbuff = { 0, nullptr };
             DWORD bytes = 0;
             DWORD flags = 0;
@@ -138,14 +138,14 @@ public:
         return false;
     }
     /*
-    * @brief  ´¦Àí·¢ËÍÏûÏ¢
+    * @brief  å¤„ç†å‘é€æ¶ˆæ¯
     */
     template<typename SocketType>
     bool OnSend(SocketType& socket)
     {
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
-            // ½¨Á¢ socket Óë iocp µÄ¹ØÁª
+            // å»ºç«‹ socket ä¸ iocp çš„å…³è”
             if (!AddSocketToIocp(socket))
             {
                 return false;
@@ -153,7 +153,7 @@ public:
         }
         else if (EIOSocketState::IOCP_SEND == socket.GetSocketState())
         {
-            // Í¶µİÒ»¸ö³¤¶ÈÓĞ0µÄsendÇëÇó
+            // æŠ•é€’ä¸€ä¸ªé•¿åº¦æœ‰0çš„sendè¯·æ±‚
             WSABUF  sbuff = { 0, nullptr };
             DWORD bytes = 0;
             DWORD flags = 0;
@@ -171,12 +171,12 @@ public:
         return false;
     }
     /*
-    * Ö´ĞĞÒ»´Î iocp
+    * æ‰§è¡Œä¸€æ¬¡ iocp
     */
     template<typename SocketType>
     bool RunOnce()
     {
-        time_t      time_stamp = time(0);    // Ê±¼ä´Á
+        time_t      time_stamp = time(0);    // æ—¶é—´æˆ³
         DWORD       bytes = 0;
         SocketType* socket = nullptr;
         PerIO_t* per_io = nullptr;
@@ -204,7 +204,7 @@ public:
         return true;
     }
 private:
-    HANDLE iocp_fd_;            // iocp ÎÄ¼şÃèÊö·û
+    HANDLE iocp_fd_;            // iocp æ–‡ä»¶æè¿°ç¬¦
 };
 
 #endif  // defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)

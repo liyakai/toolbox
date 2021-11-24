@@ -12,7 +12,7 @@ class TcpSocket;
 using TCPSocketPool = SocketPool<TcpSocket>;
 
 
-
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 /*
 * 定义 per-I/O 数据
 */
@@ -43,6 +43,7 @@ struct PerSock_t
     PerIO_t   io_recv;
     PerIO_t   io_send;
 };
+#endif
 
 /*
 * 定义一个TCP连接
@@ -117,7 +118,7 @@ public:
     /*
     * 设置 tcp_network
     */
-    void SetEpollNetwork(TcpEpollNetwork* tcp_network){ p_tcp_network_ = tcp_network; }
+    void SetEpollNetwork(INetwork* tcp_network){ p_tcp_network_ = tcp_network; }
     /*
     * 设置socket状态
     */

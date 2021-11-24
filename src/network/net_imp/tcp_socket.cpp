@@ -88,7 +88,8 @@ void TcpSocket::UpdateAccept()
         p_tcp_network_->OnAccepted(new_socket->GetConnID());
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
-        p_tcp_network_->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_tcp_network_);
+        p_epoll_network->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
     }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -220,7 +221,8 @@ void TcpSocket::UpdateConnect()
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
-    p_tcp_network_->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+    auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_tcp_network_);
+    p_epoll_network->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
     p_tcp_network_->OnConnected(GetConnID());
 }
