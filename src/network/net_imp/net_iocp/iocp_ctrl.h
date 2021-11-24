@@ -135,6 +135,7 @@ public:
                 return true;
             }
         }
+        return false;
     }
     /*
     * @brief  处理发送消息
@@ -152,9 +153,22 @@ public:
         }
         else if (EIOSocketState::IOCP_SEND == socket.GetSocketState())
         {
-
+            // 投递一个长度有0的send请求
+            WSABUF  sbuff = { 0, nullptr };
+            DWORD bytes = 0;
+            DWORD flags = 0;
+            int32_t result = WSASend(socket.GetSocketID(), &sbuff, 1, &bytes, &flags, socket.GetOverLappedPtr(), 0);
+            if (result != 0)
+            {
+                uint64_t error = GetLastError();
+                if ((ERROR_IO_PENDING != error) && (WSAENOTCONN != error))
+                {
+                    return false;
+                }
+                return true;
+            }
         }
-        return true;
+        return false;
     }
     /*
     * 执行一次 iocp
@@ -164,9 +178,9 @@ public:
     {
         time_t      time_stamp = time(0);    // 时间戳
         DWORD       bytes = 0;
-        PerSock_t<SocketType>* per_sock = nullptr;
+        SocketType* socket = nullptr;
         PerIO_t* per_io = nullptr;
-        bool error = GetQueuedCompletionStatus(iocp_fd_, &bytes, (PULONG_PTR)&per_sock, (LPOVERLAPPED*)&per_io, 2);
+        bool error = GetQueuedCompletionStatus(iocp_fd_, &bytes, (PULONG_PTR)&socket, (LPOVERLAPPED*)&per_io, 2);
         auto last_error = GetLastError();
         if (false == error)
         {
