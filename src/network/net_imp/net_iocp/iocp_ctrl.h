@@ -157,7 +157,7 @@ public:
             WSABUF  sbuff = { 0, nullptr };
             DWORD bytes = 0;
             DWORD flags = 0;
-            int32_t result = WSASend(socket.GetSocketID(), &sbuff, 1, &bytes, &flags, socket.GetOverLappedPtr(), 0);
+            int32_t result = WSASend(socket.GetSocketID(), &sbuff, 1, &bytes, flags, socket.GetOverLappedPtr(), 0);
             if (result != 0)
             {
                 uint64_t error = GetLastError();
@@ -189,16 +189,16 @@ public:
                 return true;
             }
         }
-        if (nullptr == per_sock || nullptr == per_io || nullptr == per_sock->net_socket)
+        if (nullptr == socket || nullptr == per_io)
         {
             return false;
         }
         if ((per_io->io_type & EIOSocketState::IOCP_RECV) || (per_io->io_type & EIOSocketState::IOCP_ACCEPT))
         {
-            per_sock->net_socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
+            socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
         } else if ((per_io->io_type & EIOSocketState::IOCP_SEND) || (per_io->io_type & EIOSocketState::IOCP_CONNECT))
         {
-            per_sock->net_socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
+            socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
         }
 
         return true;
