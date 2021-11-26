@@ -5,45 +5,12 @@
 #include "src/network/net_imp/base_socket.h"
 #include "src/tools/ringbuffer.h"
 #include "socket_pool.h"
+#include "src/network/net_imp/net_iocp/iocp_define.h"
 
 class TcpEpollNetwork;
 class TcpSocket;
 
 using TCPSocketPool = SocketPool<TcpSocket>;
-
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-/*
-* 定义 per-I/O 数据
-*/
-struct PerIO_t
-{
-    OVERLAPPED over_lapped; // windows 重叠I/O数据结构
-    EIOSocketState    io_type;     // 当前的I/O类型
-};
-
-/*
-* 定义 AcceptEx 函数相关
-*/
-struct AcceptEx_t
-{
-    ACCEPTEX accept_ex_fn;      // AcceptEx 函数指针
-    SOCKET   socket_fd;         // 当前未决的客户端套接字  -AcceptEx
-    char     buffer[DEFAULT_CONN_BUFFER_SIZE];           // 参数 AcceptEx
-};
-
-/*
-* 定义 per-socket 数据
-*/
-template<typename SocketType>
-struct PerSock_t
-{
-    SocketType* net_socket;     // socket 指针
-    AcceptEx_t* accept_ex_info; // AcceptEx_t指针
-    PerIO_t   io_recv;
-    PerIO_t   io_send;
-};
-#endif
 
 /*
 * 定义一个TCP连接
@@ -87,10 +54,6 @@ public:
     void SetSocketMgr(TCPSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     /*
-    * 获取 AcceptEx 指针
-    */
-    ACCEPTEX& GetAcceptEx() { return accept_ex_fn_; }
-    /*
     * 设置socket状态
     */
     void SetSocketState(EIOSocketState state) { socket_state_ = state; }
@@ -98,22 +61,11 @@ public:
     * 获取socket状态
     */
     EIOSocketState GetSocketState() { return socket_state_; }
+
     /*
-    * 获取缓冲区
+    * 获取 persocket
     */
-    char* GetBuffer() { return buffer; }
-    /*
-    * 获取重叠结构
-    */
-    OVERLAPPED& GetOverLapped() { return over_lapped_; }
-    /*
-    * 获取重叠结构指针
-    */
-    OVERLAPPED* GetOverLappedPtr() { return &over_lapped_; }
-    /*
-    * 设置 当前未决的客户端套接字SocketID 
-    */
-    void SetAcceptExSocketId(SOCKET socket) { accept_ex_socket_id_ = socket; }
+    PerSockContext& GetPerSocket() { return per_socket_; }
 #elif defined(__linux__)
     /*
     * 设置 tcp_network
@@ -239,11 +191,8 @@ private:
     time_t last_recv_ts_ = 0;                       // 最后一次读到数据的时间戳
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    ACCEPTEX accept_ex_fn_ = nullptr;      // AcceptEx 函数指针
-    SOCKET accept_ex_socket_id_ = 0;                 // 当前未决的客户端套接字
+    PerSockContext per_socket_;                     //
     EIOSocketState socket_state_ = EIOSocketState::IOCP_CLOSE;
-    char buffer[DEFAULT_CONN_BUFFER_SIZE];           // 参数 AcceptEx
-    OVERLAPPED over_lapped_; // windows 重叠I/O数据结构
 #elif defined(__linux__)
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 #endif

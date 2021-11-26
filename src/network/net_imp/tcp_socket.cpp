@@ -40,7 +40,6 @@ void TcpSocket::Reset()
     p_sock_pool_ = nullptr;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    accept_ex_fn_ = nullptr;      // AcceptEx 函数指针
     socket_state_ = EIOSocketState::IOCP_CLOSE;
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态

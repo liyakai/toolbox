@@ -75,6 +75,7 @@ public:
     template<typename SocketType>
     bool OnRecv(SocketType& socket)
     {
+        auto& per_socket = socket.GetPerSocket();
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
             // 建立 socket 与 iocp 的关联
@@ -82,30 +83,29 @@ public:
             {
                 return false;
             }
-            auto& socket_accept_ex = socket.GetAcceptEx();
-            if (nullptr == socket_accept_ex)
+            auto& accept_ex = per_socket.accept_ex;
+            if (nullptr == accept_ex.accept_ex_fn)
             {
                 // 获取 AcceptEx指针
                 DWORD bytes = 0;
                 GUID guid_accept_ex = WSAID_ACCEPTEX;
                 int32_t error_code = WSAIoctl(socket.GetSocketID(), SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex),
-                    &socket_accept_ex, sizeof(ACCEPTEX), &bytes, nullptr, nullptr);
-                if (error_code|| nullptr == socket_accept_ex)
+                    &accept_ex.accept_ex_fn, sizeof(ACCEPTEX), &bytes, nullptr, nullptr);
+                if (error_code|| nullptr == accept_ex.accept_ex_fn)
                 {
                     return false;
                 }
             }
             // 建立一个支持重叠I/O的套接字
-            auto socket_id = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
-            if (INVALID_SOCKET == socket_id)
+            accept_ex.socket_fd = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+            if (INVALID_SOCKET == accept_ex.socket_fd)
             {
                 return false;
             }
-            socket.SetAcceptExSocketId(socket_id);
             // MSDN: https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-acceptex
             // 投递一个 accept 请求
-            bool result = socket_accept_ex(socket.GetSocketID(), socket_id, socket.GetBuffer(), 0,
-                            ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &socket.GetOverLapped());
+            bool result = accept_ex.accept_ex_fn(socket.GetSocketID(), accept_ex.socket_fd, accept_ex.buffer, 0,
+                            ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &per_socket.io_recv.over_lapped);
             if (false == result)
             {
                 DWORD last_error = GetLastError();
@@ -124,7 +124,7 @@ public:
             WSABUF  sbuff = { 0, nullptr };
             DWORD bytes = 0;
             DWORD flags = 0;
-            int32_t result = WSARecv(socket.GetSocketID(), &sbuff, 1, &bytes, &flags, socket.GetOverLappedPtr(), 0);
+            int32_t result = WSARecv(socket.GetSocketID(), &sbuff, 1, &bytes, &flags, &per_socket.io_recv.over_lapped, 0);
             if (result != 0)
             {
                 uint64_t error = GetLastError();
@@ -143,7 +143,8 @@ public:
     template<typename SocketType>
     bool OnSend(SocketType& socket)
     {
-        if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
+        auto& per_socket = socket.GetPerSocket();
+        if (EIOSocketState::IOCP_CONNECT == socket.GetSocketState())
         {
             // 建立 socket 与 iocp 的关联
             if (!AddSocketToIocp(socket))
@@ -157,7 +158,7 @@ public:
             WSABUF  sbuff = { 0, nullptr };
             DWORD bytes = 0;
             DWORD flags = 0;
-            int32_t result = WSASend(socket.GetSocketID(), &sbuff, 1, &bytes, flags, socket.GetOverLappedPtr(), 0);
+            int32_t result = WSASend(socket.GetSocketID(), &sbuff, 1, &bytes, flags, &per_socket.io_send.over_lapped, 0);
             if (result != 0)
             {
                 uint64_t error = GetLastError();
@@ -179,7 +180,7 @@ public:
         time_t      time_stamp = time(0);    // 时间戳
         DWORD       bytes = 0;
         SocketType* socket = nullptr;
-        PerIO_t* per_io = nullptr;
+        PerIOContext* per_io = nullptr;
         bool error = GetQueuedCompletionStatus(iocp_fd_, &bytes, (PULONG_PTR)&socket, (LPOVERLAPPED*)&per_io, 2);
         auto last_error = GetLastError();
         if (false == error)
