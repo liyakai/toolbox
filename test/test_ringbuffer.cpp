@@ -171,7 +171,7 @@ CASE(ringbuffer_spsc)
     /*
     * 测试单生产者单消费者队列
     */
-    for(std::size_t i = 0; i < 1000; i++)
+    for(std::size_t i = 0; i < 100; i++)
     {
         product.emplace_back(i);
     }

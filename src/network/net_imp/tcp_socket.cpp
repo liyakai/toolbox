@@ -41,6 +41,13 @@ void TcpSocket::Reset()
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     socket_state_ = EIOSocketState::IOCP_CLOSE;
+    if (nullptr != per_socket_.accept_ex)
+    {
+        per_socket_.accept_ex->accept_ex_fn = nullptr;
+        Close(ENetErrCode::NET_NO_ERROR, per_socket_.accept_ex->socket_fd);
+    }
+    delete per_socket_.accept_ex;
+    per_socket_.accept_ex = nullptr;
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 #endif
@@ -303,6 +310,24 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
         p_sock_pool_->Free(this);
     }
 }
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+bool TcpSocket::IsSocketValid()
+{
+    if (BaseSocket::IsSocketValid())
+    {
+        return true;
+    }
+    if (nullptr != per_socket_.accept_ex
+        && per_socket_.accept_ex->socket_fd > 0)
+    {
+        return true;
+    }
+    return false;
+}
+#elif defined(__linux__)
+#endif
+
 
 void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 {

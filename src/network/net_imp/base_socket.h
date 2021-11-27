@@ -80,7 +80,7 @@ public:
     /*
     * socket 是否有效
     */
-    bool IsSocketValid();
+    virtual bool IsSocketValid();
 protected:
     /*
     * 获取 socket 错误

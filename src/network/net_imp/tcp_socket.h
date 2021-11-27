@@ -66,6 +66,10 @@ public:
     * 获取 persocket
     */
     PerSockContext& GetPerSocket() { return per_socket_; }
+    /*
+    * socket 是否有效
+    */
+    virtual bool IsSocketValid();
 #elif defined(__linux__)
     /*
     * 设置 tcp_network

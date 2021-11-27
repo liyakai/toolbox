@@ -138,7 +138,7 @@ CASE(test_tcp_echo)
         {
             if(time_left + 10 <= old_time || old_time == 0)
             {
-                fprintf(stderr,"距离网络库停止还有%d秒\n",time_left);
+                fprintf(stderr,"距离网络库停止还有%d秒 \n",time_left);
                 old_time = time_left;
             }
         }
@@ -185,7 +185,7 @@ CASE(test_tcp_forward)
         {
             if(time_left + 10 <= old_time || old_time == 0)
             {
-                fprintf(stderr,"距离网络库停止还有%d秒\n",time_left);
+                fprintf(stderr,"距离网络库停止还有 %d 秒\n",time_left);
                 old_time = time_left;
             }
         }

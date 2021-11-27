@@ -84,27 +84,32 @@ public:
                 return false;
             }
             auto& accept_ex = per_socket.accept_ex;
-            if (nullptr == accept_ex.accept_ex_fn)
+            if (nullptr == accept_ex)
+            {
+                accept_ex = new AcceptEx_t;
+            }
+            if (nullptr == accept_ex->accept_ex_fn)
             {
                 // 获取 AcceptEx指针
                 DWORD bytes = 0;
                 GUID guid_accept_ex = WSAID_ACCEPTEX;
                 int32_t error_code = WSAIoctl(socket.GetSocketID(), SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex),
-                    &accept_ex.accept_ex_fn, sizeof(ACCEPTEX), &bytes, nullptr, nullptr);
-                if (error_code|| nullptr == accept_ex.accept_ex_fn)
+                    &accept_ex->accept_ex_fn, sizeof(ACCEPTEX), &bytes, nullptr, nullptr);
+                if (error_code|| nullptr == accept_ex->accept_ex_fn)
                 {
                     return false;
                 }
             }
             // 建立一个支持重叠I/O的套接字
-            accept_ex.socket_fd = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
-            if (INVALID_SOCKET == accept_ex.socket_fd)
+            accept_ex->socket_fd = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+            if (INVALID_SOCKET == accept_ex->socket_fd)
             {
                 return false;
             }
             // MSDN: https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-acceptex
             // 投递一个 accept 请求
-            bool result = accept_ex.accept_ex_fn(socket.GetSocketID(), accept_ex.socket_fd, accept_ex.buffer, 0,
+            per_socket.io_recv.io_type = EIOSocketState::IOCP_ACCEPT;
+            bool result = accept_ex->accept_ex_fn(socket.GetSocketID(), accept_ex->socket_fd, accept_ex->buffer, 0,
                             ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &per_socket.io_recv.over_lapped);
             if (false == result)
             {
@@ -121,10 +126,11 @@ public:
         else if (EIOSocketState::IOCP_RECV == socket.GetSocketState())
         {
             // 投递一个长度为0的请求
-            WSABUF  sbuff = { 0, nullptr };
             DWORD bytes = 0;
             DWORD flags = 0;
-            int32_t result = WSARecv(socket.GetSocketID(), &sbuff, 1, &bytes, &flags, &per_socket.io_recv.over_lapped, 0);
+            auto& io_recv = per_socket.io_recv;
+            per_socket.io_recv.io_type = EIOSocketState::IOCP_RECV;
+            int32_t result = WSARecv(socket.GetSocketID(), &io_recv.wsa_buf, 1, &bytes, &flags, &io_recv.over_lapped, 0);
             if (result != 0)
             {
                 uint64_t error = GetLastError();
@@ -143,7 +149,8 @@ public:
     template<typename SocketType>
     bool OnSend(SocketType& socket)
     {
-        auto& per_socket = socket.GetPerSocket();
+        auto& io_send = socket.GetPerSocket().io_send;
+        
         if (EIOSocketState::IOCP_CONNECT == socket.GetSocketState())
         {
             // 建立 socket 与 iocp 的关联
@@ -151,23 +158,24 @@ public:
             {
                 return false;
             }
+            io_send.io_type = EIOSocketState::IOCP_CONNECT;
         }
         else if (EIOSocketState::IOCP_SEND == socket.GetSocketState())
         {
-            // 投递一个长度有0的send请求
-            WSABUF  sbuff = { 0, nullptr };
-            DWORD bytes = 0;
-            DWORD flags = 0;
-            int32_t result = WSASend(socket.GetSocketID(), &sbuff, 1, &bytes, flags, &per_socket.io_send.over_lapped, 0);
-            if (result != 0)
+            io_send.io_type = EIOSocketState::IOCP_SEND;
+        }
+        // 投递一个长度有0的send请求
+        DWORD bytes = 0;
+        DWORD flags = 0;
+        int32_t result = WSASend(socket.GetSocketID(), &io_send.wsa_buf, 1, &bytes, flags, &io_send.over_lapped, 0);
+        if (result != 0)
+        {
+            uint64_t error = GetLastError();
+            if ((ERROR_IO_PENDING != error) && (WSAENOTCONN != error))
             {
-                uint64_t error = GetLastError();
-                if ((ERROR_IO_PENDING != error) && (WSAENOTCONN != error))
-                {
-                    return false;
-                }
-                return true;
+                return false;
             }
+            return true;
         }
         return false;
     }

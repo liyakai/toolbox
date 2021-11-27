@@ -2,7 +2,7 @@
 
 int32_t main()
 {
-	UnitTestMgr.RunAllFixture();
-	UnitTestMgr.AnyKeyToQuit();
-	return 0;
+    UnitTestMgr.RunAllFixture();
+    UnitTestMgr.AnyKeyToQuit();
+    return 0;
 }

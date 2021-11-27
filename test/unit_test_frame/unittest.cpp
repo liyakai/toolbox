@@ -49,6 +49,10 @@ void UnitTest::SetFixtureRunable(const std::string name, bool able)
 
 void UnitTest::RunAllFixture()
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    system("chcp 65001");   // 让windows控制台以 UTF-8显示
+#elif defined(__linux__)
+#endif  // #if (defined(WIN32) || defined(_WIN64))
     for (auto fixture : fixture_list_)
     {
         if (fixture && fixture->IsEnable())

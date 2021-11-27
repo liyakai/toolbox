@@ -40,7 +40,7 @@ struct PerIOContext
 */
 struct AcceptEx_t
 {
-    ACCEPTEX accept_ex_fn;      // AcceptEx 函数指针
+    ACCEPTEX accept_ex_fn = nullptr;      // AcceptEx 函数指针
     SOCKET   socket_fd;         // 当前未决的客户端套接字  -AcceptEx
     char     buffer[ACCEPTEX_BUFF_SIZE];           // 参数 AcceptEx
 };
@@ -50,7 +50,7 @@ struct AcceptEx_t
 */
 struct PerSockContext
 {
-    AcceptEx_t accept_ex;      // AcceptEx_t指针
+    AcceptEx_t* accept_ex = nullptr;      // AcceptEx_t指针
     PerIOContext   io_recv;     // 接收请求
     PerIOContext   io_send;     // 发送请求
 };
