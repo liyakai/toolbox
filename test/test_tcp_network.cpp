@@ -20,7 +20,7 @@ public:
     };
     void OnErrored(uint64_t conn_id, ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d.\n", conn_id,  err_code, err_no);
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
@@ -107,7 +107,7 @@ private:
     uint64_t echo_conn_id_ = 0;
 };
 
-FIXTURE_BEGIN(TcpEpollNetwork)
+FIXTURE_BEGIN(TcpNetwork)
 
 CASE(test_tcp_echo)
 {
@@ -202,4 +202,4 @@ CASE(test_tcp_forward)
     return;
 }
 
-FIXTURE_END(TcpEpollNetwork)
+FIXTURE_END(TcpNetwork)

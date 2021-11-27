@@ -18,6 +18,10 @@
 
 TcpSocket::TcpSocket()
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    memset(&per_socket_, 0, sizeof(per_socket_));
+#elif defined(__linux__)
+#endif
 }
 
 TcpSocket::~TcpSocket()
@@ -48,6 +52,7 @@ void TcpSocket::Reset()
     }
     delete per_socket_.accept_ex;
     per_socket_.accept_ex = nullptr;
+    memset(&per_socket_, 0, sizeof(per_socket_));
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 #endif
@@ -68,12 +73,23 @@ void TcpSocket::UpdateAccept()
 
     while (true)
     {
-        memset(&addr, 0, addr_len);
-        // 接受客户端连接
-        client_fd = accept(socket_id_, (sockaddr *)&addr, &addr_len);
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        client_fd = per_socket_.accept_ex->socket_fd;
+        SOCKET accept_socket_id = GetSocketID();
+        // 链接进入的socket继承 accept_socket 的属性
+        setsockopt(client_fd, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&accept_socket_id, sizeof(SOCKET));
+        // 获取远端地址
+        sockaddr_in* remote_address = GetRemoteAddress(GetSocketID(), per_socket_.accept_ex->buffer, ACCEPTEX_BUFF_SIZE);
+        if (nullptr != remote_address)
+        {
+            addr = *remote_address;
+        }
         if(INVALID_SOCKET == client_fd)
 #elif defined(__linux__)
+        memset(&addr, 0, addr_len);
+        // 接受客户端连接
+        client_fd = accept(socket_id_, (sockaddr*)&addr, &addr_len);
         if (client_fd < 0 && errno != EINTR)
 #endif
         {
@@ -111,7 +127,7 @@ void TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
     socket->SetSocketMgr(p_sock_pool_);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
-    socket->SetEpollNetwork(p_tcp_network_);
+    socket->SetNetwork(p_tcp_network_);
     socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
 #endif
     socket->SetSocketID(socket_fd);
@@ -311,6 +327,11 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     }
 }
 
+void TcpSocket::OnErrored(ENetErrCode err_code, int32_t err_no)
+{
+    p_tcp_network_->OnErrored(GetConnID(), err_code, err_no);
+}
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 bool TcpSocket::IsSocketValid()
 {
@@ -325,6 +346,33 @@ bool TcpSocket::IsSocketValid()
     }
     return false;
 }
+sockaddr_in* TcpSocket::GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex_buffer, int32_t buff_len)
+{
+    DWORD bytes = 0;
+    GUID GuidGetAcceptExSockAddrs = WSAID_GETACCEPTEXSOCKADDRS;
+    LPFN_GETACCEPTEXSOCKADDRS GetAcceptExSockAddrs = nullptr;
+    // 获取函数指针
+    WSAIoctl(
+        listen_socket,
+        SIO_GET_EXTENSION_FUNCTION_POINTER,
+        &GuidGetAcceptExSockAddrs,
+        sizeof(GuidGetAcceptExSockAddrs),
+        &GetAcceptExSockAddrs,
+        sizeof(GetAcceptExSockAddrs),
+        &bytes,
+        NULL,
+        NULL);
+    if (nullptr == GetAcceptExSockAddrs)
+    {
+        return nullptr;
+    }
+    sockaddr_in* client_addr = NULL;
+    SOCKADDR_IN* local_addr = NULL;
+    int32_t remoteLen = sizeof(SOCKADDR_IN), localLen = sizeof(SOCKADDR_IN);
+
+    GetAcceptExSockAddrs(accept_ex_buffer, (buff_len - ACCEPTEX_ADDR_SIZE * 2), ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, (LPSOCKADDR*)&local_addr, &localLen, (LPSOCKADDR*)&client_addr, &remoteLen);
+    return client_addr;
+}
 #elif defined(__linux__)
 #endif
 
@@ -332,6 +380,7 @@ bool TcpSocket::IsSocketValid()
 void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    if(EIOSocketState::IOCP_CLOSE == socket_state_)
 #elif defined(__linux__)
     if (SocketState::SOCK_STATE_INVALIED == socket_state_)
 #endif
@@ -348,7 +397,7 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
     if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
     {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        if (true) // TO DO IOCP
+        if (EIOSocketState::IOCP_ACCEPT == socket_state_)
 #elif defined(__linux__)
         if (SocketState::SOCK_STATE_LISTENING == socket_state_)
 #endif
@@ -364,7 +413,7 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
     if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
     {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        if (true) // TO DO IOCP
+        if (EIOSocketState::IOCP_CONNECT == socket_state_)
 #elif defined(__linux__)
         if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
 #endif

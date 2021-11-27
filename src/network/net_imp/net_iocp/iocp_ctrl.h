@@ -118,7 +118,7 @@ public:
                 // then the operation was successfully initiated and is still in progress.
                 if (ERROR_IO_PENDING != last_error)
                 {
-                    Destroy();
+                    socket.OnErrored(ENetErrCode::NET_SYS_ERROR, last_error);
                 }
             }
 

@@ -320,7 +320,7 @@ void UdpSocket::InitAccpetSocket(UdpSocket* socket, const SocketAddress& address
     socket->SetSocketID(socket_id_);
     socket->SetRemoteAddress(UdpAddress(address));
     socket->SetSocketMgr(p_sock_pool_);
-    socket->SetEpollNetwork(p_udp_network_);
+    socket->SetNetwork(p_udp_network_);
     socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
     socket->SetType(UdpType::REMOTE);
 }

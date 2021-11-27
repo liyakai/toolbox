@@ -1,10 +1,11 @@
 #pragma once
 #include <atomic>
 #include <thread>
+#include "network_def.h"
 #include "src/tools/ringbuffer.h"
 #include "event.h"
 #include "network.h"
-#include "network_def.h"
+
 
 class INetwork;
 

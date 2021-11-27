@@ -87,7 +87,7 @@ uint64_t UdpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t po
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
-    new_socket->SetEpollNetwork(this);
+    new_socket->SetNetwork(this);
     if(false == new_socket->InitNewAccepter(ip, port))
     {
         return 0;
@@ -110,7 +110,7 @@ uint64_t UdpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
         return 0;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
-    new_socket->SetEpollNetwork(this);
+    new_socket->SetNetwork(this);
     if(false == new_socket->InitNewConnecter(ip, port))
     {
         return 0;

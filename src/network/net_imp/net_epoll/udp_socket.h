@@ -130,7 +130,7 @@ public:
     /*
     * @brief 设置 tcp_network
     */
-    void SetEpollNetwork(UdpEpollNetwork* udp_network){ p_udp_network_ = udp_network; }
+    void SetNetwork(UdpEpollNetwork* udp_network){ p_udp_network_ = udp_network; }
     /*
     * @brief 关闭套接字
     */

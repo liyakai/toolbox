@@ -6,6 +6,7 @@
 #include "src/tools/ringbuffer.h"
 #include "socket_pool.h"
 #include "src/network/net_imp/net_iocp/iocp_define.h"
+#include "src/network/network_def.h"
 
 class TcpEpollNetwork;
 class TcpSocket;
@@ -70,11 +71,15 @@ public:
     * socket 是否有效
     */
     virtual bool IsSocketValid();
-#elif defined(__linux__)
     /*
     * 设置 tcp_network
     */
-    void SetEpollNetwork(INetwork* tcp_network){ p_tcp_network_ = tcp_network; }
+    void SetNetwork(INetwork* tcp_network) { p_tcp_network_ = tcp_network; }
+    /*
+    * 获取远端地址信息
+    */
+    sockaddr_in* GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex_buffer, int32_t buff_len);
+#elif defined(__linux__)
     /*
     * 设置socket状态
     */
@@ -110,6 +115,10 @@ public:
     * 关闭套接字
     */
     void Close(ENetErrCode net_err, int32_t sys_err = 0);
+    /*
+    * 发送错误,向主线程报告
+    */
+    void OnErrored(ENetErrCode err_code, int32_t err_no);
 
 private:
     /*
