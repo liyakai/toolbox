@@ -62,10 +62,19 @@ public:
     bool AddSocketToIocp(SocketType& socket)
     {
         // 建立 socket 与 iocp 的关联
-        HANDLE iocp = CreateIoCompletionPort((HANDLE)socket.GetSocketID(), iocp_fd_, (ULONG_PTR)&socket, 0);
+        auto socket_id = socket.GetSocketID();
+        HANDLE iocp = CreateIoCompletionPort((HANDLE)socket_id, iocp_fd_, (ULONG_PTR)&socket, 0);
         if (nullptr == iocp)
         {
-            return false;
+            DWORD last_error = GetLastError();
+            // MSDN:  If WSAGetLastError returns ERROR_IO_PENDING, 
+            // then the operation was successfully initiated and is still in progress.
+            if (ERROR_IO_PENDING != last_error)
+            {
+                socket.OnErrored(ENetErrCode::NET_SYS_ERROR, last_error);
+                return false;
+            }
+
         }
         return true;
     }
@@ -78,11 +87,6 @@ public:
         auto& per_socket = socket.GetPerSocket();
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
-            // 建立 socket 与 iocp 的关联
-            if (!AddSocketToIocp(socket))
-            {
-                return false;
-            }
             auto& accept_ex = per_socket.accept_ex;
             if (nullptr == accept_ex)
             {
@@ -153,18 +157,13 @@ public:
         
         if (EIOSocketState::IOCP_CONNECT == socket.GetSocketState())
         {
-            // 建立 socket 与 iocp 的关联
-            if (!AddSocketToIocp(socket))
-            {
-                return false;
-            }
             io_send.io_type = EIOSocketState::IOCP_CONNECT;
         }
         else if (EIOSocketState::IOCP_SEND == socket.GetSocketState())
         {
             io_send.io_type = EIOSocketState::IOCP_SEND;
         }
-        // 投递一个长度有0的send请求
+        // 投递一个长度为0的send请求
         DWORD bytes = 0;
         DWORD flags = 0;
         int32_t result = WSASend(socket.GetSocketID(), &io_send.wsa_buf, 1, &bytes, flags, &io_send.over_lapped, 0);

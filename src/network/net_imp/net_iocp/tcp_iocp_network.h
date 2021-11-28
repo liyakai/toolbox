@@ -33,6 +33,8 @@ public:
     * 执行一次网络循环
     */
     virtual void Update() override;
+public:
+    IocpCtrl& GetIocpCtrl() { return iocp_ctrl_; }
    
 protected:
     /*

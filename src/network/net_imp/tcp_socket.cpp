@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include "src/network/net_imp/socket_pool.h"
 #include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
+#include "src/network/net_imp/net_iocp/tcp_iocp_network.h"
 
 TcpSocket::TcpSocket()
 {
@@ -105,35 +106,54 @@ void TcpSocket::UpdateAccept()
             p_tcp_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
             return;
         }
-        InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
+        if (!InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_))
+        {
+            p_sock_pool_->Free(new_socket);
+            return;
+        }
         // 通知主线程有新的客户端连接进来
         p_tcp_network_->OnAccepted(new_socket->GetConnID());
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+        // 将新的连接加入iocp
+        p_iocp_network->GetIocpCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        // 将监听socket重新加入iocp
+        p_iocp_network->GetIocpCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, this->GetEventType());
+        break;
 #elif defined(__linux__)
         auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_tcp_network_);
         p_epoll_network->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
     }
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#elif defined(__linux__)
-    socket_state_ = SocketState::SOCK_STATE_LISTENING;
-#endif
+//#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+//#elif defined(__linux__)
+//    socket_state_ = SocketState::SOCK_STATE_LISTENING;
+//#endif
     event_type_ = SOCKET_EVENT_RECV;
 }
 
-void TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     socket->Init(send_buff_size, recv_buff_size);
     socket->SetSocketMgr(p_sock_pool_);
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#elif defined(__linux__)
     socket->SetNetwork(p_tcp_network_);
-    socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
-#endif
     socket->SetSocketID(socket_fd);
     // socket->SetIP(ip);
     // socket->SetAddressPort(port);
     socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    socket->SetSocketState(EIOSocketState::IOCP_RECV);
+    auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+    // 建立 socket 与 iocp 的关联
+    if (nullptr == tcp_iocp_network || !tcp_iocp_network->GetIocpCtrl().AddSocketToIocp(*socket))
+    {
+        return false;
+    }
+#elif defined(__linux__)
+
+    socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
+#endif
+
 
     socket->SetNonBlocking(socket_fd);
     socket->SetKeepaliveOff(socket_fd);
@@ -222,7 +242,7 @@ ErrCode TcpSocket::ProcessRecvData()
         return ErrCode::ERR_INSUFFICIENT_LENGTH;
     }
     uint32_t len = 0;
-    recv_ring_buffer_.Copy((char *)&len, sizeof(size_t));
+    recv_ring_buffer_.Copy((char *)&len, sizeof(uint32_t));
     if (len > static_cast<uint32_t>(recv_buff_len_))
     {
         return ErrCode::ERR_INVALID_PACKET_SIZE;
@@ -488,6 +508,12 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
         return false;
     }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+    // 建立 socket 与 iocp 的关联
+    if (nullptr == tcp_iocp_network || !tcp_iocp_network->GetIocpCtrl().AddSocketToIocp(*this))
+    {
+        return false;
+    }
     socket_state_ = EIOSocketState::IOCP_ACCEPT;
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
@@ -554,6 +580,13 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
         return false;
     }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+    // 建立 socket 与 iocp 的关联
+    if (nullptr == tcp_iocp_network || !tcp_iocp_network->GetIocpCtrl().AddSocketToIocp(*this))
+    {
+        return false;
+    }
+    socket_state_ = EIOSocketState::IOCP_CONNECT;
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_CONNECTING;
 #endif

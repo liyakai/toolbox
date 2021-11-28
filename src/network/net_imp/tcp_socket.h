@@ -128,7 +128,7 @@ private:
     /*
     *  初始化从accpet函数接收得来的socket
     */
-    void InitAccpetSocket(TcpSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+    bool InitAccpetSocket(TcpSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
     /*
     * 处理客户端数据的情况
     */

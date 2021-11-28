@@ -24,8 +24,8 @@ public:
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
-        // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
-        // PrintData(data, 16);
+        Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
+        PrintData(data, 16);
         Send(NT_TCP, conn_id, data, size);
     };
     void OnClose(uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) override
@@ -56,8 +56,8 @@ public:
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
-        //Print("收到客户端数据长度为%d\n", size);
-        //PrintData(data, 32);
+        Print("收到客户端数据长度为%d\n", size);
+        PrintData(data, 32);
         if(conn_id == echo_conn_id_)
         {
             // echo 发来的信息
