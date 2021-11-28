@@ -84,6 +84,7 @@ public:
     template<typename SocketType>
     bool OnRecv(SocketType& socket)
     {
+        socket.ResetPerSocket();
         auto& per_socket = socket.GetPerSocket();
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
@@ -196,7 +197,17 @@ public:
             {
                 return true;
             }
+            else
+            {
+                socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
+                return false;
+            }
         }
+        //if ((0 == bytes) && (IOCP_RECV == per_io->io_type || IOCP_SEND == per_io->io_type))
+        //{
+        //    socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
+        //    return false;
+        //}
         if (nullptr == socket || nullptr == per_io)
         {
             return false;

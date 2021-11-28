@@ -79,6 +79,10 @@ public:
     * 获取远端地址信息
     */
     sockaddr_in* GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex_buffer, int32_t buff_len);
+    /*
+    * 重置 PerSocket
+    */
+    void ResetPerSocket() { memset(&per_socket_, 0, sizeof(per_socket_)); }
 #elif defined(__linux__)
     /*
     * 设置socket状态

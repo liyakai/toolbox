@@ -20,7 +20,7 @@
 TcpSocket::TcpSocket()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    memset(&per_socket_, 0, sizeof(per_socket_));
+    ResetPerSocket();
 #elif defined(__linux__)
 #endif
 }
@@ -53,7 +53,7 @@ void TcpSocket::Reset()
     }
     delete per_socket_.accept_ex;
     per_socket_.accept_ex = nullptr;
-    memset(&per_socket_, 0, sizeof(per_socket_));
+    ResetPerSocket();
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 #endif
@@ -320,7 +320,7 @@ int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 void TcpSocket::UpdateError()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    if (true) // TO DO IOCP
+    if (EIOSocketState::IOCP_RECV == socket_state_ || EIOSocketState::IOCP_SEND == socket_state_)
 #elif defined(__linux__)
     if(SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
 #endif
