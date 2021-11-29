@@ -198,6 +198,14 @@ void TcpSocket::UpdateRecv()
             return;
         }
     }
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+    // 将监听socket重新加入iocp
+    p_iocp_network->GetIocpCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+#elif defined(__linux__)
+#endif
+    return;
 }
 
 int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
