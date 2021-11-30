@@ -111,7 +111,7 @@ FIXTURE_BEGIN(TcpNetwork)
 
 CASE(test_tcp_echo)
 {
-    // return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_echo.prof");
 #endif // USE_GPERF_TOOLS
@@ -157,7 +157,7 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    return;
+    // return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
 #endif // USE_GPERF_TOOLS
@@ -185,7 +185,7 @@ CASE(test_tcp_forward)
         {
             if(time_left + 10 <= old_time || old_time == 0)
             {
-                fprintf(stderr,"距离网络库停止还有 %d 秒\n",time_left);
+                fprintf(stderr,"距离网络库停止还有 %d 秒. \n",time_left);
                 old_time = time_left;
             }
         }

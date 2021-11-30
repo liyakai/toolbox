@@ -83,6 +83,14 @@ public:
     * 重置 PerSocket
     */
     void ResetPerSocket() { memset(&per_socket_, 0, sizeof(per_socket_)); }
+    /*
+    * 将 socket 建立与 iocp 的关联,只调用一次.
+    */
+    bool AddSocketToIocp();
+    /*
+    * 将 socket 重新监听读写事件
+    */
+    bool ReAddSocketToIocp(SockEventType event_type);
 #elif defined(__linux__)
     /*
     * 设置socket状态
