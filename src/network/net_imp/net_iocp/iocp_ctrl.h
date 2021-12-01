@@ -59,7 +59,7 @@ public:
     * @brief 建立 socket 与 iocp 的关联
     */
     template<typename SocketType>
-    bool AddSocketToIocp(SocketType& socket)
+    bool AssociateSocketToIocp(SocketType& socket)
     {
         // 建立 socket 与 iocp 的关联
         auto socket_id = socket.GetSocketID();

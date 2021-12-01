@@ -86,7 +86,7 @@ public:
     /*
     * 将 socket 建立与 iocp 的关联,只调用一次.
     */
-    bool AddSocketToIocp();
+    bool AssociateSocketToIocp();
     /*
     * 将 socket 重新监听读写事件
     */

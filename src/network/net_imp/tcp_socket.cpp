@@ -143,7 +143,7 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     socket->SetSocketState(EIOSocketState::IOCP_RECV);
     // 建立 socket 与 iocp 的关联
-    if (!socket->AddSocketToIocp())
+    if (!socket->AssociateSocketToIocp())
     {
         return false;
     }
@@ -265,6 +265,8 @@ void TcpSocket::UpdateConnect()
     event_type_ |= SOCKET_EVENT_RECV;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    socket_state_ = IOCP_RECV;
+    ReAddSocketToIocp(SOCKET_EVENT_RECV);
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
     auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_tcp_network_);
@@ -403,7 +405,7 @@ sockaddr_in* TcpSocket::GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex
     return client_addr;
 }
 
-bool TcpSocket::AddSocketToIocp()
+bool TcpSocket::AssociateSocketToIocp()
 {
     auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
     // 建立 socket 与 iocp 的关联
@@ -411,7 +413,7 @@ bool TcpSocket::AddSocketToIocp()
     {
         return false;
     }
-    return tcp_iocp_network->GetIocpCtrl().AddSocketToIocp(*this);
+    return tcp_iocp_network->GetIocpCtrl().AssociateSocketToIocp(*this);
 }
 
 bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
@@ -538,7 +540,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     // 建立 socket 与 iocp 的关联
-    if (!AddSocketToIocp())
+    if (!AssociateSocketToIocp())
     {
         return false;
     }
@@ -610,12 +612,12 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     // 建立 socket 与 iocp 的关联
-    if (!AddSocketToIocp())
+    if (!AssociateSocketToIocp())
     {
         return false;
     }
     socket_state_ = EIOSocketState::IOCP_CONNECT;
-    event_type_ = SOCKET_EVENT_RECV;    // iocp 需要监听接收事件
+    event_type_ = SOCKET_EVENT_SEND;
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_CONNECTING;
     event_type_ = SOCKET_EVENT_SEND;
