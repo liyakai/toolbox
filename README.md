@@ -6,7 +6,7 @@ toolbox
     基于TCP+epoll的Linux网络库[reactor模式]
     基于UDP+epoll的Linux网络库[reactor模式]
     基于KCP+epoll的Linux网络库[reactor模式]
-    实现基于IOCP的windows平台网络库[proactor模式]
+    基于TCP+iocp的windows网络库[proactor模式]
 ## 1.2 工具
     1. 基于五层时间轮算法的定时器
     2. 跳表实现
@@ -16,8 +16,7 @@ toolbox
     6. 对象池
     7. 打印虚函数工具
     8. 两种读写锁
-# 2. 下一步计划
-    
+# 2. 下一步开发计划
     实现基于kqueue的MacOS平台网络库
     扩充工具库
 -------------------
