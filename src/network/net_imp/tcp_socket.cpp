@@ -162,6 +162,21 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
 
 void TcpSocket::UpdateRecv()
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    recv_ring_buffer_.Write(per_socket_.io_recv.wsa_buf.buf, per_socket_.io_recv.wsa_buf.len);
+    // 处理数据
+    if (ErrCode::ERR_SUCCESS != ProcessRecvData())
+    {
+        return;
+    }
+
+    // 检查接收 buffer 是否超限
+    if (!CheckRecvRingBufferSize())
+    {
+        return;
+    }
+    ReAddSocketToIocp(SOCKET_EVENT_RECV);
+#elif defined(__linux__)
     while (size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
     {
         int32_t bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
@@ -178,28 +193,19 @@ void TcpSocket::UpdateRecv()
         {
             recv_ring_buffer_.AdjustWritePos(bytes);
         }
-        ErrCode process_result;
-        while(ErrCode::ERR_SUCCESS == (process_result = ProcessRecvData()))
-        {}
-        if (ErrCode::ERR_INVALID_PACKET_SIZE == process_result)
+
+        // 处理数据
+        if (ErrCode::ERR_SUCCESS != ProcessRecvData())
         {
-            Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
             return;
         }
-        
 
-        size_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
-        if (cur_buffer_size > static_cast<size_t>(recv_buff_len_))
+        // 检查接收 buffer 是否超限
+        if (!CheckRecvRingBufferSize())
         {
-            // 读缓冲区超过最大限制, error
-            Close(ENetErrCode::NET_RECV_BUFF_OVERFLOW);
             return;
         }
     }
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    ReAddSocketToIocp(SOCKET_EVENT_RECV);
-#elif defined(__linux__)
 #endif
     return;
 }
@@ -239,24 +245,32 @@ int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
 
 ErrCode TcpSocket::ProcessRecvData()
 {
-    auto data_size = recv_ring_buffer_.ReadableSize();
-    // 这里暂时采用 len|buff 的方式[len包含len自身的长度]分割数据.可重构为传入解包方法
-    if (data_size < sizeof(uint32_t))
+    while (true)
     {
-        return ErrCode::ERR_INSUFFICIENT_LENGTH;
+        auto data_size = recv_ring_buffer_.ReadableSize();
+        // 这里暂时采用 len|buff 的方式[len包含len自身的长度]分割数据.可重构为传入解包方法
+        if (data_size < sizeof(uint32_t))
+        {
+            // return ErrCode::ERR_INSUFFICIENT_LENGTH;
+            break;
+        }
+        uint32_t len = 0;
+        recv_ring_buffer_.Copy((char*)&len, sizeof(uint32_t));
+        if (len > static_cast<uint32_t>(recv_buff_len_))
+        {
+            Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
+            return ErrCode::ERR_INVALID_PACKET_SIZE;
+        }
+        else if (data_size < len)
+        {
+            // return ErrCode::ERR_INSUFFICIENT_LENGTH;
+            break;
+        }
+        char* buff_block = MemPoolMgr->GetMemory(len);
+        recv_ring_buffer_.Read(buff_block, len);
+        p_tcp_network_->OnReceived(GetConnID(), buff_block, len);
     }
-    uint32_t len = 0;
-    recv_ring_buffer_.Copy((char *)&len, sizeof(uint32_t));
-    if (len > static_cast<uint32_t>(recv_buff_len_))
-    {
-        return ErrCode::ERR_INVALID_PACKET_SIZE;
-    } else if (data_size < len)
-    {
-        return ErrCode::ERR_INSUFFICIENT_LENGTH;
-    }
-    char *buff_block = MemPoolMgr->GetMemory(len);
-    recv_ring_buffer_.Read(buff_block, len);
-    p_tcp_network_->OnReceived(GetConnID(), buff_block, len);
+    
     return ErrCode::ERR_SUCCESS;
 }
 
@@ -277,6 +291,9 @@ void TcpSocket::UpdateConnect()
 
 void TcpSocket::UpdateSend()
 {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    ReAddSocketToIocp(SOCKET_EVENT_SEND);
+#elif defined(__linux__)
     while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
     {
         int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
@@ -288,13 +305,10 @@ void TcpSocket::UpdateSend()
         send_ring_buffer_.AdjustReadPos(bytes);
         if (bytes < static_cast<int32_t>(size))
         {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            ReAddSocketToIocp(SOCKET_EVENT_SEND);
-#elif defined(__linux__)
-#endif
             break;
         }
     }
+#endif
 }
 
 int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
@@ -341,6 +355,30 @@ void TcpSocket::UpdateError()
         p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
     }
 }
+
+bool TcpSocket::CheckRecvRingBufferSize()
+{
+    size_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
+    if (cur_buffer_size > static_cast<size_t>(recv_buff_len_))
+    {
+        // 读缓冲区超过最大限制, error
+        Close(ENetErrCode::NET_RECV_BUFF_OVERFLOW);
+        return false;
+    }
+    return true;
+}
+
+bool TcpSocket::CheckSendRingBufferSize()
+{
+    size_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
+    if (send_ring_buffer_.GetBufferSize() > static_cast<size_t>(send_buff_len_))
+    {
+        Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);
+        return false;
+    }
+    return true;
+}
+
 
 void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
@@ -403,6 +441,26 @@ sockaddr_in* TcpSocket::GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex
 
     GetAcceptExSockAddrs(accept_ex_buffer, (buff_len - ACCEPTEX_ADDR_SIZE * 2), ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, (LPSOCKADDR*)&local_addr, &localLen, (LPSOCKADDR*)&client_addr, &remoteLen);
     return client_addr;
+}
+
+void TcpSocket::ResetPerSocket() 
+{ 
+    ResetRecvPerSocket();
+    ResetSendPerSocket();
+}
+
+void TcpSocket::ResetRecvPerSocket()
+{
+    memset(&per_socket_.io_recv, 0, sizeof(per_socket_.io_recv));
+    per_socket_.io_recv.wsa_buf.buf = per_socket_.io_recv.buffer;
+    per_socket_.io_recv.wsa_buf.len = sizeof(per_socket_.io_recv.buffer);
+}
+
+void TcpSocket::ResetSendPerSocket()
+{
+    memset(&per_socket_.io_send, 0, sizeof(per_socket_.io_send));
+    uint32_t read_len = send_ring_buffer_.Read(per_socket_.io_send.wsa_buf.buf, sizeof(per_socket_.io_send.buffer));
+    per_socket_.io_send.wsa_buf.len = read_len;
 }
 
 bool TcpSocket::AssociateSocketToIocp()
@@ -635,13 +693,12 @@ void TcpSocket::Send(const char* data, size_t len)
 
     if(false == send_ring_buffer_.Empty())
     {
-        size_t write_size = send_ring_buffer_.Write(data, len);
-        if(write_size < len || send_ring_buffer_.GetBufferSize() > static_cast<size_t>(send_buff_len_))
+        send_ring_buffer_.Write(data, len);
+        UpdateSend();
+        if (!CheckSendRingBufferSize())
         {
-            Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);
             return;
         }
-        UpdateSend();
         return;
     }
 

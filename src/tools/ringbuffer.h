@@ -160,6 +160,7 @@ public:
     * 读取
     * @param buffer 读取数组的指针
     * @param len 读取数组的长度
+    * @return std::size_t 返回实际读出的长度
     */
     std::size_t Read(char* buffer, std::size_t len)
     {

@@ -82,7 +82,15 @@ public:
     /*
     * 重置 PerSocket
     */
-    void ResetPerSocket() { memset(&per_socket_, 0, sizeof(per_socket_)); }
+    inline void ResetPerSocket();
+    /*
+    * 重置接收 PerSocket
+    */
+    inline void ResetRecvPerSocket();
+    /*
+    * 重置发送 PerSocket
+    */
+    inline void ResetSendPerSocket();
     /*
     * 将 socket 建立与 iocp 的关联,只调用一次.
     */
@@ -169,6 +177,14 @@ private:
     * 处理错误事件
     */
     void UpdateError();
+    /*
+    * 检查接收 ringbuffer 是否超限
+    */
+    bool CheckRecvRingBufferSize();
+    /*
+    * 检查发送 ringbuffer 是否超限
+    */
+    bool CheckSendRingBufferSize();
     /*
     * 设置 非阻塞
     */

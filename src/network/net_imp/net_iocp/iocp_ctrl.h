@@ -84,7 +84,7 @@ public:
     template<typename SocketType>
     bool OnRecv(SocketType& socket)
     {
-        socket.ResetPerSocket();
+        socket.ResetRecvPerSocket();
         auto& per_socket = socket.GetPerSocket();
         if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
         {
@@ -154,8 +154,8 @@ public:
     template<typename SocketType>
     bool OnSend(SocketType& socket)
     {
+        socket.ResetSendPerSocket();
         auto& io_send = socket.GetPerSocket().io_send;
-        
         if (EIOSocketState::IOCP_CONNECT == socket.GetSocketState())
         {
             io_send.io_type = EIOSocketState::IOCP_CONNECT;
@@ -164,7 +164,7 @@ public:
         {
             io_send.io_type = EIOSocketState::IOCP_SEND;
         }
-        // 投递一个长度为0的send请求
+        // 投递一个send请求
         DWORD bytes = 0;
         DWORD flags = 0;
         int32_t result = WSASend(socket.GetSocketID(), &io_send.wsa_buf, 1, &bytes, flags, &io_send.over_lapped, 0);
@@ -214,6 +214,7 @@ public:
         }
         if ((per_io->io_type & EIOSocketState::IOCP_RECV) || (per_io->io_type & EIOSocketState::IOCP_ACCEPT))
         {
+            per_io->wsa_buf.len = bytes;
             socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
         } else if ((per_io->io_type & EIOSocketState::IOCP_SEND) || (per_io->io_type & EIOSocketState::IOCP_CONNECT))
         {
