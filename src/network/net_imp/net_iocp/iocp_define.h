@@ -30,7 +30,6 @@ struct PerIOContext
 {
     OVERLAPPED      over_lapped;    // windows 重叠I/O数据结构
     WSABUF          wsa_buf;        // 存储数据的缓冲区,用来给重叠操作传递参数.
-    char            buffer[DEFAULT_CONN_BUFFER_SIZE];   // 对应 WSABUF 里的缓冲区
     EIOSocketState  io_type;        // 当前的I/O类型. IOCP没有像epoll那样的EPOLLIN,EPOLLOUT,只能通过自身携带的类型做标记.
 };
 

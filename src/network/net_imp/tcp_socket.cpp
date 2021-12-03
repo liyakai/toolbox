@@ -163,7 +163,7 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
 void TcpSocket::UpdateRecv()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    recv_ring_buffer_.Write(per_socket_.io_recv.wsa_buf.buf, per_socket_.io_recv.wsa_buf.len);
+    recv_ring_buffer_.AdjustWritePos(per_socket_.io_recv.wsa_buf.len);
     // 处理数据
     if (ErrCode::ERR_SUCCESS != ProcessRecvData())
     {
@@ -292,10 +292,14 @@ void TcpSocket::UpdateConnect()
 void TcpSocket::UpdateSend()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    ReAddSocketToIocp(SOCKET_EVENT_SEND);
+    send_ring_buffer_.AdjustReadPos(per_socket_.io_send.wsa_buf.len);
 #elif defined(__linux__)
+#endif
     while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
     {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        ReAddSocketToIocp(SOCKET_EVENT_SEND);
+#elif defined(__linux__)
         int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
         if (bytes < 0)
         {
@@ -307,8 +311,8 @@ void TcpSocket::UpdateSend()
         {
             break;
         }
-    }
 #endif
+    }
 }
 
 int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
@@ -452,15 +456,15 @@ void TcpSocket::ResetPerSocket()
 void TcpSocket::ResetRecvPerSocket()
 {
     memset(&per_socket_.io_recv, 0, sizeof(per_socket_.io_recv));
-    per_socket_.io_recv.wsa_buf.buf = per_socket_.io_recv.buffer;
-    per_socket_.io_recv.wsa_buf.len = sizeof(per_socket_.io_recv.buffer);
+    per_socket_.io_recv.wsa_buf.buf = recv_ring_buffer_.GetWritePtr();
+    per_socket_.io_recv.wsa_buf.len = recv_ring_buffer_.ContinuouslyWriteableSize();
 }
 
 void TcpSocket::ResetSendPerSocket()
 {
-    memset(&per_socket_.io_send, 0, sizeof(per_socket_.io_send));
-    uint32_t read_len = send_ring_buffer_.Read(per_socket_.io_send.wsa_buf.buf, sizeof(per_socket_.io_send.buffer));
-    per_socket_.io_send.wsa_buf.len = read_len;
+    memset(&per_socket_.io_send, 0, sizeof(per_socket_.io_send));;
+    per_socket_.io_send.wsa_buf.buf = send_ring_buffer_.GetReadPtr();
+    per_socket_.io_send.wsa_buf.len = send_ring_buffer_.ContinuouslyReadableSize();
 }
 
 bool TcpSocket::AssociateSocketToIocp()

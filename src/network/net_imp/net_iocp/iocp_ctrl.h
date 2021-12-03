@@ -212,9 +212,9 @@ public:
         {
             return false;
         }
+        per_io->wsa_buf.len = bytes;
         if ((per_io->io_type & EIOSocketState::IOCP_RECV) || (per_io->io_type & EIOSocketState::IOCP_ACCEPT))
         {
-            per_io->wsa_buf.len = bytes;
             socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
         } else if ((per_io->io_type & EIOSocketState::IOCP_SEND) || (per_io->io_type & EIOSocketState::IOCP_CONNECT))
         {
