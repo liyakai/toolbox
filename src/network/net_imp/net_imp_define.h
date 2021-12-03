@@ -41,12 +41,18 @@ enum class ErrCode
 
 };
 
-enum class SocketConnType
+/*
+* IOCP下socket的状态
+*/
+enum EIOSocketState
 {
-    SOCK_TYPE_INVALID = 0,
-    SOCK_TYPE_CONNECT,
-    SOCK_TYPE_LISTEN,
+    IOCP_ACCEPT = 1,    // 监听
+    IOCP_CONNECT = 2,    // 连接建立
+    IOCP_RECV = 4,    // 接收
+    IOCP_SEND = 8,    // 发送
+    IOCP_CLOSE = 16,   // 关闭
 };
+
 /*
 * epoll下socket的状态
 */
