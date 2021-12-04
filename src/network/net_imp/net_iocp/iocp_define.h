@@ -1,14 +1,12 @@
 #pragma once
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+
 using ACCEPTEX = LPFN_ACCEPTEX;  // AcceptEx 函数指针,详见MSDN
 // MSDN: The number of bytes reserved for the local address information. 
 // This value must be at least 16 bytes more than the maximum address length for the transport protocol in use.
 constexpr std::size_t ACCEPTEX_ADDR_SIZE = sizeof(sockaddr_in) + 16;
 constexpr std::size_t ACCEPTEX_BUFF_SIZE = 2014;
-
-
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 
 /*
 * IOCP下socket的状态

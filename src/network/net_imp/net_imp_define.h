@@ -7,13 +7,14 @@
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 #include "Mswsock.h"
+
+constexpr std::size_t INVALID_SOCKET = -1;
+
 #elif defined(__linux__)
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-constexpr std::size_t INVALID_SOCKET = -1;
 
 #endif  // #if (defined(WIN32) || defined(_WIN64))
 

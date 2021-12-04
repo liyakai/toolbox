@@ -148,16 +148,15 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
         return false;
     }
 #elif defined(__linux__)
-
     socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
 #endif
-
 
     socket->SetNonBlocking(socket_fd);
     socket->SetKeepaliveOff(socket_fd);
     socket->SetLingerOff(socket_fd);
     socket->SetNagleOff(socket_fd);
     socket->SetTcpBuffSize(socket_fd);
+    return true;
 }
 
 void TcpSocket::UpdateRecv()
@@ -362,8 +361,7 @@ void TcpSocket::UpdateError()
 
 bool TcpSocket::CheckRecvRingBufferSize()
 {
-    size_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
-    if (cur_buffer_size > static_cast<size_t>(recv_buff_len_))
+    if (recv_ring_buffer_.GetBufferSize() > static_cast<size_t>(recv_buff_len_))
     {
         // 读缓冲区超过最大限制, error
         Close(ENetErrCode::NET_RECV_BUFF_OVERFLOW);
@@ -374,7 +372,6 @@ bool TcpSocket::CheckRecvRingBufferSize()
 
 bool TcpSocket::CheckSendRingBufferSize()
 {
-    size_t cur_buffer_size = recv_ring_buffer_.GetBufferSize();
     if (send_ring_buffer_.GetBufferSize() > static_cast<size_t>(send_buff_len_))
     {
         Close(ENetErrCode::NET_SEND_BUFF_OVERFLOW);

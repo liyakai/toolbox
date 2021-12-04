@@ -72,10 +72,6 @@ public:
     */
     virtual bool IsSocketValid();
     /*
-    * 设置 tcp_network
-    */
-    void SetNetwork(INetwork* tcp_network) { p_tcp_network_ = tcp_network; }
-    /*
     * 获取远端地址信息
     */
     sockaddr_in* GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex_buffer, int32_t buff_len);
@@ -105,6 +101,10 @@ public:
     */
     void SetSocketState(SocketState state) { socket_state_ = state; }
 #endif
+    /*
+    * 设置 tcp_network
+    */
+    void SetNetwork(INetwork* tcp_network) { p_tcp_network_ = tcp_network; }
     /*
     * 更新 epoll 事件
     * @params event_type 事件类型
