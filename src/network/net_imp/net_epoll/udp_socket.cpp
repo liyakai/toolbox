@@ -107,7 +107,7 @@ bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port)
     Bind(ip,port);
     type_ = UdpType::ACCEPTOR;
     local_address_.SetAddress(ip,port);
-    event_type_ = SOCKET_EVENT_RECV;
+    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_ERR;
     return true;
 }
 bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
@@ -115,7 +115,7 @@ bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
     Bind(ip,port);
     type_ = UdpType::CONNECTOR;
     remote_address_.SetAddress(ip,port);
-    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_SEND;
+    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_SEND | SOCKET_EVENT_ERR;
     return true;
 }
 

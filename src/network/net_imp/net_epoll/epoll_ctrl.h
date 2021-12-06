@@ -128,11 +128,11 @@ public:
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
                 epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
             }
-            else if (event.events & EPOLLIN)
+            if (event.events & EPOLLIN)
             {
                 socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
             }
-            else if (event.events & EPOLLOUT)
+            if (event.events & EPOLLOUT)
             {
                 socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
             }

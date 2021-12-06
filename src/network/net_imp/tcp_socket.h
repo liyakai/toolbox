@@ -55,15 +55,6 @@ public:
     void SetSocketMgr(TCPSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     /*
-    * 设置socket状态
-    */
-    void SetSocketState(EIOSocketState state) { socket_state_ = state; }
-    /*
-    * 获取socket状态
-    */
-    EIOSocketState GetSocketState() { return socket_state_; }
-
-    /*
     * 获取 persocket
     */
     PerSockContext& GetPerSocket() { return per_socket_; }
@@ -96,11 +87,15 @@ public:
     */
     bool ReAddSocketToIocp(SockEventType event_type);
 #elif defined(__linux__)
+#endif
     /*
     * 设置socket状态
     */
     void SetSocketState(SocketState state) { socket_state_ = state; }
-#endif
+    /*
+    * 获取socket状态
+    */
+    SocketState GetSocketState() { return socket_state_; }
     /*
     * 设置 tcp_network
     */
@@ -232,10 +227,9 @@ private:
     time_t last_recv_ts_ = 0;                       // 最后一次读到数据的时间戳
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    PerSockContext per_socket_;                     //
-    EIOSocketState socket_state_ = EIOSocketState::IOCP_CLOSE;
+    PerSockContext per_socket_;                     
 #elif defined(__linux__)
-    SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 #endif
+    SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 
 };

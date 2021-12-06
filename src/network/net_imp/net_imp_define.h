@@ -8,8 +8,6 @@
 #include <ws2tcpip.h>
 #include "Mswsock.h"
 
-constexpr std::size_t INVALID_SOCKET = -1;
-
 #elif defined(__linux__)
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -17,6 +15,7 @@ constexpr std::size_t INVALID_SOCKET = -1;
 #include <unistd.h>
 
 #endif  // #if (defined(WIN32) || defined(_WIN64))
+
 
 constexpr std::size_t MAX_SOCKET_COUNT = 40000;
 constexpr std::size_t INVALID_CONN_ID = UINT32_MAX;
@@ -42,26 +41,16 @@ enum class ErrCode
 };
 
 /*
-* IOCP下socket的状态
+* socket的状态
 */
-enum EIOSocketState
+enum SocketState
 {
-    IOCP_ACCEPT = 1,    // 监听
-    IOCP_CONNECT = 2,    // 连接建立
-    IOCP_RECV = 4,    // 接收
-    IOCP_SEND = 8,    // 发送
-    IOCP_CLOSE = 16,   // 关闭
-};
-
-/*
-* epoll下socket的状态
-*/
-enum class SocketState
-{
-    SOCK_STATE_INVALIED = 1,    // 初始状态
-    SOCK_STATE_LISTENING = 2,   // 监听
-    SOCK_STATE_CONNECTING = 3,  // 主动连接
-    SOCK_STATE_ESTABLISHED = 4, // 连接建立
+    SOCK_STATE_INVALIED     = 1 << 0,   // 初始状态
+    SOCK_STATE_LISTENING    = 1 << 1,   // 监听
+    SOCK_STATE_CONNECTING   = 1 << 2,   // 主动连接
+    SOCK_STATE_ESTABLISHED  = 1 << 3,   // 连接建立
+    SOCK_STATE_RECV         = 1 << 4,   // 接收[iocp中persocket的细分状态]
+    SOCK_STATE_SEND         = 1 << 5,   // 发送[iocp中persocket的细分状态]
 };
 
 /*

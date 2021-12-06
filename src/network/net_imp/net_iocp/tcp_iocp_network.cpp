@@ -49,7 +49,7 @@ uint64_t TcpIocpNetwork::OnNewAccepter(const std::string& ip, const uint16_t por
     {
         return 0;
     }
-    new_socket->SetSocketState(EIOSocketState::IOCP_ACCEPT);
+    new_socket->SetSocketState(SocketState::SOCK_STATE_LISTENING);
     iocp_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
 }
@@ -67,7 +67,7 @@ uint64_t TcpIocpNetwork::OnNewConnecter(const std::string& ip, const uint16_t po
     {
         return 0;
     }
-    new_socket->SetSocketState(EIOSocketState::IOCP_CONNECT);
+    new_socket->SetSocketState(SocketState::SOCK_STATE_CONNECTING);
     iocp_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
 }

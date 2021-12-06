@@ -43,9 +43,14 @@ void TcpSocket::Reset()
 {
     p_tcp_network_ = nullptr;
     p_sock_pool_ = nullptr;
+    socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
+    send_buff_len_ = 0;
+    recv_buff_len_ = 0;
+    recv_ring_buffer_.Clear();
+    send_ring_buffer_.Clear();
+    last_recv_ts_ = 0;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    socket_state_ = EIOSocketState::IOCP_CLOSE;
     if (nullptr != per_socket_.accept_ex)
     {
         per_socket_.accept_ex->accept_ex_fn = nullptr;
@@ -54,14 +59,8 @@ void TcpSocket::Reset()
     per_socket_.accept_ex = nullptr;
     ResetPerSocket();
 #elif defined(__linux__)
-    socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 #endif
 
-    send_buff_len_ = 0;
-    recv_buff_len_ = 0;
-    recv_ring_buffer_.Clear();
-    send_ring_buffer_.Clear();
-    last_recv_ts_ = 0;
     BaseSocket::Reset();
 }
 
@@ -124,11 +123,6 @@ void TcpSocket::UpdateAccept()
         p_epoll_network->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
     }
-//#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-//#elif defined(__linux__)
-//    socket_state_ = SocketState::SOCK_STATE_LISTENING;
-//#endif
-    event_type_ = SOCKET_EVENT_RECV;
 }
 
 bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
@@ -141,7 +135,7 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
     // socket->SetAddressPort(port);
     socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    socket->SetSocketState(EIOSocketState::IOCP_RECV);
+    socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
     // 建立 socket 与 iocp 的关联
     if (!socket->AssociateSocketToIocp())
     {
@@ -275,16 +269,17 @@ ErrCode TcpSocket::ProcessRecvData()
 
 void TcpSocket::UpdateConnect()
 {
+    // 完成主动连接后增加可处理"接收"能力.
     event_type_ |= SOCKET_EVENT_RECV;
+    socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    socket_state_ = IOCP_RECV;
     ReAddSocketToIocp(SOCKET_EVENT_RECV);
 #elif defined(__linux__)
-    socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
     auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_tcp_network_);
     p_epoll_network->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
+
     p_tcp_network_->OnConnected(GetConnID());
 }
 
@@ -317,7 +312,8 @@ void TcpSocket::UpdateSend()
 int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    int32_t send_bytes = send(socket_fd, data, (int32_t)size, 0);
+    int32_t send_bytes = 0; //send(socket_fd, data, (int32_t)size, 0);
+    return send_bytes;
 #elif defined(__linux__)
     int32_t send_bytes = send(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
 #endif
@@ -346,11 +342,7 @@ int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 
 void TcpSocket::UpdateError()
 {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    if (EIOSocketState::IOCP_RECV == socket_state_ || EIOSocketState::IOCP_SEND == socket_state_)
-#elif defined(__linux__)
-    if(SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
-#endif
+    if (SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
     {
         Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
     } else 
@@ -388,11 +380,7 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
         BaseSocket::Close();
         // 通知主线程 socket 关闭
         p_tcp_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        socket_state_ = IOCP_CLOSE;
-#elif defined(__linux__)
         socket_state_ = SocketState::SOCK_STATE_INVALIED;
-#endif
         p_sock_pool_->Free(this);
     }
 }
@@ -491,11 +479,7 @@ bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
 
 void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    if(EIOSocketState::IOCP_CLOSE == socket_state_)
-#elif defined(__linux__)
     if (SocketState::SOCK_STATE_INVALIED == socket_state_)
-#endif
     {
         // socket 已经关闭
         p_tcp_network_->OnErrored(0, ENetErrCode::NET_INVALID_SOCKET, errno);
@@ -508,11 +492,7 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
     }
     if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
     {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        if (EIOSocketState::IOCP_ACCEPT == socket_state_)
-#elif defined(__linux__)
         if (SocketState::SOCK_STATE_LISTENING == socket_state_)
-#endif
         {
             UpdateAccept();
         }
@@ -524,11 +504,7 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
     }
     if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
     {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        if (EIOSocketState::IOCP_CONNECT == socket_state_)
-#elif defined(__linux__)
         if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
-#endif
         {
             UpdateConnect();
         }
@@ -541,11 +517,7 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 
 bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    if (EIOSocketState::IOCP_ACCEPT == socket_state_)
-#elif defined(__linux__)
     if (SocketState::SOCK_STATE_LISTENING == socket_state_)
-#endif
     {
         p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, 0);
         return false;
@@ -603,21 +575,18 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     {
         return false;
     }
-    socket_state_ = EIOSocketState::IOCP_ACCEPT;
+    socket_state_ = SocketState::SOCK_STATE_LISTENING;
 #elif defined(__linux__)
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
 #endif
-    event_type_ = SOCKET_EVENT_RECV;
+    // 用于监听的 socket 只能接受"接收","错误"事件.
+    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_RECV;
     return true;
 }
 
 bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    if (EIOSocketState::IOCP_CONNECT == socket_state_)
-#elif defined(__linux__)
     if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
-#endif
     {
         p_tcp_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, 0);
         return false;
@@ -675,12 +644,12 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     {
         return false;
     }
-    socket_state_ = EIOSocketState::IOCP_CONNECT;
-    event_type_ = SOCKET_EVENT_SEND;
 #elif defined(__linux__)
-    socket_state_ = SocketState::SOCK_STATE_CONNECTING;
-    event_type_ = SOCKET_EVENT_SEND;
 #endif
+    socket_state_ = SocketState::SOCK_STATE_CONNECTING;
+    // 用于主动连接的 socket 可接受 "发送","接收","错误" 事件.
+    // 在获取正确连接前只接受 "发送","错误"事件.
+    event_type_ |= SOCKET_EVENT_SEND | SOCKET_EVENT_ERR;
     
     return true;
 }
@@ -695,7 +664,7 @@ void TcpSocket::Send(const char* data, size_t len)
     if(false == send_ring_buffer_.Empty())
     {
         send_ring_buffer_.Write(data, len);
-        UpdateSend();
+        // UpdateSend();
         if (!CheckSendRingBufferSize())
         {
             return;

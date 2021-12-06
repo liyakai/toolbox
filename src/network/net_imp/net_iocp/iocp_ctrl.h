@@ -86,7 +86,7 @@ public:
     {
         socket.ResetRecvPerSocket();
         auto& per_socket = socket.GetPerSocket();
-        if (EIOSocketState::IOCP_ACCEPT == socket.GetSocketState())
+        if (SocketState::SOCK_STATE_LISTENING == socket.GetSocketState())
         {
             auto& accept_ex = per_socket.accept_ex;
             if (nullptr == accept_ex)
@@ -113,7 +113,7 @@ public:
             }
             // MSDN: https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-acceptex
             // 投递一个 accept 请求
-            per_socket.io_recv.io_type = EIOSocketState::IOCP_ACCEPT;
+            per_socket.io_recv.io_type = SocketState::SOCK_STATE_LISTENING;
             bool result = accept_ex->accept_ex_fn(socket.GetSocketID(), accept_ex->socket_fd, accept_ex->buffer, 0,
                             ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &per_socket.io_recv.over_lapped);
             if (false == result)
@@ -128,13 +128,13 @@ public:
             }
 
         }
-        else if (EIOSocketState::IOCP_RECV == socket.GetSocketState())
+        else if (SocketState::SOCK_STATE_ESTABLISHED == socket.GetSocketState())
         {
             // 投递一个长度为0的请求
             DWORD bytes = 0;
             DWORD flags = 0;
             auto& io_recv = per_socket.io_recv;
-            per_socket.io_recv.io_type = EIOSocketState::IOCP_RECV;
+            per_socket.io_recv.io_type = SocketState::SOCK_STATE_RECV;
             int32_t result = WSARecv(socket.GetSocketID(), &io_recv.wsa_buf, 1, &bytes, &flags, &io_recv.over_lapped, 0);
             if (result != 0)
             {
@@ -156,13 +156,13 @@ public:
     {
         socket.ResetSendPerSocket();
         auto& io_send = socket.GetPerSocket().io_send;
-        if (EIOSocketState::IOCP_CONNECT == socket.GetSocketState())
+        if (SocketState::SOCK_STATE_CONNECTING == socket.GetSocketState())
         {
-            io_send.io_type = EIOSocketState::IOCP_CONNECT;
+            io_send.io_type = SocketState::SOCK_STATE_CONNECTING;
         }
-        else if (EIOSocketState::IOCP_SEND == socket.GetSocketState())
+        else if (SocketState::SOCK_STATE_ESTABLISHED == socket.GetSocketState())
         {
-            io_send.io_type = EIOSocketState::IOCP_SEND;
+            io_send.io_type = SocketState::SOCK_STATE_SEND;
         }
         // 投递一个send请求
         DWORD bytes = 0;
@@ -213,10 +213,10 @@ public:
             return false;
         }
         per_io->wsa_buf.len = bytes;
-        if ((per_io->io_type & EIOSocketState::IOCP_RECV) || (per_io->io_type & EIOSocketState::IOCP_ACCEPT))
+        if ((per_io->io_type & SocketState::SOCK_STATE_RECV) || (per_io->io_type & SocketState::SOCK_STATE_LISTENING))
         {
             socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
-        } else if ((per_io->io_type & EIOSocketState::IOCP_SEND) || (per_io->io_type & EIOSocketState::IOCP_CONNECT))
+        } else if ((per_io->io_type & SocketState::SOCK_STATE_SEND) || (per_io->io_type & SocketState::SOCK_STATE_CONNECTING))
         {
             socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
         }

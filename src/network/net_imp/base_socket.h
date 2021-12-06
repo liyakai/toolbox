@@ -95,5 +95,5 @@ protected:
     int32_t socket_id_ = -1; // socket_id
     bool is_ctrl_add_ = false;                      // 是否已经执行过 EPOLL_CTL_ADD
 #endif
-    int32_t event_type_ = SOCKET_EVENT_INVALID;     // 可投递事件类型
+    int32_t event_type_ = SOCKET_EVENT_INVALID;     // socket 可响应的事件类型
 };
