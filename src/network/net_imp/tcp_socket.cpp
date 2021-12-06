@@ -482,9 +482,7 @@ void TcpSocket::UpdateEvent(SockEventType event_type, time_t ts)
     if (SocketState::SOCK_STATE_INVALIED == socket_state_)
     {
         // socket 已经关闭
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_INVALID_SOCKET, errno);
         return;
-    
     }
     if(event_type & SOCKET_EVENT_ERR)
     {
