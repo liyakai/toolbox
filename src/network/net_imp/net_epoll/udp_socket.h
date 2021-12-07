@@ -174,12 +174,17 @@ public:
     void KcpUpdate(std::time_t current);
 private:
     /*
-    * @brief 绑定ip地址和端口
+    * @brief 绑定ip地址和端口.[用于监听]
     * @param ip 地址
     * @param port 端口
     * @return 是否成功
     */
     bool Bind(const std::string& ip, uint16_t port);
+    /*
+    * @brief 绑定到本地任意地址和端口.[用于主动连接]
+    * @return 是否成功
+    */
+    bool Bind();
     /*
     * @brief 处理错误事件
     */

@@ -121,8 +121,13 @@ uint64_t UdpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
         new_socket->OpenKcpMode();
     }
     epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
-    address_to_connect_[new_socket->GetRemoteAddressID()] = new_socket->GetConnID();
-    return new_socket->GetRemoteAddressID();
+    uint64_t remote_address_id = new_socket->GetRemoteAddressID();
+    address_to_connect_[remote_address_id] = new_socket->GetConnID();
+    if(remote_address_id > 0)
+    {
+        OnConnected(remote_address_id);
+    }
+    return remote_address_id;
 }
 void UdpEpollNetwork::OnClose(uint64_t address_id)
 {

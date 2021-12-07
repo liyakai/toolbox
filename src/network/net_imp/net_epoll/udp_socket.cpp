@@ -112,7 +112,7 @@ bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port)
 }
 bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
 {
-    Bind(ip,port);
+    Bind();
     type_ = UdpType::CONNECTOR;
     remote_address_.SetAddress(ip,port);
     event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_SEND | SOCKET_EVENT_ERR;
@@ -189,6 +189,30 @@ bool UdpSocket::Bind(const std::string& ip, uint16_t port)
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
     sa.sin_addr.s_addr = inet_addr(ip.c_str());
+    // 绑定端口
+    int32_t error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
+    if (error < 0)
+    {
+        p_udp_network_->OnErrored(socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
+        return false;
+    }
+    return true;
+}
+
+bool UdpSocket::Bind()
+{
+    socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (socket_id_ < 0)
+    {
+        p_udp_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, errno);
+        return false;
+    }
+
+    SocketAddress sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port = 0;
+    sa.sin_addr.s_addr = htonl(INADDR_ANY);
     // 绑定端口
     int32_t error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
     if (error < 0)
@@ -337,6 +361,7 @@ bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size,  const S
             return true;
         } else
         {
+            p_udp_network_->OnErrored(GetLocalAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
             return false;
         }
     }
@@ -356,6 +381,7 @@ bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, co
             return true;
         } else 
         {
+            p_udp_network_->OnErrored(GetLocalAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
             return false;
         }
     }
