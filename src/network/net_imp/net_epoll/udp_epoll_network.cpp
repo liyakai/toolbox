@@ -51,15 +51,15 @@ void UdpEpollNetwork::Update()
     }
 }
 
-int32_t UdpEpollNetwork::GetConnIdByUdpAddress(const UdpAddress& udp_address)
+UdpSocket* UdpEpollNetwork::GetSocketByUdpAddress(const UdpAddress& udp_address)
 {
     auto iter = address_to_connect_.find(udp_address.GetID());
     if(iter != address_to_connect_.end())
     {
-        return iter->second;
+        return sock_mgr_.GetEpollSocket(iter->second);
     } else 
     {
-        return -1;
+        return nullptr;
     }
 }
 

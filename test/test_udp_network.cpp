@@ -115,7 +115,7 @@ FIXTURE_BEGIN(UdpEpollNetwork)
 
 CASE(test_udp_echo)
 {
-    // return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_udp_echo.prof");
 #endif // USE_GPERF_TOOLS

@@ -24,7 +24,7 @@ constexpr std::size_t DEFAULT_RING_BUFF_SIZE = 256 * 1024;        /* 256 k */
 constexpr std::size_t DEFAULT_BACKLOG_SIZE = 256;
 // 
 constexpr int32_t KCP_TRANSPORT_MTU = 1000;
-constexpr uint32_t KCP_CONV = 0x01020304;          // kcp会话ID
+constexpr uint32_t KCP_CONV = 0x01020304;          // kcp会话ID, must equal in two endpoint from the same connection
 
 using SocketAddress = struct sockaddr_in;
 /*

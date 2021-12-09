@@ -40,9 +40,10 @@ public:
     EpollCtrl& GetEpollCtrl(){ return epoll_ctrl_;}
     /*
     * @brief UdpAddress 是否存在
-    * @param int32_t >=0:conn_id; <0 非法值
+    * @param udp_address 远端udp地址
+    * @return != nullptr:udpsocket指针; nullptr:找不到socket
     */
-    int32_t GetConnIdByUdpAddress(const UdpAddress& udp_address);
+    UdpSocket* GetSocketByUdpAddress(const UdpAddress& udp_address);
     /*
     * @brief 增加地址映射
     * @param udp_address udp地址
@@ -62,7 +63,6 @@ public:
     * @return bool true:kcp false:udp
     */
     bool IsKcpModeOpen(){ return is_kcp_open_; };
-   
 protected:
     /*
     * 工作线程内建立监听器

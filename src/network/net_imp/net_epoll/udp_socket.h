@@ -24,7 +24,8 @@ public:
     */
     UdpAddress()
         : id_(0)
-        {}
+        {
+        }
     /*
     * @brief 构造
     * @param ip 地址
@@ -172,6 +173,13 @@ public:
     * @brief KCP update
     */
     void KcpUpdate(std::time_t current);
+    /*
+    * @brief KCP 接收数据
+    * @param buffer 数据指针
+    * @param length 数据长度
+    * @param address 数据来源地址
+    */
+    void KcpRecv(const char* buffer, std::size_t length, const UdpAddress&& address);
 private:
     /*
     * @brief 绑定ip地址和端口.[用于监听]
@@ -198,9 +206,11 @@ private:
     */
     void UpdateSend();
     /*
-    * 处理接受客户端连接的情况
+    * @brief 处理接受客户端连接的情况
+    * @param address 远端地址
+    * @return UdpSocket* 新socket,如果失败则为nullptr
     */
-    void UpdateAccept(const SocketAddress& address);
+    UdpSocket* UpdateAccept(const SocketAddress& address);
     /*
     *  初始化从accpet函数接收得来的socket
     */
@@ -208,7 +218,7 @@ private:
     /*
     * @brief 套接字接收数据
     */
-    bool SocketRecv(int32_t socket_fd, char* data, size_t& size, const SocketAddress& address);
+    bool SocketRecv(int32_t socket_fd, char* data, size_t& size, SocketAddress& address);
     /*
     * 套接字发送数据
     */

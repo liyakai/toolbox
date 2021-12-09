@@ -180,7 +180,7 @@ bool UdpSocket::Bind(const std::string& ip, uint16_t port)
     socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (socket_id_ < 0)
     {
-        p_udp_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, errno);
+        p_udp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, errno);
         return false;
     }
 
@@ -231,6 +231,7 @@ void UdpSocket::OpenKcpMode()
     ikcp_setmtu(kcp_, KCP_TRANSPORT_MTU);
     // 极速模式,官方推荐
     ikcp_nodelay(kcp_, 1, 10, 2, 1);
+    return;
 }
 
 void UdpSocket::KcpUpdate(std::time_t current)
@@ -239,6 +240,21 @@ void UdpSocket::KcpUpdate(std::time_t current)
     {
         ikcp_update(kcp_, current);
         UpdateSend();
+    }
+}
+
+void UdpSocket::KcpRecv(const char* buffer, std::size_t length, const UdpAddress&& address)
+{
+    // 将收到的数据输入到 kcp
+    ikcp_input(kcp_, buffer, length);
+    // 从 KCP 返回可靠包
+    char out_buffer[DEFAULT_CONN_BUFFER_SIZE];
+    auto bytes_size = ikcp_recv(kcp_, out_buffer, sizeof(out_buffer));
+    if(bytes_size > 0)
+    {
+        char *buff_block = MemPoolMgr->GetMemory(bytes_size);
+        memcpy(buff_block, out_buffer, bytes_size);
+        p_udp_network_->OnReceived(UdpAddress(address).GetID(), buff_block, bytes_size);
     }
 }
 
@@ -256,10 +272,10 @@ void UdpSocket::UpdateRecv()
     {
         auto success = SocketRecv(socket_id_, array.data(), size, address);
         if (success && size) {
-            auto address_id = p_udp_network_->GetConnIdByUdpAddress(address);
-            if(address_id < 0 && UdpType::ACCEPTOR == type_)
+            auto* udp_socket = p_udp_network_->GetSocketByUdpAddress(address);
+            if(nullptr == udp_socket)
             {
-                UpdateAccept(address);
+                udp_socket = UpdateAccept(address);
             }
             if(nullptr == kcp_)     // 原始 udp 模式
             {
@@ -268,21 +284,11 @@ void UdpSocket::UpdateRecv()
                 p_udp_network_->OnReceived(UdpAddress(address).GetID(), buff_block, size);
             } else                  // 开启了kcp
             {
-                // DebugPrint::PrintfData(array.data(), 64, "KCP_RECEIVE");
-                // 将收到的数据输入到 kcp
-                ikcp_input(kcp_, array.data(), size);
-                //auto input_ret =  ikcp_input(kcp_, array.data(), size);
-                //fprintf(stderr, "[UdpSocket::UpdateRecv] kcp ## 收到客户端数据.size:%zu input_ret:%d %x\n",size, input_ret, kcp_->conv);
-                // 从 KCP 返回可靠包
-                char buffer[DEFAULT_CONN_BUFFER_SIZE];
-                auto bytes_size = ikcp_recv(kcp_, buffer, sizeof(buffer));
-                //fprintf(stderr, "[UdpSocket::UpdateRecv] kcp ## 从ikcp中取出数据.size:%d\n",bytes_size);
-                if(bytes_size > 0)
+                if (nullptr != udp_socket)
                 {
-                    char *buff_block = MemPoolMgr->GetMemory(bytes_size);
-                    memcpy(buff_block, buffer, bytes_size);
-                    p_udp_network_->OnReceived(UdpAddress(address).GetID(), buff_block, bytes_size);
+                    udp_socket->KcpRecv(array.data(), size, UdpAddress(address));
                 }
+                
             }
         } else 
         {
@@ -319,13 +325,13 @@ void UdpSocket::UpdateSend()
     }
 }
 
-void UdpSocket::UpdateAccept(const SocketAddress& address)
+UdpSocket* UdpSocket::UpdateAccept(const SocketAddress& address)
 {
-    auto new_socket = p_sock_pool_->Alloc();
+    auto* new_socket = p_sock_pool_->Alloc();
     if(nullptr == new_socket)
     {
         p_udp_network_->OnErrored(GetLocalAddressID(), ENetErrCode::NET_ALLOC_FAILED, 0);
-        return ;
+        return nullptr;
     }
     InitAccpetSocket(new_socket, address);
     if(p_udp_network_->IsKcpModeOpen())
@@ -335,8 +341,7 @@ void UdpSocket::UpdateAccept(const SocketAddress& address)
     // 通知主线程有新的客户端连接进来
     p_udp_network_->OnAccepted(new_socket->GetRemoteAddressID());
     p_udp_network_->AddUdpAddress(address, new_socket->GetConnID());
-    p_udp_network_->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
-    return;
+    return new_socket;
 }
 
 void UdpSocket::InitAccpetSocket(UdpSocket* socket, const SocketAddress& address)
@@ -345,11 +350,11 @@ void UdpSocket::InitAccpetSocket(UdpSocket* socket, const SocketAddress& address
     socket->SetRemoteAddress(UdpAddress(address));
     socket->SetSocketMgr(p_sock_pool_);
     socket->SetNetwork(p_udp_network_);
-    socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
+    socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND | SOCKET_EVENT_ERR);
     socket->SetType(UdpType::REMOTE);
 }
 
-bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size,  const SocketAddress& address)
+bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size,  SocketAddress& address)
 {
     socklen_t fromlen = sizeof(address);
     auto bytes = recvfrom(socket_fd, data, size, MSG_DONTWAIT, (struct sockaddr*)&address, &fromlen);
@@ -391,11 +396,8 @@ bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size, co
 
 int32_t UdpSocket::Output(const char* buf, int32_t len, ikcpcb* kcp, void*user)
 {
-    auto socket = reinterpret_cast<UdpSocket*>(user);
-    if(UdpType::ACCEPTOR != socket->GetType())
-    {
-        socket->SendTo(buf, len);
-    }
+    auto* socket = reinterpret_cast<UdpSocket*>(user);
+    socket->SendTo(buf, len);
     return 0;
 }
 
