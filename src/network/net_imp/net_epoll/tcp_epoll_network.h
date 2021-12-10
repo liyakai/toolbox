@@ -54,7 +54,6 @@ protected:
     virtual void OnSend(uint64_t connect_id, const char* data, std::size_t size) override;
 
 private:
-    NetworkMaster *network_master_;     // 主线程网络管理器
     EpollCtrl epoll_ctrl_;              // epoll控制器
     SocketPool<TcpSocket> sock_mgr_;    // socket池
 };

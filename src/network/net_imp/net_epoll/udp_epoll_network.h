@@ -82,7 +82,6 @@ protected:
     virtual void OnSend(uint64_t address_id, const char* data, std::size_t size) override;
 
 private:
-    NetworkMaster *network_master_;     // 主线程网络管理器
     EpollCtrl epoll_ctrl_;              // epoll控制器
     SocketPool<UdpSocket> sock_mgr_;    // socket池
     std::unordered_map<uint64_t, uint32_t> address_to_connect_;      // 地址转换的ID 到 SocketPool管理的连接ID的映射
