@@ -5,9 +5,9 @@
 #include <list>
 #include <string>
 #include "src/network/net_imp/base_socket.h"
-#include "epoll_define.h"
+#include "net_imp_define.h"
 #include "src/network/net_imp/socket_pool.h"
-#include "udp_epoll_network.h"
+//#include "udp_epoll_network.h"
 #include "kcp/ikcp.h"
 
 class UdpSocket;
@@ -129,10 +129,6 @@ public:
     */
     void SetSocketMgr(UdpSocketPool* sock_pool){p_sock_pool_ = sock_pool;}
     /*
-    * @brief 设置 tcp_network
-    */
-    void SetNetwork(UdpEpollNetwork* udp_network){ p_udp_network_ = udp_network; }
-    /*
     * @brief 关闭套接字
     */
     void Close(ENetErrCode net_err, int32_t sys_err = 0);
@@ -222,7 +218,7 @@ private:
     /*
     * 套接字发送数据
     */
-    bool SocketSend(int32_t socket_fd, const char* data, size_t& size, const SocketAddress& address);
+    bool SocketSend(int32_t socket_fd, const char* data, size_t& size);
     /*
     * @brief kcp 用来执行发送的回调函数
     */
@@ -231,22 +227,18 @@ private:
     // buff包
     struct Buffer
     {
-        Buffer(const char* data, std::size_t size, SocketAddress& address);
+        Buffer(const char* data, std::size_t size);
         char buffer_[DEFAULT_CONN_BUFFER_SIZE]; // 缓冲区
         char* data_;            // 可读/写地址
         std::size_t size_;      // 可读/写长度
-        SocketAddress address_; // 地址
     };
     using BufferList = std::list<Buffer*>;
-    BufferList read_buffers_;   // 读缓冲区列表
-    BufferList write_buffers_;  // 写缓冲区列表
-    BufferList dead_buffers_;   // 需要销毁的缓冲区
+    // BufferList recv_list_;      // 接收缓冲区列表
+    BufferList send_list_;      // 接收缓冲区列表
     UdpAddress remote_address_; // 远端地址
     UdpAddress local_address_;  // 本地地址
     UdpType type_ = UdpType::UNKNOWN;               // 管道类型
     ikcpcb* kcp_ = nullptr;     // kcp实例
-
-    UdpEpollNetwork* p_udp_network_ = nullptr;      // 工作线程
     UdpSocketPool *p_sock_pool_ = nullptr;          // socket 池子
 };
 

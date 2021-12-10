@@ -41,7 +41,7 @@ void TcpSocket::UnInit()
 
 void TcpSocket::Reset()
 {
-    p_tcp_network_ = nullptr;
+    p_network_ = nullptr;
     p_sock_pool_ = nullptr;
     socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
     send_buff_len_ = 0;
@@ -101,7 +101,7 @@ void TcpSocket::UpdateAccept()
 #elif defined(__linux__)
             close(client_fd);
 #endif
-            p_tcp_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
+            p_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
             return;
         }
         if (!InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_))
@@ -110,16 +110,16 @@ void TcpSocket::UpdateAccept()
             return;
         }
         // 通知主线程有新的客户端连接进来
-        p_tcp_network_->OnAccepted(new_socket->GetConnID());
+        p_network_->OnAccepted(new_socket->GetConnID());
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+        auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
         // 将新的连接加入iocp
         p_iocp_network->GetIocpCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         // 将监听socket重新加入iocp
         ReAddSocketToIocp(SOCKET_EVENT_RECV);
         break;
 #elif defined(__linux__)
-        auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_tcp_network_);
+        auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
         p_epoll_network->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
     }
@@ -129,7 +129,7 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
 {
     socket->Init(send_buff_size, recv_buff_size);
     socket->SetSocketMgr(p_sock_pool_);
-    socket->SetNetwork(p_tcp_network_);
+    socket->SetNetwork(p_network_);
     socket->SetSocketID(socket_fd);
     // socket->SetIP(ip);
     // socket->SetAddressPort(port);
@@ -261,7 +261,7 @@ ErrCode TcpSocket::ProcessRecvData()
         }
         char* buff_block = MemPoolMgr->GetMemory(len);
         recv_ring_buffer_.Read(buff_block, len);
-        p_tcp_network_->OnReceived(GetConnID(), buff_block, len);
+        p_network_->OnReceived(GetConnID(), buff_block, len);
     }
     
     return ErrCode::ERR_SUCCESS;
@@ -276,11 +276,11 @@ void TcpSocket::UpdateConnect()
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     ReAddSocketToIocp(SOCKET_EVENT_RECV);
 #elif defined(__linux__)
-    auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_tcp_network_);
+    auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
     p_epoll_network->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
 
-    p_tcp_network_->OnConnected(GetConnID());
+    p_network_->OnConnected(GetConnID());
 }
 
 void TcpSocket::UpdateSend()
@@ -347,7 +347,7 @@ void TcpSocket::UpdateError()
         Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
     } else 
     {
-        p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
+        p_network_->OnConnectedFailed(ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
     }
 }
 
@@ -379,7 +379,7 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     {
         BaseSocket::Close();
         // 通知主线程 socket 关闭
-        p_tcp_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
+        p_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
         socket_state_ = SocketState::SOCK_STATE_INVALIED;
         p_sock_pool_->Free(this);
     }
@@ -387,7 +387,7 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 
 void TcpSocket::OnErrored(ENetErrCode err_code, int32_t err_no)
 {
-    p_tcp_network_->OnErrored(GetConnID(), err_code, err_no);
+    p_network_->OnErrored(GetConnID(), err_code, err_no);
 }
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -454,7 +454,7 @@ void TcpSocket::ResetSendPerSocket()
 
 bool TcpSocket::AssociateSocketToIocp()
 {
-    auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+    auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
     // 建立 socket 与 iocp 的关联
     if (nullptr == tcp_iocp_network)
     {
@@ -465,7 +465,7 @@ bool TcpSocket::AssociateSocketToIocp()
 
 bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
 {
-    auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_tcp_network_);
+    auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
     if (nullptr == p_iocp_network)
     {
         return false;
@@ -517,7 +517,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
 {
     if (SocketState::SOCK_STATE_LISTENING == socket_state_)
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, 0);
+        p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, 0);
         return false;
     }
     Init(send_buff_size, recv_buff_size);
@@ -529,7 +529,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     if (socket_id_ < 0)
 #endif
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+        p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
         return false;
     }
 
@@ -558,13 +558,13 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     int32_t error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
     if (error < 0)
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+        p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
         return false;
     }
     error = listen(socket_id_, DEFAULT_BACKLOG_SIZE);
     if (error < 0)
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+        p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
         return false;
     }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -586,7 +586,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
 {
     if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, 0);
+        p_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, 0);
         return false;
     }
 
@@ -596,7 +596,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_id_ < 0)
     {
-        p_tcp_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, errno);
+        p_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, errno);
         return false;
     }
 
@@ -632,7 +632,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
 #endif
     {
         // 通知 主线程连接失败
-        p_tcp_network_->OnConnectedFailed(ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
+        p_network_->OnConnectedFailed(ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
         Close(ENetErrCode::NET_SYS_ERROR, errno);
         return false;
     }

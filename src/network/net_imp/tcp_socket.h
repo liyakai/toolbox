@@ -97,10 +97,6 @@ public:
     */
     SocketState GetSocketState() { return socket_state_; }
     /*
-    * 设置 tcp_network
-    */
-    void SetNetwork(INetwork* tcp_network) { p_tcp_network_ = tcp_network; }
-    /*
     * 更新 epoll 事件
     * @params event_type 事件类型
     * @params ts 时间戳
@@ -216,14 +212,13 @@ private:
 private:
     // std::string ip_;
     // uint16_t port_ = 0;
-    INetwork* p_tcp_network_ = nullptr;      // 工作线程
 
     TCPSocketPool *p_sock_pool_ = nullptr;          // socket 池子
 
     int32_t send_buff_len_ = 0;                     // 接收缓冲区大小
     int32_t recv_buff_len_ = 0;                     // 接收缓冲区大小
-    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_;
-    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_;
+    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> send_ring_buffer_; // 发送缓冲区
+    RingBuffer<char, DEFAULT_RING_BUFF_SIZE> recv_ring_buffer_; // 接收缓冲区
     time_t last_recv_ts_ = 0;                       // 最后一次读到数据的时间戳
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)

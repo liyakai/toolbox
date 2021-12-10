@@ -21,6 +21,11 @@ public:
     */
     virtual void Reset();
     /*
+    * @brief 设置 tcp_network
+    * @param network 工作线程
+    */
+    void SetNetwork(INetwork* network){ p_network_ = network; }
+    /*
     * 更新事件
     * @params event_type 事件类型
     * @params ts 时间戳
@@ -92,8 +97,9 @@ protected:
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     SOCKET socket_id_ = 0;
 #elif defined(__linux__)
-    int32_t socket_id_ = -1; // socket_id
+    int32_t socket_id_ = -1;                        // socket_id
     bool is_ctrl_add_ = false;                      // 是否已经执行过 EPOLL_CTL_ADD
 #endif
     int32_t event_type_ = SOCKET_EVENT_INVALID;     // socket 可响应的事件类型
+    INetwork* p_network_ = nullptr;                 // 工作线程
 };
