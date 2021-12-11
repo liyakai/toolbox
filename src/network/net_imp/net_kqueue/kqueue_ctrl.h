@@ -1,30 +1,26 @@
 #pragma once
 
-#ifdef __linux__
+#if defined(__APPLE__)
 
-#include "src/tools/singleton.h"
-#include <sys/epoll.h>
-#include "epoll_define.h"
-#include "src/network/net_imp/tcp_socket.h"
 
 /*
-* epoll 类
+* 定义 kqueue 管理类
 */
-class EpollCtrl
+class KqueueCtrl
 {
 public:
     /*
     * 构造
     * @param max_events 最大事件数量
     */
-    EpollCtrl(uint32_t max_events);
+    KqueueCtrl(uint max_events);
     /*
-    * 创建 epoll
+    * 创建 Kqueue
     * @return 是否成功
     */
-    bool CreateEpoll();
+    bool CreateKqueue();
     /*
-    * 销毁 epoll
+    * 销毁 Kqueue
     */
     void Destroy();
     /*
@@ -145,6 +141,5 @@ private:
     epoll_event *events_;     // epoll 事件数组
 };
 
-#define EpollCtrlMgr Singleton<EpollCtrl>::Instance(10240)
 
-#endif // __linux__
+#endif // defined(__APPLE__)

@@ -1,18 +1,14 @@
-#include "epoll_ctrl.h"
+#include "kqueue_ctrl.h"
 
-#ifdef __linux__
+#if defined(__APPLE__)
 
-#include <sys/socket.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
 
-EpollCtrl::EpollCtrl(uint max_events)
+KqueueCtrl::KqueueCtrl(uint max_events)
     : max_events_(max_events)
 {
 }
 
-bool EpollCtrl::CreateEpoll()
+bool KqueueCtrl::CreateEpoll()
 {
     epoll_fd_ = epoll_create(max_events_);
     if (epoll_fd_ < 0)
@@ -23,7 +19,7 @@ bool EpollCtrl::CreateEpoll()
 
     return true;
 }
-void EpollCtrl::Destroy()
+void KqueueCtrl::Destroy()
 {
     if (events_ != nullptr)
     {
@@ -37,7 +33,7 @@ void EpollCtrl::Destroy()
     }
 }
 
-bool EpollCtrl::AddEvent(int socket_fd, int event, void *ptr)
+bool KqueueCtrl::AddEvent(int socket_fd, int event, void *ptr)
 {
     epoll_event evt;
     evt.data.ptr = ptr;
@@ -46,7 +42,7 @@ bool EpollCtrl::AddEvent(int socket_fd, int event, void *ptr)
     return epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, socket_fd, &evt) == 0;
 }
 
-bool EpollCtrl::ModEvent(int socket_fd, int event, void *ptr)
+bool KqueueCtrl::ModEvent(int socket_fd, int event, void *ptr)
 {
     epoll_event evt;
     evt.events = event;
@@ -54,18 +50,18 @@ bool EpollCtrl::ModEvent(int socket_fd, int event, void *ptr)
     return epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, socket_fd, &evt) == 0;
 }
 
-bool EpollCtrl::DelEvent(int socket_fd)
+bool KqueueCtrl::DelEvent(int socket_fd)
 {
     epoll_event evt;
     return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
 }
 
-int EpollCtrl::EpollWait(int msec)
+int KqueueCtrl::EpollWait(int msec)
 {
     return epoll_wait(epoll_fd_, events_, max_events_, msec);
 }
 
-epoll_event *EpollCtrl::GetEvent(int index)
+epoll_event *KqueueCtrl::GetEvent(int index)
 {
     if (index < 0 || index >= int(max_events_))
     {
@@ -74,4 +70,5 @@ epoll_event *EpollCtrl::GetEvent(int index)
     return &events_[index];
 }
 
-#endif  // __linux__
+
+#endif // defined(__APPLE__)

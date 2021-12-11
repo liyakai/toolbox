@@ -1,9 +1,11 @@
 #include "network_mgr.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #include "src/network/net_imp/net_iocp/tcp_iocp_network.h"
-#elif __linux__
+#elif defined(__linux__) 
 #include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
 #include "src/network/net_imp/net_epoll/udp_epoll_network.h"
+#elif defined(__APPLE__)
+#include "src/network/net_imp/net_kqueue/tcp_kqueue_network.h"
 #endif
 #include "src/tools/object_pool.h"
 NetworkMaster::NetworkMaster()
@@ -163,18 +165,18 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         auto* tcp_network = new TcpIocpNetwork();
-        tcp_network->Init(this, type);
-        return tcp_network;
-#elif __linux__
+#elif defined(__linux__) 
         auto* tcp_network = new TcpEpollNetwork();
+#elif defined(__APPLE__)
+        auto* tcp_network = new TcpKqueueNetwork();
+#endif 
         tcp_network->Init(this, type);
         return tcp_network;
-#endif // __linux__
         break;
     }
     case NT_UDP:
     {
-#ifdef __linux__
+#ifdef defined(__linux__) 
         auto* udp_network = new UdpEpollNetwork();
         udp_network->Init(this, type);
         return udp_network;
@@ -183,7 +185,7 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     }
     case NT_KCP:
     {
-#ifdef __linux__
+#ifdef defined(__linux__) 
         auto* udp_network = new UdpEpollNetwork();
         udp_network->Init(this, type);
         udp_network->OpenKcpMode();
