@@ -68,6 +68,16 @@ public:
     * @params bool
     */
     void SetCtrlAdd(bool value) { is_ctrl_add_ = value; }
+#elif defined(__APPLE__)
+    /*
+    * 获取 socket id
+    */
+    int32_t GetSocketID() { return socket_id_; }
+    /*
+    * 设置 socket id
+    */
+    void SetSocketID(int32_t id) { socket_id_ = id; }
+
 #endif
 
     /* 
@@ -99,6 +109,8 @@ protected:
 #elif defined(__linux__)
     int32_t socket_id_ = -1;                        // socket_id
     bool is_ctrl_add_ = false;                      // 是否已经执行过 EPOLL_CTL_ADD
+#elif defined(__APPLE__)
+    int32_t socket_id_ = -1;                        // socket_id
 #endif
     int32_t event_type_ = SOCKET_EVENT_INVALID;     // socket 可响应的事件类型
     INetwork* p_network_ = nullptr;                 // 工作线程

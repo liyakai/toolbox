@@ -38,7 +38,7 @@ public:
     /*
     * 重置
     */
-    void Reset();
+    void Reset() override;
     // /*
     // * 设置远端IP
     // */

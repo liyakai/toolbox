@@ -5,6 +5,7 @@
 #include <deque>
 #include <chrono>
 #include <array>
+#include <string>
 
 // 实现五层时间轮算法
 
@@ -342,7 +343,7 @@ public:
     * @param timer 句柄
     * @return 返回剩余毫秒数
     */
-    int32_t GetTimeLeft(HTIMER timer)
+    int32_t GetTimeLeft(HTIMER timer) override
     {
         auto iter = all_timers_.find(timer);
         if(iter == all_timers_.end())
@@ -355,7 +356,7 @@ public:
     * @brief 删除一个定时器节点
     * @return timer 定时器句柄
     */
-    void KillTimer(HTIMER timer)
+    void KillTimer(HTIMER timer) override
     {
         auto iter = all_timers_.find(timer);
         if(iter == all_timers_.end())
@@ -375,7 +376,7 @@ public:
     * @brief 释放定时器
     * @return void
     */
-    void Release()
+    void Release() override
     {
         UnInit();
     }
@@ -383,7 +384,7 @@ public:
     * @brief 执行一次更新
     * @return void
     */
-    void Update()
+    void Update() override
     {
         // 获取现在的毫秒数
         int64_t now_time = GetMilliSecond();

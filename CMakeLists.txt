@@ -1,18 +1,32 @@
 # cmake verson
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.12)
 
 # project name
 PROJECT(toolbox)
 
-# flat
+# 根据宏确定不同的操作系统
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(STATUS "Configuring on/for Linux")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    message(STATUS "Configuring on/for macOS")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    message(STATUS "Configuring on/for Windows")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "AIX")
+    message(STATUS "Configuring on/for IBM AIX")
+else()
+    message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
+endif()
+
+
+# 设置编译选项
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11  -lpthread ")
 
-# Debug
+# 设置编译调试信息
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
     add_definitions(-DDEBUG -g)
 endif()
 
-# head file path
+# 头文件
 INCLUDE_DIRECTORIES(
     .
     ./src/tools
@@ -24,7 +38,7 @@ INCLUDE_DIRECTORIES(
     ./src/thirdparty
 )
 
-# source directory
+# 源文件
 AUX_SOURCE_DIRECTORY(./src/tools DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/thirdparty/kcp DIR_SRCS)
@@ -32,7 +46,7 @@ AUX_SOURCE_DIRECTORY(./src/network/net_imp DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_epoll DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_iocp DIR_SRCS)
 
-# set output path
+# 设置输出路径
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 # set environment variable
@@ -43,8 +57,10 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 # add library
 ADD_LIBRARY(toolbox ${DIR_SRCS})
 
+# 单元测试
 add_subdirectory(test)
 
+# 编译选项
 option(CMAKE_GPERF_TOOLS "Use Gperf Tools" OFF)
 if(CMAKE_GPERF_TOOLS)
     add_definitions(-DUSE_GPERF_TOOLS)

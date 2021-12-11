@@ -94,10 +94,8 @@ private:
 
 #define CASE(name) \
 	class case_##name : public TestCase{	\
-		bool std_except_;	\
-		bool except_;	\
 	public:	\
-		case_##name(const std::string& name) : TestCase(name), std_except_(false), except_(false){}	\
+		case_##name(const std::string& name) : TestCase(name){}	\
 		virtual ~case_##name() = default;	\
 		virtual void Run() override;	\
 	};	\

@@ -8,7 +8,13 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <linux/tcp.h> // TCP_NODELAY
-#endif // __linux__
+#elif defined(__APPLE__)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netinet/tcp.h>
+#endif
 
 #include <string.h>
 #include <errno.h>
@@ -67,8 +73,7 @@ void TcpSocket::Reset()
 void TcpSocket::UpdateAccept()
 {
     int32_t client_fd = 0; // 客户端套接字
-    sockaddr_in addr;
-    socklen_t addr_len = sizeof(sockaddr_in);
+    SocketAddress addr;
 
     while (true)
     {
@@ -85,7 +90,8 @@ void TcpSocket::UpdateAccept()
             addr = *remote_address;
         }
         if(INVALID_SOCKET == client_fd)
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
+        socklen_t addr_len = sizeof(SocketAddress);
         memset(&addr, 0, addr_len);
         // 接受客户端连接
         client_fd = accept(socket_id_, (sockaddr*)&addr, &addr_len);
@@ -207,7 +213,7 @@ int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, 0);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
 #endif
     if (recv_bytes > 0)
@@ -223,7 +229,7 @@ int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         int32_t last_errno = GetSocketError();
         if ((0 == last_errno) || (WSAEINTR == last_errno) || (WSAEINPROGRESS == last_errno) || (WSAEWOULDBLOCK == last_errno))
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
         if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
 #endif
         {
@@ -314,7 +320,7 @@ int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     int32_t send_bytes = 0; //send(socket_fd, data, (int32_t)size, 0);
     return send_bytes;
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     int32_t send_bytes = send(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
 #endif
     if (send_bytes < 0)
@@ -322,7 +328,7 @@ int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         int32_t last_errno = GetSocketError();
         if((0 == last_errno) || (WSAEINTR == last_errno) || (WSAEINPROGRESS == last_errno) || (WSAEWOULDBLOCK == last_errno))
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
         if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
 #endif
         {
@@ -627,7 +633,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     int32_t error = connect(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     if (error < 0 && ((WSAEWOULDBLOCK != GetSysErrNo()) && (WSAEISCONN != GetSysErrNo())))
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
 #endif
     {
@@ -741,10 +747,13 @@ int32_t TcpSocket::SetReuseAddrOn(int32_t fd)
 int32_t TcpSocket::SetDeferAccept(int32_t fd)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    // TODO
     return 0;
 #elif defined(__linux__)
     int32_t secs = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &secs, sizeof(secs));
+#elif defined(__APPLE__)
+    return 0;
 #endif
 }
 
@@ -769,7 +778,7 @@ int32_t TcpSocket::GetSysErrNo()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     return GetLastError();
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     return errno;
 #endif
 }
