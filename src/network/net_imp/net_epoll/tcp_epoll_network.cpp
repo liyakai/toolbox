@@ -36,6 +36,11 @@ void TcpEpollNetwork::Update()
     epoll_ctrl_.RunOnce<TcpSocket>();
 }
 
+void TcpEpollNetwork::CloseListenInMultiplexing(int32_t socket_id)
+{
+    epoll_ctrl_.DelEvent(socket_id);
+}
+
 
 uint64_t TcpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
@@ -73,7 +78,7 @@ uint64_t TcpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
 }
 void TcpEpollNetwork::OnClose(uint64_t connect_id)
 {
-    auto socket = sock_mgr_.GetEpollSocket((uint32_t)connect_id);
+    auto socket = sock_mgr_.GetSocket((uint32_t)connect_id);
     if(nullptr == socket)
     {
         return;
@@ -83,7 +88,7 @@ void TcpEpollNetwork::OnClose(uint64_t connect_id)
 
 void TcpEpollNetwork::OnSend(uint64_t connect_id, const char* data, std::size_t size)
 {
-    auto socket = sock_mgr_.GetEpollSocket(connect_id);
+    auto socket = sock_mgr_.GetSocket(connect_id);
     if(nullptr == socket)
     {
         return;

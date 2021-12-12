@@ -39,6 +39,11 @@ public:
     */
     virtual void Update();
     /*
+    * @brief 在io多路复用中关闭监听socket
+    * @param socket 的文件描述符
+    */
+    virtual void CloseListenInMultiplexing(int32_t socket_id){};
+    /*
     * 加入事件
     */
     void PushEvent(NetEventWorker *event);

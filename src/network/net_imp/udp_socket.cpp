@@ -160,9 +160,14 @@ void UdpSocket::Close(ENetErrCode net_err, int32_t sys_err)
         if (UdpType::ACCEPTOR == type_)
         {
             p_network_->OnClosed(GetLocalAddressID(), net_err, sys_err);
+            p_network_->CloseListenInMultiplexing(GetSocketID());
         }
         else
         {
+            if (UdpType::CONNECTOR == type_)
+            {
+                p_network_->CloseListenInMultiplexing(GetSocketID());
+            }
             p_network_->OnClosed(GetRemoteAddressID(), net_err, sys_err);
         }
         p_sock_pool_->Free(this);

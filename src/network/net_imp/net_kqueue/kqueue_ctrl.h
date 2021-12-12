@@ -1,7 +1,7 @@
 #pragma once
 
 #if defined(__APPLE__)
-
+#include "src/network/net_imp/net_imp_define.h"
 
 /*
 * 定义 kqueue 管理类
@@ -13,7 +13,7 @@ public:
     * 构造
     * @param max_events 最大事件数量
     */
-    KqueueCtrl(uint max_events);
+    KqueueCtrl(uint32_t max_events);
     /*
     * 创建 Kqueue
     * @return 是否成功
@@ -24,111 +24,70 @@ public:
     */
     void Destroy();
     /*
-    * 添加事件
-    * @param socket_fd 文件描述符
-    * @param event  事件类型
-    * @param ptr 透传指针
-    * @return 是否成功
-    */
-    bool AddEvent(int socket_fd, int event, void *ptr);
-    /*
-    * 修改事件
-    * @param socket_fd 文件描述符
-    * @param event  事件类型
-    * @param ptr 透传指针
-    * @return 是否成功
-    */
-    bool ModEvent(int socket_fd, int event, void *ptr);
-    /*
-    * 删除事件
-    * @param socket_fd 文件描述符
-    */
-    bool DelEvent(int socket_fd);
-    /*
     * 处理事件
     */
     template<typename SocketType>
     bool OperEvent(SocketType &socket, EventOperType op_type, int32_t event_type)
     {
-        epoll_event event;
-        memset(&event, 0, sizeof(event));
-        const auto now_event = socket.GetEventType();
-        event.data.ptr = &socket;
-        event.events |= EPOLLET;
+        struct kevent changes[2];    // 要监视的事件列表
+        int32_t change_num = 0;
         if (event_type & SOCKET_EVENT_RECV)
         {
-            if (now_event & SOCKET_EVENT_SEND) // 已经注册写事件
-            {
-                event.events |= EPOLLOUT;
-            }
             if (EventOperType::EVENT_OPER_ADD == op_type)
             {
-                event.events |= EPOLLIN;
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_READ, EV_ADD|EV_ENABLE, 0, 0, &socket);
+            } else if (EventOperType::EVENT_OPER_RDC == op_type)
+            {
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_READ, EV_DELETE|EV_DISABLE, 0, 0, &socket);
             }
         }
         if (event_type & SOCKET_EVENT_SEND)
         {
-            if (now_event & SOCKET_EVENT_RECV) // 已经注册读事件
-            {
-                event.events |= EPOLLIN;
-            }
             if (EventOperType::EVENT_OPER_ADD == op_type)
             {
-                event.events |= EPOLLOUT;
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_WRITE, EV_ADD|EV_ENABLE, 0, 0, &socket);
+            }else if (EventOperType::EVENT_OPER_RDC == op_type)
+            {
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_READ, EV_DELETE|EV_DISABLE, 0, 0, &socket);
             }
         }
-        if (socket.IsCtrlAdd())
-        {
-            epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, socket.GetSocketID(), &event);
-        }
-        else
-        {
-            socket.SetCtrlAdd(true);
-            epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, socket.GetSocketID(), &event);
-        }
+
+        kevent(kqueue_fd_, changes, 0, nullptr, 0, nullptr);
 
         return true;
     }
     /*
-    * epoll_wait
+    * @brief kevent 获取结果
     * @param msec 等待毫秒数
     * @return 有读写通知的文件描述符的个数
     */
-    int EpollWait(int msec);
-    /*
-    * 获取事件
-    * @param index 事件序号
-    * @return epoll_event*
-    */
-    epoll_event *GetEvent(int index);
+    int32_t Kevent(int msec);
     /*
     * 执行一次 epoll wait
     */
     template<typename SocketType>
     bool RunOnce()
     {
-        epoll_event evt;
         time_t time_stamp = time(0);    // 时间戳
-        int32_t count = EpollWait(EPOLL_WAIT_MSECONDS);
+        int32_t count = Kevent(KQUEUE_WAIT_MSECONDS);
         if (count < 0)
         {
             return false;
         }
         for (int32_t i = 0; i < count; i++)
         {
-            epoll_event& event = events_[i];
-            SocketType* socket = static_cast<SocketType*>(event.data.ptr);
+            auto& event = events_[i];
+            SocketType* socket = static_cast<SocketType*>(event.udata);
             if (nullptr == socket) continue;
-            if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
+            if ((event.flags & EV_EOF) || (event.flags & EV_ERROR))
             {
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-                epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
             }
-            if (event.events & EPOLLIN)
+            if (event.filter & EVFILT_READ)
             {
                 socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
             }
-            if (event.events & EPOLLOUT)
+            if (event.filter & EVFILT_WRITE)
             {
                 socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
             }
@@ -136,9 +95,9 @@ public:
         return true;
     }
 private:
-    uint32_t max_events_ = 0; // 最大事件数
-    int epoll_fd_;            // epoll 文件描述符
-    epoll_event *events_;     // epoll 事件数组
+    uint32_t fd_num_ = 0;       // 最大文件描述符监视数
+    int kqueue_fd_ = 0;         // kqueue 文件描述符
+    struct kevent *events_;     // kevent返回的事件列表
 };
 
 

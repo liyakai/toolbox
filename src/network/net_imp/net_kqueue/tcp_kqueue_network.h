@@ -4,6 +4,7 @@
 
 #include "src/network/network.h"
 #include "src/network/net_imp/socket_pool.h"
+#include "src/network/net_imp/tcp_socket.h"
 #include "kqueue_ctrl.h"
 
 /*
@@ -32,6 +33,11 @@ public:
     * 执行一次网络循环
     */
     virtual void Update() override;
+    /*
+    * @brief 在io多路复用中关闭监听socket
+    * @param socket 的文件描述符
+    */
+    virtual void CloseListenInMultiplexing(int32_t socket_id) override;
 public:
     KqueueCtrl& GetIocpCtrl() { return kqueue_ctrl_; }
    

@@ -37,23 +37,6 @@ void EpollCtrl::Destroy()
     }
 }
 
-bool EpollCtrl::AddEvent(int socket_fd, int event, void *ptr)
-{
-    epoll_event evt;
-    evt.data.ptr = ptr;
-    evt.events = event;
-
-    return epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, socket_fd, &evt) == 0;
-}
-
-bool EpollCtrl::ModEvent(int socket_fd, int event, void *ptr)
-{
-    epoll_event evt;
-    evt.events = event;
-    evt.data.ptr = ptr;
-    return epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, socket_fd, &evt) == 0;
-}
-
 bool EpollCtrl::DelEvent(int socket_fd)
 {
     epoll_event evt;
@@ -65,13 +48,5 @@ int EpollCtrl::EpollWait(int msec)
     return epoll_wait(epoll_fd_, events_, max_events_, msec);
 }
 
-epoll_event *EpollCtrl::GetEvent(int index)
-{
-    if (index < 0 || index >= int(max_events_))
-    {
-        return nullptr;
-    }
-    return &events_[index];
-}
 
 #endif  // __linux__

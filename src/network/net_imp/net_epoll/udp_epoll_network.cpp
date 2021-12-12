@@ -41,7 +41,7 @@ void UdpEpollNetwork::Update()
         // 更新 kcp [TODO: 这里的update存在优化空间]
         for(auto iter : address_to_connect_)
         {
-            auto socket = sock_mgr_.GetEpollSocket(iter.second);
+            auto socket = sock_mgr_.GetSocket(iter.second);
             if(nullptr == socket)
             {
                 continue;
@@ -51,12 +51,17 @@ void UdpEpollNetwork::Update()
     }
 }
 
+void UdpEpollNetwork::CloseListenInMultiplexing(int32_t socket_id)
+{
+    epoll_ctrl_.DelEvent(socket_id);
+}
+
 UdpSocket* UdpEpollNetwork::GetSocketByUdpAddress(const UdpAddress& udp_address)
 {
     auto iter = address_to_connect_.find(udp_address.GetID());
     if(iter != address_to_connect_.end())
     {
-        return sock_mgr_.GetEpollSocket(iter->second);
+        return sock_mgr_.GetSocket(iter->second);
     } else 
     {
         return nullptr;
@@ -136,7 +141,7 @@ void UdpEpollNetwork::OnClose(uint64_t address_id)
     {
         return;
     }
-    auto socket = sock_mgr_.GetEpollSocket(iter->second);
+    auto socket = sock_mgr_.GetSocket(iter->second);
     if(nullptr == socket)
     {
         return;
@@ -152,7 +157,7 @@ void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, std::size_t 
     {
         return;
     }
-    auto socket = sock_mgr_.GetEpollSocket(iter->second);
+    auto socket = sock_mgr_.GetSocket(iter->second);
     if(nullptr == socket)
     {
         return;

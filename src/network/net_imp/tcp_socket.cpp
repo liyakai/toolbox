@@ -384,6 +384,7 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     if (IsSocketValid())
     {
         BaseSocket::Close();
+        p_network_->CloseListenInMultiplexing(GetSocketID());
         // 通知主线程 socket 关闭
         p_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
         socket_state_ = SocketState::SOCK_STATE_INVALIED;
@@ -530,7 +531,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     socket_id_ = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
     if(socket_id_ == INVALID_SOCKET)
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_id_ < 0)
 #endif

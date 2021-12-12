@@ -97,6 +97,12 @@ void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType ty
 }
 void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
 {
+    if (type >= NT_MAX || type <= NT_UNKNOWN )
+    {
+        OnErrored(0, ENetErrCode::NET_INVALID_NETWORK_TYPE, 0);
+        return;
+    }
+    
     auto index = static_cast<size_t>(type);
     if(nullptr == networks_[index])
     {
@@ -176,7 +182,7 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     }
     case NT_UDP:
     {
-#ifdef defined(__linux__) 
+#if defined(__linux__) 
         auto* udp_network = new UdpEpollNetwork();
         udp_network->Init(this, type);
         return udp_network;
@@ -185,7 +191,7 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     }
     case NT_KCP:
     {
-#ifdef defined(__linux__) 
+#if defined(__linux__) 
         auto* udp_network = new UdpEpollNetwork();
         udp_network->Init(this, type);
         udp_network->OpenKcpMode();

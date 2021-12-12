@@ -73,7 +73,7 @@ uint64_t TcpIocpNetwork::OnNewConnecter(const std::string& ip, const uint16_t po
 }
 void TcpIocpNetwork::OnClose(uint64_t connect_id)
 {
-    auto socket = sock_mgr_.GetEpollSocket((uint32_t)connect_id);
+    auto socket = sock_mgr_.GetSocket((uint32_t)connect_id);
     if(nullptr == socket)
     {
         return;
@@ -83,7 +83,7 @@ void TcpIocpNetwork::OnClose(uint64_t connect_id)
 
 void TcpIocpNetwork::OnSend(uint64_t connect_id, const char* data, std::size_t size)
 {
-    auto socket = sock_mgr_.GetEpollSocket(connect_id);
+    auto socket = sock_mgr_.GetSocket(connect_id);
     if(nullptr == socket)
     {
         return;
