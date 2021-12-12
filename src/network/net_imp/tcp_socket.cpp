@@ -22,6 +22,7 @@
 #include "src/network/net_imp/socket_pool.h"
 #include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
 #include "src/network/net_imp/net_iocp/tcp_iocp_network.h"
+#include "src/network/net_imp/net_kqueue/tcp_kqueue_network.h"
 
 TcpSocket::TcpSocket()
 {
@@ -127,6 +128,10 @@ void TcpSocket::UpdateAccept()
 #elif defined(__linux__)
         auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
         p_epoll_network->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+#elif defined(__APPLE__)
+        auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
+        p_kqueue_network->GetKqueueCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        p_kqueue_network->GetKqueueCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_SEND);
 #endif
     }
 }
@@ -147,7 +152,7 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
     {
         return false;
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
 #endif
 
@@ -175,7 +180,7 @@ void TcpSocket::UpdateRecv()
         return;
     }
     ReAddSocketToIocp(SOCKET_EVENT_RECV);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     while (size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
     {
         int32_t bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
@@ -284,6 +289,9 @@ void TcpSocket::UpdateConnect()
 #elif defined(__linux__)
     auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
     p_epoll_network->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+#elif defined(__APPLE__)
+    auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
+    p_kqueue_network->GetKqueueCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
 
     p_network_->OnConnected(GetConnID());
@@ -293,13 +301,13 @@ void TcpSocket::UpdateSend()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     send_ring_buffer_.AdjustReadPos(per_socket_.io_send.wsa_buf.len);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
     while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
     {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         ReAddSocketToIocp(SOCKET_EVENT_SEND);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
         int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
         if (bytes < 0)
         {
@@ -480,7 +488,7 @@ bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
     // 将监听socket重新加入iocp
     return p_iocp_network->GetIocpCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type);
 }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
 
 
@@ -550,7 +558,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     {
         sa.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     sa.sin_addr.s_addr = INADDR_ANY;
     if (0 != ip.size())
     {
@@ -581,11 +589,11 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
         return false;
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
 #endif
     // 用于监听的 socket 只能接受"接收","错误"事件.
-    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_RECV;
+    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_ERR;
     return true;
 }
 
@@ -621,7 +629,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     {
         sa.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     sa.sin_addr.s_addr = INADDR_ANY;
     if (0 != ip.size())
     {
@@ -649,7 +657,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     {
         return false;
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
     socket_state_ = SocketState::SOCK_STATE_CONNECTING;
     // 用于主动连接的 socket 可接受 "发送","接收","错误" 事件.
@@ -690,7 +698,7 @@ void TcpSocket::Send(const char* data, size_t len)
         send_ring_buffer_.Write(data + sended, len - sended);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         ReAddSocketToIocp(SOCKET_EVENT_SEND);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
     }   
     // MemPoolMgr->GiveBack(const_cast<char*>(data), "TcpSocket::Send");
@@ -708,7 +716,7 @@ int32_t TcpSocket::SetNonBlocking(int32_t fd)
     {
         return 1;
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     if (fd < 0)
     {
         return 1;

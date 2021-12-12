@@ -52,8 +52,8 @@ public:
             }
         }
 
-        kevent(kqueue_fd_, changes, 0, nullptr, 0, nullptr);
-
+        kevent(kqueue_fd_, changes, change_num, nullptr, 0, nullptr);
+        
         return true;
     }
     /*

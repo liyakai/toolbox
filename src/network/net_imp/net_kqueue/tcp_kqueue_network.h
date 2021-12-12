@@ -39,7 +39,7 @@ public:
     */
     virtual void CloseListenInMultiplexing(int32_t socket_id) override;
 public:
-    KqueueCtrl& GetIocpCtrl() { return kqueue_ctrl_; }
+    KqueueCtrl& GetKqueueCtrl() { return kqueue_ctrl_; }
    
 protected:
     /*
