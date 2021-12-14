@@ -1,6 +1,8 @@
 #include "src/tools/skip_list.h"
 #include "unit_test_frame/unittest.h"
 #include <map>
+#include <inttypes.h>
+#include <stdint.h>
 
 FIXTURE_BEGIN(SkipList)
 
@@ -105,7 +107,7 @@ CASE(SkipListCase){
         res[ele] = true;
     }
     // 打印排行榜
-    fprintf(stderr,"[跳表排行榜] 元素数量：%llu\n", rank_skip_list->Length());
+    fprintf(stderr,"[跳表排行榜] 元素数量:%" PRIu64" \n", rank_skip_list->Length());
     int32_t i = 1;
     SkipListNode<Score, int32_t>* node = rank_skip_list->GetNodeByRank(i);
     do{
@@ -119,7 +121,7 @@ CASE(SkipListCase){
                 SetError("[跳表排行榜] 出现重复\n");
                 return;
             }
-            fprintf(stderr,"[跳表排行榜] rank=%lld, id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
+            fprintf(stderr,"[跳表排行榜] rank=% " PRId64", id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
                 rank_skip_list->Rank(score.id), score.id, score.Sum(),score.chinese, score.math, score.english);
                 res[score.id] = true;
                 i++;
@@ -139,7 +141,7 @@ CASE(SkipListCase){
         if(nullptr != node)
         {
             Score score = node->key;
-            fprintf(stderr,"[跳表排行榜] rank=%lld, id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
+            fprintf(stderr,"[跳表排行榜] rank=% " PRId64", id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
                 rank_skip_list->Rank(score.id), score.id, score.Sum(),score.chinese, score.math, score.english);
                 res[score.id] = true;
                 i++;
@@ -152,7 +154,7 @@ CASE(SkipListCase){
     for(auto it : list)
     {
         Score score = it -> key;
-            fprintf(stderr,"[跳表排行榜] rank=%lld id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
+            fprintf(stderr,"[跳表排行榜] rank=% " PRId64" id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
         rank_skip_list->Rank(score.id), score.id, score.Sum(),score.chinese, score.math, score.english);
         res[score.id] = true;
     }
@@ -182,7 +184,7 @@ CASE(SkipListCase2){
         SetError("[跳表排行榜] Score 功能异常.\n");
     } else 
     {
-        fprintf(stderr,"[跳表排行榜] 通过 value 找到 key rank=%lld id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
+        fprintf(stderr,"[跳表排行榜] 通过 value 找到 key rank=% " PRId64" id=%d, sum=%d, chinese=%d, math=%d, english=%d\n",
         rank_skip_list->Rank(score->id), score->id, score->Sum(),score->chinese, score->math, score->english);
     }
 
@@ -193,7 +195,7 @@ CASE(SkipListCase2){
         if(nullptr != node)
         {
             Score score = node->key;
-            fprintf(stderr,"[跳表排行榜] rank=%lld, id=%d, sum=%d, chinese=%d, math=%d, english=%d \n",
+            fprintf(stderr,"[跳表排行榜] rank=% " PRId64", id=%d, sum=%d, chinese=%d, math=%d, english=%d \n",
                 rank_skip_list->Rank(score.id), score.id, score.Sum(),score.chinese, score.math, score.english);
                 i++;
                 node = rank_skip_list->GetNodeByRank(i);
