@@ -1,6 +1,6 @@
 #pragma once
 #ifdef __linux__
-#include "src/network/network.h"
+#include "src/network/net_imp/imp_network.h"
 #include <unordered_map>
 #include "epoll_ctrl.h"
 #include "src/network/net_imp/socket_pool.h"
@@ -10,7 +10,7 @@ class UdpAddress;
 /*
 * 定义基于 UDP 和 Epoll 的网络
 */
-class UdpEpollNetwork : public INetwork
+class UdpEpollNetwork  : public ImpNetwork<UdpSocket>
 {
 public:
     /*
@@ -88,7 +88,6 @@ protected:
 
 private:
     EpollCtrl epoll_ctrl_;              // epoll控制器
-    SocketPool<UdpSocket> sock_mgr_;    // socket池
     std::unordered_map<uint64_t, uint32_t> address_to_connect_;      // 地址转换的ID 到 SocketPool管理的连接ID的映射
     bool is_kcp_open_ = false;      // KCP是否开启
 };

@@ -98,7 +98,7 @@ void UdpSocket::UpdateEvent(SockEventType event_type, time_t ts)
 }
 
 
-bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port)
+bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     Bind(ip,port);
     type_ = UdpType::ACCEPTOR;
@@ -106,7 +106,7 @@ bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port)
     event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_ERR;
     return true;
 }
-bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
+bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
     Bind();
     type_ = UdpType::CONNECTOR;
@@ -115,7 +115,7 @@ bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port)
     return true;
 }
 
-void UdpSocket::SendTo(const char* buffer, std::size_t length)
+void UdpSocket::Send(const char* buffer, std::size_t length)
 {
     if(nullptr == buffer || 0 == length)
     {
@@ -399,7 +399,7 @@ bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size)
 int32_t UdpSocket::Output(const char* buf, int32_t len, ikcpcb* kcp, void*user)
 {
     auto* socket = reinterpret_cast<UdpSocket*>(user);
-    socket->SendTo(buf, len);
+    socket->Send(buf, len);
     return 0;
 }
 
