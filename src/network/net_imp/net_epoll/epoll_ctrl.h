@@ -4,7 +4,7 @@
 
 #include "src/tools/singleton.h"
 #include <sys/epoll.h>
-#include "net_imp_define.h"
+#include "src/network/net_imp/net_imp_define.h"
 #include "src/network/net_imp/tcp_socket.h"
 
 /*
