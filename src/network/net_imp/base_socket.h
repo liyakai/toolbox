@@ -32,6 +32,26 @@ public:
     */
     virtual void UpdateEvent(SockEventType event_type, time_t ts) = 0;
     /*
+    * @brief 监听(模拟)
+    * @param ip 地址
+    * @param port 端口
+    */
+    virtual bool InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+    /*
+    * @brief 连接
+    * @param ip 地址
+    * @param port 端口
+    * @return 是否成功
+    */
+    virtual bool InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+    /*
+    * @brief 发送 [原生UDP发送接口,不适用于kcp等协议的发送入口]
+    * @param buffer 数据指针
+    * @param length 数据长度
+    * @param address 目标地址
+    */
+    void Send(const char* buffer, std::size_t length);
+    /*
     * 获取事件类型
     * @return 可投递事件类型
     */
