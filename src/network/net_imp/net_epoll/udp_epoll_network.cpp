@@ -19,19 +19,19 @@ UdpEpollNetwork::~UdpEpollNetwork()
 void UdpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
     ImpNetwork<UdpSocket>::Init(master, network_type);
-    epoll_ctrl_.CreateEpoll();
+    epoll_ctrl_.CreateIOMultiplexing();
 }
 
 void UdpEpollNetwork::UnInit()
 {
-    epoll_ctrl_.Destroy();
+    epoll_ctrl_.DestroyIOMultiplexing();
     ImpNetwork<UdpSocket>::UnInit();
 }
 
 void UdpEpollNetwork::Update()
 {
     ImpNetwork<UdpSocket>::Update();
-    epoll_ctrl_.RunOnce<UdpSocket>();
+    epoll_ctrl_.RunOnce();
     if(is_kcp_open_)
     {
         auto current = GetMillSecondTimeStamp();

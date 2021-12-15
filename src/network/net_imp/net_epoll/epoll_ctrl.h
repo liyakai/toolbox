@@ -6,11 +6,12 @@
 #include <sys/epoll.h>
 #include "src/network/net_imp/net_imp_define.h"
 #include "src/network/net_imp/tcp_socket.h"
+#include "src/network/net_imp/base_ctrl.h"
 
 /*
 * epoll 类
 */
-class EpollCtrl
+class EpollCtrl : public IOMultiplexingInterface
 {
 public:
     /*
@@ -22,11 +23,11 @@ public:
     * 创建 epoll
     * @return 是否成功
     */
-    bool CreateEpoll();
+    bool CreateIOMultiplexing() override;
     /*
     * 销毁 epoll
     */
-    void Destroy();
+    void DestroyIOMultiplexing() override;
     /*
     * 删除事件
     * @param socket_fd 文件描述符
@@ -35,8 +36,7 @@ public:
     /*
     * 处理事件
     */
-    template<typename SocketType>
-    bool OperEvent(SocketType &socket, EventOperType op_type, int32_t event_type)
+    bool OperEvent(BaseSocket &socket, EventOperType op_type, int32_t event_type) override
     {
         epoll_event event;
         memset(&event, 0, sizeof(event));
@@ -86,8 +86,7 @@ public:
     /*
     * 执行一次 epoll wait
     */
-    template<typename SocketType>
-    bool RunOnce()
+    bool RunOnce() override
     {
         epoll_event evt;
         time_t time_stamp = time(0);    // 时间戳
@@ -99,7 +98,7 @@ public:
         for (int32_t i = 0; i < count; i++)
         {
             epoll_event& event = events_[i];
-            SocketType* socket = static_cast<SocketType*>(event.data.ptr);
+            BaseSocket* socket = static_cast<BaseSocket*>(event.data.ptr);
             if (nullptr == socket) continue;
             if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
             {

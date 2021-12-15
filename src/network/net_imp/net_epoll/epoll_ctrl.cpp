@@ -12,7 +12,7 @@ EpollCtrl::EpollCtrl(uint max_events)
 {
 }
 
-bool EpollCtrl::CreateEpoll()
+bool EpollCtrl::CreateIOMultiplexing()
 {
     epoll_fd_ = epoll_create(max_events_);
     if (epoll_fd_ < 0)
@@ -23,7 +23,7 @@ bool EpollCtrl::CreateEpoll()
 
     return true;
 }
-void EpollCtrl::Destroy()
+void EpollCtrl::DestroyIOMultiplexing()
 {
     if (events_ != nullptr)
     {

@@ -20,19 +20,19 @@ void TcpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
 
     ImpNetwork<TcpSocket>::Init(master, network_type);
-    epoll_ctrl_.CreateEpoll();
+    epoll_ctrl_.CreateIOMultiplexing();
 }
 
 void TcpEpollNetwork::UnInit()
 {
-    epoll_ctrl_.Destroy();
+    epoll_ctrl_.DestroyIOMultiplexing();
     ImpNetwork<TcpSocket>::UnInit();
 }
 
 void TcpEpollNetwork::Update()
 {
     ImpNetwork<TcpSocket>::Update();
-    epoll_ctrl_.RunOnce<TcpSocket>();
+    epoll_ctrl_.RunOnce();
 }
 
 void TcpEpollNetwork::CloseListenInMultiplexing(int32_t socket_id)
