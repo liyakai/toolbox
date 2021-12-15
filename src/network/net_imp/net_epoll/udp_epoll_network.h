@@ -10,7 +10,7 @@ class UdpAddress;
 /*
 * 定义基于 UDP 和 Epoll 的网络
 */
-class UdpEpollNetwork  : public ImpNetwork<UdpSocket>
+class UdpEpollNetwork : public ImpNetwork<UdpSocket>
 {
 public:
     /*
