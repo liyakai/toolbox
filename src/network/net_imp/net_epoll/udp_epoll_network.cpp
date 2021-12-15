@@ -8,7 +8,6 @@
 
 UdpEpollNetwork::UdpEpollNetwork()
      : epoll_ctrl_(MAX_SOCKET_COUNT)
-  
 {
 }
 

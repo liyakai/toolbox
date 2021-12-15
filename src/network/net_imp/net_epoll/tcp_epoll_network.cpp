@@ -62,6 +62,5 @@ uint64_t TcpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
         return new_socket->GetConnID();
     }
     return INVALID_CONN_ID;
-    
 }
 #endif // __linux__
