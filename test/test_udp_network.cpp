@@ -64,8 +64,8 @@ public:
         {
             // echo 发来的信息
             // 换头后发送给 client
-             Print("收到 echo 数据长度为%d\n", size);
-             PrintData(data, 32);
+            //  Print("收到 echo 数据长度为%d\n", size);
+            //  PrintData(data, 32);
             uint64_t connect_id = 0;
             memmove(&connect_id, data + sizeof(uint32_t), sizeof(connect_id));
 
@@ -86,8 +86,8 @@ public:
         {
             // 客户端发来的消息
             // 换头后发送给 echo
-             Print("收到 client 数据长度为%d\n", size);
-             PrintData(data, 32);
+            //  Print("收到 client 数据长度为%d\n", size);
+            //  PrintData(data, 32);
 
             char* send_data = MemPoolMgr->GetMemory(size + sizeof(uint64_t));
             uint32_t send_data_size = size + sizeof(uint64_t);  
