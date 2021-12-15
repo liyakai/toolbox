@@ -71,8 +71,12 @@ void UdpSocket::Reset()
     remote_address_.Reset();
     local_address_.Reset();
     type_ = UdpType::UNKNOWN;
-    ikcp_release(kcp_);
-    kcp_ = nullptr;
+    if(nullptr != kcp_)
+    {
+        ikcp_release(kcp_);
+        kcp_ = nullptr;
+    }
+
 
     p_network_ = nullptr;
     p_sock_pool_ = nullptr;
@@ -214,7 +218,7 @@ bool UdpSocket::Bind()
     sa.sin_port = 0;
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
     // 绑定端口
-    int32_t error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
+    int32_t error = bind(socket_id_, (struct sockaddr *)&sa, sizeof(SocketAddress));
     if (error < 0)
     {
         p_network_->OnErrored(socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
@@ -379,7 +383,7 @@ bool UdpSocket::SocketRecv(int32_t socket_fd, char* data, size_t& size,  SocketA
 bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size)
 {
     // DebugPrint::PrintfData(data, 32, "KCP_SEND");
-    auto bytes = sendto(socket_fd, data, size, MSG_DONTWAIT, (struct sockaddr*)&remote_address_, sizeof(remote_address_));
+    auto bytes = sendto(socket_fd, data, size, MSG_DONTWAIT, (struct sockaddr*)&(remote_address_.GetAddress()), sizeof(SocketAddress));
     if(bytes < 0)
     {
         size = 0;
@@ -388,7 +392,7 @@ bool UdpSocket::SocketSend(int32_t socket_fd, const char* data, size_t& size)
             return true;
         } else 
         {
-            p_network_->OnErrored(GetLocalAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
+            p_network_->OnErrored(GetRemoteAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
             return false;
         }
     }
