@@ -6,32 +6,15 @@
 #include "src/network/net_imp/udp_socket.h"
 #include "time_util.h"
 
-UdpEpollNetwork::UdpEpollNetwork()
-     : epoll_ctrl_(MAX_SOCKET_COUNT)
-{
-}
-
-UdpEpollNetwork::~UdpEpollNetwork()
-{
-
-}
-
 void UdpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
+    base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
     ImpNetwork<UdpSocket>::Init(master, network_type);
-    epoll_ctrl_.CreateIOMultiplexing();
-}
-
-void UdpEpollNetwork::UnInit()
-{
-    epoll_ctrl_.DestroyIOMultiplexing();
-    ImpNetwork<UdpSocket>::UnInit();
 }
 
 void UdpEpollNetwork::Update()
 {
     ImpNetwork<UdpSocket>::Update();
-    epoll_ctrl_.RunOnce();
     if(is_kcp_open_)
     {
         auto current = GetMillSecondTimeStamp();
@@ -46,11 +29,6 @@ void UdpEpollNetwork::Update()
             socket->KcpUpdate(current);
         }
     }
-}
-
-void UdpEpollNetwork::CloseListenInMultiplexing(int32_t socket_id)
-{
-    epoll_ctrl_.DelEvent(socket_id);
 }
 
 UdpSocket* UdpEpollNetwork::GetSocketByUdpAddress(const UdpAddress& udp_address)
@@ -91,7 +69,6 @@ uint64_t UdpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t po
         {
             new_socket->OpenKcpMode();
         }
-        epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         address_to_connect_[new_socket->GetLocalAddressID()] = new_socket->GetConnID();
         return new_socket->GetLocalAddressID();
     } 
@@ -108,7 +85,6 @@ uint64_t UdpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t p
         {
             new_socket->OpenKcpMode();
         }
-        epoll_ctrl_.OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         uint64_t remote_address_id = new_socket->GetRemoteAddressID();
         address_to_connect_[remote_address_id] = new_socket->GetConnID();
         if(remote_address_id > 0)
@@ -151,7 +127,6 @@ void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, std::size_t 
     {
         socket->Send(data, size);
     }
-    
 }
 
 #endif // __linux__
