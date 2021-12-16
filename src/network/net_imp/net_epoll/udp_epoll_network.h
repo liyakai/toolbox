@@ -40,10 +40,6 @@ public:
     virtual void CloseListenInMultiplexing(int32_t socket_id) override;
 public:
     /*
-    * @brief 获取Epoll
-    */
-    EpollCtrl& GetEpollCtrl(){ return epoll_ctrl_;}
-    /*
     * @brief UdpAddress 是否存在
     * @param udp_address 远端udp地址
     * @return != nullptr:udpsocket指针; nullptr:找不到socket
