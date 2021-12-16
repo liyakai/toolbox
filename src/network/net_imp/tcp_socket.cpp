@@ -23,6 +23,7 @@
 #include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
 #include "src/network/net_imp/net_iocp/tcp_iocp_network.h"
 #include "src/network/net_imp/net_kqueue/tcp_kqueue_network.h"
+#include "imp_network.h"
 
 TcpSocket::TcpSocket()
 {
@@ -126,8 +127,8 @@ void TcpSocket::UpdateAccept()
         ReAddSocketToIocp(SOCKET_EVENT_RECV);
         break;
 #elif defined(__linux__)
-        auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
-        p_epoll_network->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #elif defined(__APPLE__)
         auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
         p_kqueue_network->GetKqueueCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
@@ -288,7 +289,7 @@ void TcpSocket::UpdateConnect()
     ReAddSocketToIocp(SOCKET_EVENT_RECV);
 #elif defined(__linux__)
     auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
-    p_epoll_network->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+    p_epoll_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #elif defined(__APPLE__)
     auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
     p_kqueue_network->GetKqueueCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);

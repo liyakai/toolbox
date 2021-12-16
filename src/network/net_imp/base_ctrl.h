@@ -21,9 +21,13 @@ public:
     */
     virtual void DestroyIOMultiplexing() = 0;
     /*
-    * 添加/删除IO多路复用
+    * 在 IO多路复用上 添加/删除 socket 
     */
     virtual bool OperEvent(BaseSocket &socket, EventOperType op_type, int32_t event_type) = 0;
+    /*
+    * 在IO多路复用删除 socket
+    */
+    virtual bool DelEvent(int socket_fd){ return true;};
     /*
     * 执行一次. e.g. epollwait;GetQueuedCompletionStatus;kevent.
     */
