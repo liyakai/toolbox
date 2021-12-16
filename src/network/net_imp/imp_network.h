@@ -2,6 +2,7 @@
 #include "src/network/network.h"
 #include "socket_pool.h"
 #include "base_ctrl.h"
+#include "udp_socket.h"
 /*
 * @file brief 网络基类 INetwork 作为纯虚函数,更多的是作为接口的存在,不关心实现细节.但各种类型的具体实现又有很多相同的地方.
 * 故,中间增加一层实现层,将据悉实现共通的部分提出,单独作为一层.
@@ -117,7 +118,7 @@ void ImpNetwork<SocketType>::CloseListenInMultiplexing(int32_t socket_id)
 template<typename SocketType>
 uint64_t ImpNetwork<SocketType>::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
 {
-    auto new_socket = sock_mgr_.Alloc();
+    auto* new_socket = sock_mgr_.Alloc();
     if(nullptr == new_socket)
     {
         OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
@@ -139,13 +140,13 @@ uint64_t ImpNetwork<SocketType>::OnNewConnecter(const std::string& ip, const uin
     if(nullptr == new_socket)
     {
         OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
-        return 0;
+        return INVALID_CONN_ID;
     }
     new_socket->SetSocketMgr(&sock_mgr_);
     new_socket->SetNetwork(this);
     if(false == new_socket->InitNewConnecter(ip, port, send_buff_size, recv_buff_size))
     {
-        return 0;
+        return INVALID_CONN_ID;
     }
     base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
     return new_socket->GetConnID();
