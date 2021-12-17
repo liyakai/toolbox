@@ -57,7 +57,7 @@ public:
     /*
     * 获取 persocket
     */
-    PerSockContext& GetPerSocket() { return per_socket_; }
+    PerSockContext* GetPerSocket() { return &per_socket_; }
     /*
     * socket 是否有效
     */
@@ -73,11 +73,11 @@ public:
     /*
     * 重置接收 PerSocket
     */
-    inline void ResetRecvPerSocket();
+    void ResetRecvPerSocket() override;
     /*
     * 重置发送 PerSocket
     */
-    inline void ResetSendPerSocket();
+    void ResetSendPerSocket() override;
     /*
     * 将 socket 建立与 iocp 的关联,只调用一次.
     */
@@ -95,7 +95,7 @@ public:
     /*
     * 获取socket状态
     */
-    SocketState GetSocketState() { return socket_state_; }
+    SocketState GetSocketState() override { return socket_state_; }
     /*
     * 更新 epoll 事件
     * @params event_type 事件类型
@@ -126,10 +126,6 @@ public:
     * 关闭套接字
     */
     void Close(ENetErrCode net_err, int32_t sys_err = 0);
-    /*
-    * 发送错误,向主线程报告
-    */
-    void OnErrored(ENetErrCode err_code, int32_t err_no);
 
 private:
     /*

@@ -55,3 +55,8 @@ int32_t BaseSocket::GetSocketError()
 #endif // __linux__
     return error;
 }
+
+void BaseSocket::OnErrored(ENetErrCode err_code, int32_t err_no)
+{
+    p_network_->OnErrored(GetConnID(), err_code, err_no);
+}
