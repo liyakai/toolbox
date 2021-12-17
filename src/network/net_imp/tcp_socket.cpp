@@ -120,9 +120,9 @@ void TcpSocket::UpdateAccept()
         // 通知主线程有新的客户端连接进来
         p_network_->OnAccepted(new_socket->GetConnID());
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
+        auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
         // 将新的连接加入iocp
-        p_iocp_network->GetIocpCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        p_iocp_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         // 将监听socket重新加入iocp
         ReAddSocketToIocp(SOCKET_EVENT_RECV);
         break;
@@ -401,11 +401,6 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     }
 }
 
-void TcpSocket::OnErrored(ENetErrCode err_code, int32_t err_no)
-{
-    p_network_->OnErrored(GetConnID(), err_code, err_no);
-}
-
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 bool TcpSocket::IsSocketValid()
 {
@@ -470,24 +465,24 @@ void TcpSocket::ResetSendPerSocket()
 
 bool TcpSocket::AssociateSocketToIocp()
 {
-    auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
+    auto tcp_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
     // 建立 socket 与 iocp 的关联
     if (nullptr == tcp_iocp_network)
     {
         return false;
     }
-    return tcp_iocp_network->GetIocpCtrl().AssociateSocketToIocp(*this);
+    return tcp_iocp_network->GetBaseCtrl()->AssociateSocketToIocp(*this);
 }
 
 bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
 {
-    auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
+    auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
     if (nullptr == p_iocp_network)
     {
         return false;
     }
     // 将监听socket重新加入iocp
-    return p_iocp_network->GetIocpCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type);
+    return p_iocp_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type);
 }
 #elif defined(__linux__) || defined(__APPLE__)
 #endif

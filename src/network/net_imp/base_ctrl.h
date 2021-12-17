@@ -32,4 +32,10 @@ public:
     * 执行一次. e.g. epollwait;GetQueuedCompletionStatus;kevent.
     */
     virtual bool RunOnce() = 0;
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    /*
+    * @brief 建立 socket 与 iocp 的关联
+    */
+    virtual bool AssociateSocketToIocp(BaseSocket& socket) { return true; };
+#endif 
 };

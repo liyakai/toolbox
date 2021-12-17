@@ -52,6 +52,10 @@ public:
     */
     void Send(const char* buffer, std::size_t length);
     /*
+    * 获取socket状态
+    */
+    virtual SocketState GetSocketState() { return SOCK_STATE_INVALIED; }
+    /*
     * 获取事件类型
     * @return 可投递事件类型
     */
@@ -60,6 +64,10 @@ public:
     * 设置可投递类型
     */
     void SetSockEventType(int32_t type) { event_type_ = type; }
+    /*
+    * 发送错误,向主线程报告
+    */
+    void OnErrored(ENetErrCode err_code, int32_t err_no);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     /*
     * 获取 socket id
@@ -69,6 +77,22 @@ public:
     * 设置 socket id
     */
     void SetSocketID(SOCKET id) { socket_id_ = id; }
+    /*
+    * 获取 persocket
+    */
+    virtual PerSockContext* GetPerSocket() { return nullptr; }
+    /*
+    * 重置接收 PerSocket
+    */
+    virtual void ResetRecvPerSocket() {};
+    /*
+    * 重置发送 PerSocket
+    */
+    virtual void ResetSendPerSocket(){};
+    /*
+    * 将 socket 建立与 iocp 的关联,只调用一次.
+    */
+    virtual bool AssociateSocketToIocp() { return true; };
 #elif defined(__linux__)
     /*
     * 获取 socket id
