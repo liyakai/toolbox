@@ -14,7 +14,7 @@ BaseSocket::~BaseSocket()
 }
 void BaseSocket::Reset()
 {
-    Close();
+    Close(ENetErrCode::NET_NO_ERROR, 0);
     conn_id_ = INVALID_CONN_ID;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
@@ -27,7 +27,7 @@ bool BaseSocket::IsSocketValid()
     return socket_id_ > 0;
 }
 
-void BaseSocket::Close()
+void BaseSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (IsSocketValid())
     {

@@ -135,7 +135,7 @@ public:
     /*
     * @brief 关闭
     */
-    void Close();
+    virtual void Close(ENetErrCode net_err, int32_t sys_err);
     /*
     * socket 是否有效
     */
