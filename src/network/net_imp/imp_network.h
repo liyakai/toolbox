@@ -46,7 +46,7 @@ public:
     /*
     * @brief 从IO多路复用种删去监听
     */
-    void CloseListenInMultiplexing(int32_t socket_id);
+    virtual void CloseListenInMultiplexing(int32_t socket_id) override;
     
 protected:
     /*

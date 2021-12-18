@@ -108,24 +108,24 @@ public:
     * @param port 监听端口
     * @retval 初始化是否成功
     */
-    bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+    bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
     /*
     * 初始化新的连接器
     * @param ip 连接IP
     * @param port 连接端口
     * @retval 初始化是否成功
     */
-    bool InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+    bool InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
     /*
     * 发送数据
     * @param data 发送数据指针
     * @param len 发送数据长度
     */
-    void Send(const char* data, size_t len);
+    void Send(const char* data, size_t len) override;
     /*
     * 关闭套接字
     */
-    void Close(ENetErrCode net_err, int32_t sys_err = 0);
+    void Close(ENetErrCode net_err, int32_t sys_err = 0) override;
 
 private:
     /*

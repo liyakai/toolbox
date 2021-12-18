@@ -50,7 +50,7 @@ public:
     * @param length 数据长度
     * @param address 目标地址
     */
-    void Send(const char* buffer, std::size_t length);
+    virtual void Send(const char* buffer, std::size_t length) = 0;
     /*
     * 获取socket状态
     */
