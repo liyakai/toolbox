@@ -130,9 +130,9 @@ void TcpSocket::UpdateAccept()
         auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
         p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #elif defined(__APPLE__)
-        auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
-        p_kqueue_network->GetKqueueCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
-        p_kqueue_network->GetKqueueCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_SEND);
+        auto p_kqueue_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_SEND);
 #endif
     }
 }
@@ -292,7 +292,7 @@ void TcpSocket::UpdateConnect()
     p_epoll_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #elif defined(__APPLE__)
     auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
-    p_kqueue_network->GetKqueueCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+    p_kqueue_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
 
     p_network_->OnConnected(GetConnID());
