@@ -392,7 +392,7 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (IsSocketValid())
     {
-        BaseSocket::Close();
+        BaseSocket::Close(net_err, sys_err);
         p_network_->CloseListenInMultiplexing(GetSocketID());
         // 通知主线程 socket 关闭
         p_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);

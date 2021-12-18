@@ -79,7 +79,7 @@ public:
             auto& event = events_[i];
             SocketType* socket = static_cast<SocketType*>(event.udata);
             if (nullptr == socket) continue;
-            if ((event.flags & EV_EOF) || (event.flags & EV_ERROR))
+            if (event.flags & EV_ERROR)
             {
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
             }
