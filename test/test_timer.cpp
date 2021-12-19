@@ -14,9 +14,10 @@ public:
 
 // 测试ITimer触发10次
 CASE(TimerCase1){
-    static TestTimer timer;
-    TimerMgr->AddTimer(&timer, 10086, 1000, 10, __FILE__, __LINE__);
-    while(false) // 打开测试将这里改为 true
+    return;
+    auto timer = std::make_shared<TestTimer>();
+    TimerMgr->AddTimer(timer, 10086, 1000, 10, __FILE__, __LINE__);
+    while(true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         TimerMgr->Update();
@@ -25,11 +26,26 @@ CASE(TimerCase1){
 
 // 测试ITimer触发无限次
 CASE(TimerCase2){
-    static TestTimer timer;
-    TimerMgr->AddTimer(&timer, 10087, 1000, -1, __FILE__, __LINE__);
+    return;
+    auto timer = std::make_shared<TestTimer>();
+    TimerMgr->AddTimer(timer, 10087, 1000, -1, __FILE__, __LINE__);
+    while(true)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        TimerMgr->Update();
+    }
+}
+
+// 测试将 ITimer 对象添加到定时器后立马 ITimer 对象的情况.
+CASE(TimerCase3){
+    return;
+    auto timer = std::make_shared<TestTimer>();
+    TimerMgr->AddTimer(timer, 10087, 1000, 10, __FILE__, __LINE__);
+    timer.reset();
     while(false) // 打开测试将这里改为 true
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        fprintf(stderr, "[定时器测试3] TimerMgr->Update() \n");
         TimerMgr->Update();
     }
 }
@@ -42,7 +58,8 @@ public:
 };
 
 // 测试回调
-CASE(TimerCase3){
+CASE(TimerCase4){
+    return;
     static auto lambda = [](IArgs* iargs, void* arg)->bool{
         if(nullptr == iargs)
         {
@@ -58,11 +75,11 @@ CASE(TimerCase3){
         fprintf(stderr,"触发 回调 类型定时器 lambda.参数为 arg1:%d,arg2:%s.\n", largs->arg1, largs->arg2.c_str());
         return true;
     };
-    static LambdaArgs largs;
+    LambdaArgs largs;
     largs.arg1 = 100;
     largs.arg2 = "参数2";
     TimerMgr->AddTimer(lambda, &largs, nullptr, 1000, -1, __FILE__, __LINE__);
-    while(false) // 打开测试将这里改为 true
+    while(true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         TimerMgr->Update();
@@ -74,7 +91,7 @@ class TestTimerDelegate
 public:
     bool OnTimer(IArgs* iargs, void* args)
     {
-                if(nullptr == iargs)
+        if(nullptr == iargs)
         {
             fprintf(stderr,"参数 iargs 为空指针.\n");
             return false;
@@ -91,13 +108,13 @@ public:
 };
 
 // 测试委托
-CASE(TimerCase4){
-    static TestTimerDelegate timer;
-    static LambdaArgs largs;
+CASE(TimerCase5){
+    TestTimerDelegate timer;
+    LambdaArgs largs;
     largs.arg1 = 100;
     largs.arg2 = "参数2";
     TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, &timer), &largs, nullptr, 1000, -1, __FILE__, __LINE__);
-    while(false) // 打开测试将这里改为 true
+    while(true) // 打开测试将这里改为 true
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         TimerMgr->Update();

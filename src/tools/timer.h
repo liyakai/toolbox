@@ -26,8 +26,6 @@ constexpr uint32_t TVR_MASK = TVR_SIZE - 1;                             // 255--
 constexpr uint32_t MAX_SLOT = 256 + 4 * 64;                             // 数组大小
 constexpr uint32_t INVALID_HTIMER = 0;
 
-
-
 /*
 * 定义定时器任务接口
 */
@@ -59,7 +57,7 @@ using TMethod = std::function<bool(IArgs*, void*)>;
 #define DelegateCombination(T_, Func_, Instance_) (XDelegate::RegisterMethod(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
 
 /*
-* 定义类函数绑定接口
+* 定义委托
 */
 class XDelegate
 {
@@ -68,7 +66,7 @@ public:
     : stub_ptr_(nullptr)
     {}
     
-    static XDelegate RegisterMethod(TMethod method)
+    static XDelegate RegisterMethod(const TMethod& method)
     {
         XDelegate xd;
         xd.stub_ptr_ = method;
@@ -77,6 +75,10 @@ public:
 
     bool operator()(IArgs* pargs, void* arg) const
     {
+        if(nullptr == stub_ptr_)
+        {
+            return false;
+        }
         return stub_ptr_(pargs, arg);
     }
 private:
@@ -102,7 +104,7 @@ public:
     * @param count 触发次数, -1为永远触发
     * @return 成功返回 Timer的句柄,失败返回 INVALID_HTIMER
     */
-    virtual HTIMER AddTimer(ITimer* timer, int32_t id, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
+    virtual HTIMER AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
     /*
     * @brief 增加定时器
     * @param delegate 定时器委托
@@ -134,14 +136,27 @@ public:
 };
 
 /*
+* @brief 定义触发类型.内部类型
+*        根据外部使用接口的不同,内部赋予不同的触发类型
+*/
+enum class ETriggerType
+{
+    ETRIGGER_INVALID = 0,   // 定义无效类型,用于初始状态
+    ETRIGGER_ONTIMER = 1,   // 定义 ITIMER 类型, 此种类型对象需要继承ITimer
+    ETRIGGER_DELEGATE = 2,  // 定义委托类型
+};
+
+
+/*
 * 定义定时器节点
 */
 struct TimerNode
 {
     TimerNode* prev = nullptr;      // 前置节点
     TimerNode* next = nullptr;      // 后置节点
-    ITimer* timer = nullptr;        // 定时器接口
     uint32_t identifier = 0;        // 透传定时器ID
+    ETriggerType trigger_type = ETriggerType::ETRIGGER_INVALID; // 定义触发类型
+    std::weak_ptr<ITimer> timer;    // 定时器接口
     XDelegate delegate;             // 委托事件
     IArgs* delegate_args = nullptr;  // 委托事件参数
     void* args = nullptr;           // 透传参数
@@ -166,14 +181,15 @@ struct TimerNode
     */
     void Reset()
     {
-        if(delegate_args)
+        if(ETriggerType::ETRIGGER_INVALID != trigger_type && nullptr != delegate_args)
         {
             delete delegate_args;
             delegate_args = nullptr;
         }
+        trigger_type = ETriggerType::ETRIGGER_INVALID;
         prev = nullptr;
         next = nullptr;
-        timer = nullptr;
+        timer.reset();
         args = nullptr;
         guid = 0;
         interval = 0;
@@ -259,9 +275,10 @@ public:
     * @param file 文件名
     * @param line 文件号
     */
-    HTIMER AddTimer(ITimer* timer, int32_t id, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override
+    HTIMER AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override
     {
-        if(nullptr == timer)
+        std::shared_ptr<ITimer> sp_timer = timer.lock();
+        if(nullptr == sp_timer)
         {
             return INVALID_HTIMER;
         }
@@ -271,6 +288,7 @@ public:
         {
             return INVALID_HTIMER;
         }
+        node->trigger_type = ETriggerType::ETRIGGER_ONTIMER;
         node->timer = timer;
         node->identifier = id;
         node->interval = interval;
@@ -321,7 +339,8 @@ public:
         {
             return INVALID_HTIMER;
         }
-        node->timer = nullptr;
+        node->trigger_type = ETriggerType::ETRIGGER_DELEGATE;
+        node->timer.reset();
         node->delegate = delegate;
         node->delegate_args = delegate_args;
         node->args = args;
@@ -420,13 +439,7 @@ public:
             {
                 auto* next = node->next;
                 ++next->curr_count;
-                if(nullptr != next->timer)
-                {
-                    next->timer->OnTimer(next->identifier, next->curr_count);
-                } else{
-                    next->delegate(next -> delegate_args, next -> args);
-                }
-                
+                OnNodeTrigger(next);
                 TimerNode::ListRemove(next);
                 if(next -> total_count < 0 || next -> curr_count < next -> total_count)
                 {
@@ -441,7 +454,6 @@ public:
             cur_time_++;
         }
     }
-
 
 private:
     /*
@@ -513,6 +525,35 @@ private:
         }
         node -> Reset();
         free_nodes_.emplace_back(node);
+    }
+    /*
+    * @brief 触发节点
+    */
+    void OnNodeTrigger(TimerNode* node)
+    {
+        if(nullptr == node)
+        {
+            return;
+        }
+        switch (node->trigger_type)
+        {
+        case ETriggerType::ETRIGGER_ONTIMER:
+            {
+                auto sp_timer = node->timer.lock();
+                if(nullptr != sp_timer)
+                {
+                    sp_timer->OnTimer(node->identifier, node->curr_count);
+                } 
+                break;
+            }
+        case ETriggerType::ETRIGGER_DELEGATE:
+        {
+            node->delegate(node -> delegate_args, node -> args);
+            break;
+        }
+        default:
+            break;
+        }     
     }
     /*
     * @brief 添加定时器
