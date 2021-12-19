@@ -56,29 +56,44 @@ public:
     int32_t arg1 = 0;
     std::string arg2;
 };
-
-// 测试回调
-CASE(TimerCase4){
-    return;
-    static auto lambda = [](IArgs* iargs, void* arg)->bool{
-        if(nullptr == iargs)
+static auto lambda = [](std::weak_ptr<IArgs> iargs, std::weak_ptr<void> arg)->bool{
+        auto args = iargs.lock();
+        if(nullptr == args)
         {
-            fprintf(stderr,"参数 iargs 为空指针.\n");
+            fprintf(stderr,"[lambda]参数 iargs 为空指针.\n");
             return false;
         }
-        auto* largs = dynamic_cast<LambdaArgs*>(iargs);
+        auto* largs = dynamic_cast<LambdaArgs*>(args.get());
         if(nullptr == largs)
         {
-            fprintf(stderr,"参数 iargs 向子类转换失败.\n");
+            fprintf(stderr,"[lambda]参数 args 向子类转换失败.\n");
             return false;
         }
         fprintf(stderr,"触发 回调 类型定时器 lambda.参数为 arg1:%d,arg2:%s.\n", largs->arg1, largs->arg2.c_str());
         return true;
     };
-    LambdaArgs largs;
-    largs.arg1 = 100;
-    largs.arg2 = "参数2";
-    TimerMgr->AddTimer(lambda, &largs, nullptr, 1000, -1, __FILE__, __LINE__);
+// 测试回调lambda
+CASE(TimerCase4){
+    return;
+    auto largs = std::make_shared<LambdaArgs>();
+    largs->arg1 = 100;
+    largs->arg2 = "参数2";
+    TimerMgr->AddTimer(lambda, largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    while(true)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        TimerMgr->Update();
+    }
+}
+
+// 测试回调lambda 参数AddTimer之后立马重置
+CASE(TimerCase5){
+    return;
+    auto largs = std::make_shared<LambdaArgs>();
+    largs->arg1 = 100;
+    largs->arg2 = "参数2";
+    TimerMgr->AddTimer(lambda, largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    largs.reset();
     while(true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -89,31 +104,50 @@ CASE(TimerCase4){
 class TestTimerDelegate
 {
 public:
-    bool OnTimer(IArgs* iargs, void* args)
+    bool OnTimer(std::weak_ptr<IArgs> iargs, std::weak_ptr<void> arg)
     {
-        if(nullptr == iargs)
+        auto args = iargs.lock();
+        if(nullptr == args)
         {
-            fprintf(stderr,"参数 iargs 为空指针.\n");
+            fprintf(stderr,"[TestTimerDelegate]参数 iargs 为空指针.\n");
             return false;
         }
-        auto* largs = dynamic_cast<LambdaArgs*>(iargs);
+        auto* largs = dynamic_cast<LambdaArgs*>(args.get());
         if(nullptr == largs)
         {
-            fprintf(stderr,"参数 iargs 向子类转换失败.\n");
+            fprintf(stderr,"[TestTimerDelegate]参数 args 向子类转换失败.\n");
             return false;
         }
-        fprintf(stderr,"触发 Delegate 类型定时器 lambda.参数为 arg1:%d,arg2:%s.\n", largs->arg1, largs->arg2.c_str());
+        fprintf(stderr,"触发 Delegate 类型定时器 .参数为 arg1:%d,arg2:%s.\n", largs->arg1, largs->arg2.c_str());
         return true;
     }
 };
 
 // 测试委托
-CASE(TimerCase5){
-    TestTimerDelegate timer;
-    LambdaArgs largs;
-    largs.arg1 = 100;
-    largs.arg2 = "参数2";
-    TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, &timer), &largs, nullptr, 1000, -1, __FILE__, __LINE__);
+CASE(TimerCase6){
+    return;
+    auto timer = std::make_shared<TestTimerDelegate>();
+    auto largs = std::make_shared<LambdaArgs>();
+    largs->arg1 = 100;
+    largs->arg2 = "参数2";
+    TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, timer), largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    while(true) // 打开测试将这里改为 true
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        TimerMgr->Update();
+    }
+}
+
+// 测试委托 测试对象和参数在AddTimer后立马重置
+CASE(TimerCase7){
+    return;
+    auto timer = std::make_shared<TestTimerDelegate>();
+    auto largs = std::make_shared<LambdaArgs>();
+    largs->arg1 = 100;
+    largs->arg2 = "参数2";
+    TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, timer), largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    timer.reset();
+    largs.reset();
     while(true) // 打开测试将这里改为 true
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

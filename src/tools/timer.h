@@ -53,7 +53,7 @@ public:
     virtual ~IArgs(){}
 };
 
-using TMethod = std::function<bool(IArgs*, void*)>;
+using TMethod = std::function<bool(std::weak_ptr<IArgs>, std::weak_ptr<void>)>;
 #define DelegateCombination(T_, Func_, Instance_) (XDelegate::RegisterMethod(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
 
 /*
@@ -73,7 +73,7 @@ public:
         return xd;
     }
 
-    bool operator()(IArgs* pargs, void* arg) const
+    bool operator()(std::weak_ptr<IArgs> pargs, std::weak_ptr<void> arg) const
     {
         if(nullptr == stub_ptr_)
         {
@@ -114,7 +114,7 @@ public:
     * @param count 触发次数, -1为永远触发
     * @return 成功返回 Timer的句柄,失败返回 INVALID_HTIMER
     */
-    virtual HTIMER AddTimer(const XDelegate& delegate, IArgs *args, void *arg, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
+    virtual HTIMER AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> args, std::weak_ptr<void> arg, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
 
     /*
     * @brief Timer过多长时间后会触发
@@ -158,8 +158,8 @@ struct TimerNode
     ETriggerType trigger_type = ETriggerType::ETRIGGER_INVALID; // 定义触发类型
     std::weak_ptr<ITimer> timer;    // 定时器接口
     XDelegate delegate;             // 委托事件
-    IArgs* delegate_args = nullptr;  // 委托事件参数
-    void* args = nullptr;           // 透传参数
+    std::weak_ptr<IArgs> delegate_args;  // 委托事件参数
+    std::weak_ptr<void> args;           // 透传参数
     int64_t expire_time = 0;        // 超时时间
     HTIMER guid = 0;                // 唯一标识
     int32_t interval = 0;           // 间隔
@@ -181,16 +181,12 @@ struct TimerNode
     */
     void Reset()
     {
-        if(ETriggerType::ETRIGGER_INVALID != trigger_type && nullptr != delegate_args)
-        {
-            delete delegate_args;
-            delegate_args = nullptr;
-        }
         trigger_type = ETriggerType::ETRIGGER_INVALID;
         prev = nullptr;
         next = nullptr;
         timer.reset();
-        args = nullptr;
+        delegate_args.reset();
+        args.reset();
         guid = 0;
         interval = 0;
         total_count = 0;
@@ -255,17 +251,11 @@ public:
     /*
     * 构造
     */
-    TimerWheel()
-    {
-        Init();
-    }
+    TimerWheel();
     /*
     * 析构
     */
-    virtual ~TimerWheel()
-    {
-        UnInit();
-    }
+    virtual ~TimerWheel();
     /*
     * @brief 添加定时器任务
     * @param timer 定时器接口
@@ -275,35 +265,7 @@ public:
     * @param file 文件名
     * @param line 文件号
     */
-    HTIMER AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override
-    {
-        std::shared_ptr<ITimer> sp_timer = timer.lock();
-        if(nullptr == sp_timer)
-        {
-            return INVALID_HTIMER;
-        }
-
-        auto* node = GetFreeNode();
-        if(nullptr == node)
-        {
-            return INVALID_HTIMER;
-        }
-        node->trigger_type = ETriggerType::ETRIGGER_ONTIMER;
-        node->timer = timer;
-        node->identifier = id;
-        node->interval = interval;
-        node->total_count = count;
-        node->file = file;
-        node->line = line;
-        if(node->interval >= INT32_MAX)
-        {
-            node->interval = INT32_MAX;
-        }
-        node->expire_time = cur_time_ + node->interval;
-        node->guid = GetNewTimerID();
-        AddTimer(node);
-        return node->guid;
-    }
+    HTIMER AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override;
     /*
     * @brief 添加定时器任务 
     * @param callback 定时器回调
@@ -314,14 +276,7 @@ public:
     * @param file 文件名
     * @param line 文件号
     */
-    HTIMER AddTimer(const std::function<bool(IArgs*, void*)>& callback, IArgs* delegate_args, void* args, int32_t interval, int32_t count, const std::string file = "", int32_t line = 0)
-    {
-        if(nullptr == callback)
-        {
-            return INVALID_HTIMER;
-        }
-        return AddTimer(XDelegate::RegisterMethod(callback), delegate_args, args, interval, count, file, line);
-    }
+    HTIMER AddTimer(const TMethod& callback, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string file = "", int32_t line = 0);
     /*
     * @brief 添加定时器任务 
     * @param delegate 类函数接口委托
@@ -332,167 +287,39 @@ public:
     * @param file 文件名
     * @param line 文件号
     */
-    HTIMER AddTimer(const XDelegate& delegate, IArgs* delegate_args, void* args, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override
-    {
-        auto* node = GetFreeNode();
-        if(nullptr == node)
-        {
-            return INVALID_HTIMER;
-        }
-        node->trigger_type = ETriggerType::ETRIGGER_DELEGATE;
-        node->timer.reset();
-        node->delegate = delegate;
-        node->delegate_args = delegate_args;
-        node->args = args;
-        node->interval = interval;
-        node->total_count = count;
-        node->file = file;
-        node->line = line;
-        if(node->interval >= INT32_MAX)
-        {
-            node->interval = INT32_MAX;
-        }
-        node->expire_time = cur_time_ + node->interval;
-        node->guid = GetNewTimerID();
-        AddTimer(node);
-        return node->guid;
-    }
+    HTIMER AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override;
     /*
     * @brief Timer过多长时间后会触发
     * @param timer 句柄
     * @return 返回剩余毫秒数
     */
-    int32_t GetTimeLeft(HTIMER timer) override
-    {
-        auto iter = all_timers_.find(timer);
-        if(iter == all_timers_.end())
-        {
-            return 0;
-        }
-        return static_cast<uint32_t>(iter->second->expire_time - cur_time_);
-    }
+    int32_t GetTimeLeft(HTIMER timer) override;
     /*
     * @brief 删除一个定时器节点
     * @return timer 定时器句柄
     */
-    void KillTimer(HTIMER timer) override
-    {
-        auto iter = all_timers_.find(timer);
-        if(iter == all_timers_.end())
-        {
-            return;
-        }
-        auto* node = iter->second;
-        if(nullptr == node)
-        {
-            return;
-        }
-        TimerNode::ListRemove(node);
-        all_timers_.erase(iter);
-        AddFreeNode(node);
-    }
+    void KillTimer(HTIMER timer) override;
     /*
     * @brief 释放定时器
     * @return void
     */
-    void Release() override
-    {
-        UnInit();
-    }
+    void Release() override;
     /*
     * @brief 执行一次更新
     * @return void
     */
-    void Update() override
-    {
-        // 获取现在的毫秒数
-        int64_t now_time = GetMilliSecond();
-        if(0 == last_update_time_)
-        {
-            // 第一次 Update 只更新 last_update_time_
-            last_update_time_ = now_time;
-            return;
-        }
-        // 时间流逝的毫秒数
-        int64_t time_delta = now_time - last_update_time_;
-        if(0 == time_delta)
-        {
-            return;
-        }
-        // 用"现在的毫秒数" 更新 "上次更新时间"
-        last_update_time_ = now_time;   
-        // 设置时间轮时钟的最新值
-        int64_t new_time = cur_time_ + time_delta;
-        while(cur_time_ < new_time)
-        {
-            int32_t idx = cur_time_ & TVR_MASK;
-            // 当前时间低8位如果为0,则把外层时间轮上的时间节点往内层转移
-            if(0 == idx
-                && 0 == CascadeTime(OFFSET(0), INDEX(cur_time_, 0))
-                && 0 == CascadeTime(OFFSET(1), INDEX(cur_time_, 1))
-                && 0 == CascadeTime(OFFSET(2), INDEX(cur_time_, 2)))
-                {
-                    CascadeTime(OFFSET(3), INDEX(cur_time_, 3));
-                }
-            auto* node = &timer_nodes_[idx];
-            while(node -> next != node)
-            {
-                auto* next = node->next;
-                ++next->curr_count;
-                OnNodeTrigger(next);
-                TimerNode::ListRemove(next);
-                if(next -> total_count < 0 || next -> curr_count < next -> total_count)
-                {
-                    next -> expire_time = cur_time_ + next -> interval;
-                    AddTimer(next);
-                } else
-                {
-                    all_timers_.erase(next->guid);
-                    AddFreeNode(next);
-                }
-            }
-            cur_time_++;
-        }
-    }
-
+    void Update() override;
 private:
     /*
     * @brief 初始化时间轮
     * @return void
     */
-    void Init()
-    {
-        for(auto &iter : timer_nodes_)
-        {
-            auto* head = &iter;
-            head -> next = head;
-            head -> prev = head;
-        }
-    }
+    void Init();
     /*
     * @brief 释放时间轮
     * @return void
     */
-    void UnInit()
-    {
-        for(auto& iter : timer_nodes_)
-        {
-            auto* node = &iter;
-            while(node -> next != node)
-            {
-                auto* node_to_del = node -> next;
-                TimerNode::ListRemove(node_to_del);
-                AddFreeNode(node_to_del);
-            }
-        }
-        for(auto &p : free_nodes_)
-        {
-            delete p;
-            p = nullptr;
-        }
-        all_timers_.clear();
-        free_nodes_.clear();
-    }
+    void UnInit();
     /*
     * @brief 获取一个新的ID
     * @return HTIMER
@@ -504,123 +331,27 @@ private:
     /*
     * @brief 获取空闲的节点
     */
-    TimerNode* GetFreeNode()
-    {
-        if(free_nodes_.empty())
-        {
-            return new TimerNode();
-        }
-        auto* node = free_nodes_.front();
-        free_nodes_.pop_front();
-        return node;
-    }
+    TimerNode* GetFreeNode();
     /*
     * @brief 添加空闲节点
     */
-    void AddFreeNode(TimerNode* node)
-    {
-        if(nullptr == node)
-        {
-            return;
-        }
-        node -> Reset();
-        free_nodes_.emplace_back(node);
-    }
+    void AddFreeNode(TimerNode* node);
     /*
     * @brief 触发节点
     */
-    void OnNodeTrigger(TimerNode* node)
-    {
-        if(nullptr == node)
-        {
-            return;
-        }
-        switch (node->trigger_type)
-        {
-        case ETriggerType::ETRIGGER_ONTIMER:
-            {
-                auto sp_timer = node->timer.lock();
-                if(nullptr != sp_timer)
-                {
-                    sp_timer->OnTimer(node->identifier, node->curr_count);
-                } 
-                break;
-            }
-        case ETriggerType::ETRIGGER_DELEGATE:
-        {
-            node->delegate(node -> delegate_args, node -> args);
-            break;
-        }
-        default:
-            break;
-        }     
-    }
+    void OnNodeTrigger(TimerNode* node);
     /*
     * @brief 添加定时器
     */
-    void AddTimer(TimerNode* node)
-    {
-        if(nullptr == node)
-        {
-            return;
-        }
-        int32_t slot_idx = 0;
-        int64_t delay = node -> expire_time - cur_time_;
-        if(delay < 0)
-        {
-            // 已经超时的定时器放入最内层时间轮的随机位置
-            slot_idx = cur_time_ & TVR_MASK;
-        } else if(delay < TVR_SIZE)
-        {
-            // 第一层的索引为低8位的值
-            slot_idx = node -> expire_time & TVR_MASK;
-        } else if(delay < (1 << (TVR_BITS + TVN_BITS)))
-        {
-            // 第二层的索引偏移量+9-14位值
-            slot_idx = OFFSET(0) + INDEX(node->expire_time, 0);
-        } else if(delay < (1 << (TVR_BITS + 2 * TVN_BITS)))
-        {
-            // 第三层的索引为偏移值+15-20位值
-            slot_idx = OFFSET(1) + INDEX(node->expire_time, 1);
-        } else if(delay < (1 << (TVR_BITS + 3 * TVN_BITS)))
-        {
-            // 第四层的索引为偏移量+21-26位值
-            slot_idx = OFFSET(2) + INDEX(node->expire_time, 2);
-        } else
-        {
-            // 最外层的索引为偏移量+27-32位值
-            slot_idx = OFFSET(3) + INDEX(node->expire_time,3);
-        }
-        
-        all_timers_[node->guid] = node;
-        auto* head = &timer_nodes_[slot_idx];
-        TimerNode::ListAdd(head, node);
-    }
+    void AddTimer(TimerNode* node);
     /*
     * @brief 外层的时间节点向内层转移.
     */
-    int32_t CascadeTime(int32_t off, int32_t index)
-    {
-        int32_t slot_idx = off + index;
-        auto* node = &timer_nodes_[slot_idx];
-        while(node->next != node)
-        {
-            auto* next = node -> next;
-            TimerNode::ListRemove(next);
-            AddTimer(next);
-        }
-        return index;
-    }
+    int32_t CascadeTime(int32_t off, int32_t index);
     /*
     * @brief 获取毫秒数
     */
-    uint64_t GetMilliSecond()
-    {
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch());
-
-        return ms.count();
-    }
+    uint64_t GetMilliSecond();
 private: 
     using TimersMap = std::unordered_map<HTIMER, TimerNode*>;
     using FreeNode = std::deque<TimerNode*>;
@@ -633,6 +364,303 @@ private:
     int64_t cur_time_ = 0;              // 时间轮当前时间
     int64_t last_update_time_ = 0;      // 上次更新时间
 };
+
+TimerWheel::TimerWheel()
+{
+    Init();
+}
+TimerWheel:: ~TimerWheel()
+{
+    UnInit();
+}
+
+HTIMER TimerWheel::AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string &file, int32_t line)
+{
+    std::shared_ptr<ITimer> sp_timer = timer.lock();
+    if(nullptr == sp_timer)
+    {
+        return INVALID_HTIMER;
+    }
+
+    auto* node = GetFreeNode();
+    if(nullptr == node)
+    {
+        return INVALID_HTIMER;
+    }
+    node->trigger_type = ETriggerType::ETRIGGER_ONTIMER;
+    node->timer = timer;
+    node->identifier = id;
+    node->interval = interval;
+    node->total_count = count;
+    node->file = file;
+    node->line = line;
+    if(node->interval >= INT32_MAX)
+    {
+        node->interval = INT32_MAX;
+    }
+    node->expire_time = cur_time_ + node->interval;
+    node->guid = GetNewTimerID();
+    AddTimer(node);
+    return node->guid;
+}
+
+HTIMER TimerWheel::AddTimer(const TMethod& callback, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string file, int32_t line)
+{
+    if(nullptr == callback)
+    {
+        return INVALID_HTIMER;
+    }
+    return AddTimer(XDelegate::RegisterMethod(callback), delegate_args, args, interval, count, file, line);
+}
+
+HTIMER TimerWheel::AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file, int32_t line)
+{
+    auto* node = GetFreeNode();
+    if(nullptr == node)
+    {
+        return INVALID_HTIMER;
+    }
+    node->trigger_type = ETriggerType::ETRIGGER_DELEGATE;
+    node->timer.reset();
+    node->delegate = delegate;
+    node->delegate_args = delegate_args;
+    node->args = args;
+    node->interval = interval;
+    node->total_count = count;
+    node->file = file;
+    node->line = line;
+    if(node->interval >= INT32_MAX)
+    {
+        node->interval = INT32_MAX;
+    }
+    node->expire_time = cur_time_ + node->interval;
+    node->guid = GetNewTimerID();
+    AddTimer(node);
+    return node->guid;
+}
+
+int32_t TimerWheel::GetTimeLeft(HTIMER timer)
+{
+    auto iter = all_timers_.find(timer);
+    if(iter == all_timers_.end())
+    {
+        return 0;
+    }
+    return static_cast<uint32_t>(iter->second->expire_time - cur_time_);
+}
+
+void TimerWheel::KillTimer(HTIMER timer)
+{
+    auto iter = all_timers_.find(timer);
+    if(iter == all_timers_.end())
+    {
+        return;
+    }
+    auto* node = iter->second;
+    if(nullptr == node)
+    {
+        return;
+    }
+    TimerNode::ListRemove(node);
+    all_timers_.erase(iter);
+    AddFreeNode(node);
+}
+
+void TimerWheel::Release()
+{
+    UnInit();
+}
+
+void TimerWheel::Update()
+{
+    // 获取现在的毫秒数
+    int64_t now_time = GetMilliSecond();
+    if(0 == last_update_time_)
+    {
+        // 第一次 Update 只更新 last_update_time_
+        last_update_time_ = now_time;
+        return;
+    }
+    // 时间流逝的毫秒数
+    int64_t time_delta = now_time - last_update_time_;
+    if(0 == time_delta)
+    {
+        return;
+    }
+    // 用"现在的毫秒数" 更新 "上次更新时间"
+    last_update_time_ = now_time;   
+    // 设置时间轮时钟的最新值
+    int64_t new_time = cur_time_ + time_delta;
+    while(cur_time_ < new_time)
+    {
+        int32_t idx = cur_time_ & TVR_MASK;
+        // 当前时间低8位如果为0,则把外层时间轮上的时间节点往内层转移
+        if(0 == idx
+            && 0 == CascadeTime(OFFSET(0), INDEX(cur_time_, 0))
+            && 0 == CascadeTime(OFFSET(1), INDEX(cur_time_, 1))
+            && 0 == CascadeTime(OFFSET(2), INDEX(cur_time_, 2)))
+            {
+                CascadeTime(OFFSET(3), INDEX(cur_time_, 3));
+            }
+        auto* node = &timer_nodes_[idx];
+        while(node -> next != node)
+        {
+            auto* next = node->next;
+            ++next->curr_count;
+            OnNodeTrigger(next);
+            TimerNode::ListRemove(next);
+            if(next -> total_count < 0 || next -> curr_count < next -> total_count)
+            {
+                next -> expire_time = cur_time_ + next -> interval;
+                AddTimer(next);
+            } else
+            {
+                all_timers_.erase(next->guid);
+                AddFreeNode(next);
+            }
+        }
+        cur_time_++;
+    }
+}
+
+void TimerWheel::Init()
+{
+    for(auto &iter : timer_nodes_)
+    {
+        auto* head = &iter;
+        head -> next = head;
+        head -> prev = head;
+    }
+}
+
+void TimerWheel::UnInit()
+{
+    for(auto& iter : timer_nodes_)
+    {
+        auto* node = &iter;
+        while(node -> next != node)
+        {
+            auto* node_to_del = node -> next;
+            TimerNode::ListRemove(node_to_del);
+            AddFreeNode(node_to_del);
+        }
+    }
+    for(auto &p : free_nodes_)
+    {
+        delete p;
+        p = nullptr;
+    }
+    all_timers_.clear();
+    free_nodes_.clear();
+}
+
+TimerNode* TimerWheel::GetFreeNode()
+{
+    if(free_nodes_.empty())
+    {
+        return new TimerNode();
+    }
+    auto* node = free_nodes_.front();
+    free_nodes_.pop_front();
+    return node;
+}
+
+void TimerWheel::AddFreeNode(TimerNode* node)
+{
+    if(nullptr == node)
+    {
+        return;
+    }
+    node -> Reset();
+    free_nodes_.emplace_back(node);
+}
+
+void TimerWheel::OnNodeTrigger(TimerNode* node)
+{
+    if(nullptr == node)
+    {
+        return;
+    }
+    switch (node->trigger_type)
+    {
+    case ETriggerType::ETRIGGER_ONTIMER:
+        {
+            auto sp_timer = node->timer.lock();
+            if(nullptr != sp_timer)
+            {
+                sp_timer->OnTimer(node->identifier, node->curr_count);
+            } 
+            break;
+        }
+    case ETriggerType::ETRIGGER_DELEGATE:
+    {
+        node->delegate(node -> delegate_args, node -> args);
+        break;
+    }
+    default:
+        break;
+    }     
+}
+
+void TimerWheel::AddTimer(TimerNode* node)
+{
+    if(nullptr == node)
+    {
+        return;
+    }
+    int32_t slot_idx = 0;
+    int64_t delay = node -> expire_time - cur_time_;
+    if(delay < 0)
+    {
+        // 已经超时的定时器放入最内层时间轮的随机位置
+        slot_idx = cur_time_ & TVR_MASK;
+    } else if(delay < TVR_SIZE)
+    {
+        // 第一层的索引为低8位的值
+        slot_idx = node -> expire_time & TVR_MASK;
+    } else if(delay < (1 << (TVR_BITS + TVN_BITS)))
+    {
+        // 第二层的索引偏移量+9-14位值
+        slot_idx = OFFSET(0) + INDEX(node->expire_time, 0);
+    } else if(delay < (1 << (TVR_BITS + 2 * TVN_BITS)))
+    {
+        // 第三层的索引为偏移值+15-20位值
+        slot_idx = OFFSET(1) + INDEX(node->expire_time, 1);
+    } else if(delay < (1 << (TVR_BITS + 3 * TVN_BITS)))
+    {
+        // 第四层的索引为偏移量+21-26位值
+        slot_idx = OFFSET(2) + INDEX(node->expire_time, 2);
+    } else
+    {
+        // 最外层的索引为偏移量+27-32位值
+        slot_idx = OFFSET(3) + INDEX(node->expire_time,3);
+    }
+    
+    all_timers_[node->guid] = node;
+    auto* head = &timer_nodes_[slot_idx];
+    TimerNode::ListAdd(head, node);
+}
+
+int32_t TimerWheel::CascadeTime(int32_t off, int32_t index)
+{
+    int32_t slot_idx = off + index;
+    auto* node = &timer_nodes_[slot_idx];
+    while(node->next != node)
+    {
+        auto* next = node -> next;
+        TimerNode::ListRemove(next);
+        AddTimer(next);
+    }
+    return index;
+}
+
+uint64_t TimerWheel::GetMilliSecond()
+{
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch());
+
+    return ms.count();
+}
 
 /*
 * 定义定时器管理器单件
