@@ -32,6 +32,30 @@ public:
     */
     virtual void UpdateEvent(SockEventType event_type, time_t ts) = 0;
     /*
+    * @brief 监听(模拟)
+    * @param ip 地址
+    * @param port 端口
+    */
+    virtual bool InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+    /*
+    * @brief 连接
+    * @param ip 地址
+    * @param port 端口
+    * @return 是否成功
+    */
+    virtual bool InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+    /*
+    * @brief 发送 [原生UDP发送接口,不适用于kcp等协议的发送入口]
+    * @param buffer 数据指针
+    * @param length 数据长度
+    * @param address 目标地址
+    */
+    virtual void Send(const char* buffer, std::size_t length) = 0;
+    /*
+    * 获取socket状态
+    */
+    virtual SocketState GetSocketState() { return SOCK_STATE_INVALIED; }
+    /*
     * 获取事件类型
     * @return 可投递事件类型
     */
@@ -40,6 +64,10 @@ public:
     * 设置可投递类型
     */
     void SetSockEventType(int32_t type) { event_type_ = type; }
+    /*
+    * 发送错误,向主线程报告
+    */
+    void OnErrored(ENetErrCode err_code, int32_t err_no);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     /*
     * 获取 socket id
@@ -49,6 +77,22 @@ public:
     * 设置 socket id
     */
     void SetSocketID(SOCKET id) { socket_id_ = id; }
+    /*
+    * 获取 persocket
+    */
+    virtual PerSockContext* GetPerSocket() { return nullptr; }
+    /*
+    * 重置接收 PerSocket
+    */
+    virtual void ResetRecvPerSocket() {};
+    /*
+    * 重置发送 PerSocket
+    */
+    virtual void ResetSendPerSocket(){};
+    /*
+    * 将 socket 建立与 iocp 的关联,只调用一次.
+    */
+    virtual bool AssociateSocketToIocp() { return true; };
 #elif defined(__linux__)
     /*
     * 获取 socket id
@@ -68,6 +112,16 @@ public:
     * @params bool
     */
     void SetCtrlAdd(bool value) { is_ctrl_add_ = value; }
+#elif defined(__APPLE__)
+    /*
+    * 获取 socket id
+    */
+    int32_t GetSocketID() { return socket_id_; }
+    /*
+    * 设置 socket id
+    */
+    void SetSocketID(int32_t id) { socket_id_ = id; }
+
 #endif
 
     /* 
@@ -81,7 +135,7 @@ public:
     /*
     * @brief 关闭
     */
-    void Close();
+    virtual void Close(ENetErrCode net_err, int32_t sys_err);
     /*
     * socket 是否有效
     */
@@ -99,6 +153,8 @@ protected:
 #elif defined(__linux__)
     int32_t socket_id_ = -1;                        // socket_id
     bool is_ctrl_add_ = false;                      // 是否已经执行过 EPOLL_CTL_ADD
+#elif defined(__APPLE__)
+    int32_t socket_id_ = -1;                        // socket_id
 #endif
     int32_t event_type_ = SOCKET_EVENT_INVALID;     // socket 可响应的事件类型
     INetwork* p_network_ = nullptr;                 // 工作线程

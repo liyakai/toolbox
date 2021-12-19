@@ -8,7 +8,13 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <linux/tcp.h> // TCP_NODELAY
-#endif // __linux__
+#elif defined(__APPLE__)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netinet/tcp.h>
+#endif
 
 #include <string.h>
 #include <errno.h>
@@ -16,6 +22,8 @@
 #include "src/network/net_imp/socket_pool.h"
 #include "src/network/net_imp/net_epoll/tcp_epoll_network.h"
 #include "src/network/net_imp/net_iocp/tcp_iocp_network.h"
+#include "src/network/net_imp/net_kqueue/tcp_kqueue_network.h"
+#include "imp_network.h"
 
 TcpSocket::TcpSocket()
 {
@@ -67,8 +75,7 @@ void TcpSocket::Reset()
 void TcpSocket::UpdateAccept()
 {
     int32_t client_fd = 0; // 客户端套接字
-    sockaddr_in addr;
-    socklen_t addr_len = sizeof(sockaddr_in);
+    SocketAddress addr;
 
     while (true)
     {
@@ -85,7 +92,8 @@ void TcpSocket::UpdateAccept()
             addr = *remote_address;
         }
         if(INVALID_SOCKET == client_fd)
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
+        socklen_t addr_len = sizeof(SocketAddress);
         memset(&addr, 0, addr_len);
         // 接受客户端连接
         client_fd = accept(socket_id_, (sockaddr*)&addr, &addr_len);
@@ -112,15 +120,19 @@ void TcpSocket::UpdateAccept()
         // 通知主线程有新的客户端连接进来
         p_network_->OnAccepted(new_socket->GetConnID());
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
+        auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
         // 将新的连接加入iocp
-        p_iocp_network->GetIocpCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        p_iocp_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         // 将监听socket重新加入iocp
         ReAddSocketToIocp(SOCKET_EVENT_RECV);
         break;
 #elif defined(__linux__)
-        auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
-        p_epoll_network->GetEpollCtrl().OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+#elif defined(__APPLE__)
+        auto p_kqueue_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_SEND);
 #endif
     }
 }
@@ -141,7 +153,7 @@ bool TcpSocket::InitAccpetSocket(TcpSocket *socket, int32_t socket_fd, std::stri
     {
         return false;
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
 #endif
 
@@ -169,7 +181,7 @@ void TcpSocket::UpdateRecv()
         return;
     }
     ReAddSocketToIocp(SOCKET_EVENT_RECV);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     while (size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
     {
         int32_t bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
@@ -207,7 +219,7 @@ int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, 0);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
 #endif
     if (recv_bytes > 0)
@@ -223,7 +235,7 @@ int32_t TcpSocket::SocketRecv(int32_t socket_fd, char *data, size_t size)
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         int32_t last_errno = GetSocketError();
         if ((0 == last_errno) || (WSAEINTR == last_errno) || (WSAEINPROGRESS == last_errno) || (WSAEWOULDBLOCK == last_errno))
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
         if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
 #endif
         {
@@ -277,7 +289,10 @@ void TcpSocket::UpdateConnect()
     ReAddSocketToIocp(SOCKET_EVENT_RECV);
 #elif defined(__linux__)
     auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
-    p_epoll_network->GetEpollCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+    p_epoll_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+#elif defined(__APPLE__)
+    auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
+    p_kqueue_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #endif
 
     p_network_->OnConnected(GetConnID());
@@ -287,13 +302,13 @@ void TcpSocket::UpdateSend()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     send_ring_buffer_.AdjustReadPos(per_socket_.io_send.wsa_buf.len);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
     while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
     {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         ReAddSocketToIocp(SOCKET_EVENT_SEND);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
         int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
         if (bytes < 0)
         {
@@ -314,7 +329,7 @@ int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     int32_t send_bytes = 0; //send(socket_fd, data, (int32_t)size, 0);
     return send_bytes;
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     int32_t send_bytes = send(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
 #endif
     if (send_bytes < 0)
@@ -322,7 +337,7 @@ int32_t TcpSocket::SocketSend(int32_t socket_fd, const char *data, size_t size)
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         int32_t last_errno = GetSocketError();
         if((0 == last_errno) || (WSAEINTR == last_errno) || (WSAEINPROGRESS == last_errno) || (WSAEWOULDBLOCK == last_errno))
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
         if ((0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
 #endif
         {
@@ -377,17 +392,13 @@ void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (IsSocketValid())
     {
-        BaseSocket::Close();
+        BaseSocket::Close(net_err, sys_err);
+        p_network_->CloseListenInMultiplexing(GetSocketID());
         // 通知主线程 socket 关闭
         p_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
         socket_state_ = SocketState::SOCK_STATE_INVALIED;
         p_sock_pool_->Free(this);
     }
-}
-
-void TcpSocket::OnErrored(ENetErrCode err_code, int32_t err_no)
-{
-    p_network_->OnErrored(GetConnID(), err_code, err_no);
 }
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -454,26 +465,26 @@ void TcpSocket::ResetSendPerSocket()
 
 bool TcpSocket::AssociateSocketToIocp()
 {
-    auto tcp_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
+    auto tcp_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
     // 建立 socket 与 iocp 的关联
     if (nullptr == tcp_iocp_network)
     {
         return false;
     }
-    return tcp_iocp_network->GetIocpCtrl().AssociateSocketToIocp(*this);
+    return tcp_iocp_network->GetBaseCtrl()->AssociateSocketToIocp(*this);
 }
 
 bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
 {
-    auto p_iocp_network = dynamic_cast<TcpIocpNetwork*>(p_network_);
+    auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
     if (nullptr == p_iocp_network)
     {
         return false;
     }
     // 将监听socket重新加入iocp
-    return p_iocp_network->GetIocpCtrl().OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type);
+    return p_iocp_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type);
 }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
 
 
@@ -524,7 +535,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     socket_id_ = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
     if(socket_id_ == INVALID_SOCKET)
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_id_ < 0)
 #endif
@@ -543,7 +554,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
     {
         sa.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     sa.sin_addr.s_addr = INADDR_ANY;
     if (0 != ip.size())
     {
@@ -574,11 +585,11 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
         return false;
     }
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     socket_state_ = SocketState::SOCK_STATE_LISTENING;
 #endif
     // 用于监听的 socket 只能接受"接收","错误"事件.
-    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_RECV;
+    event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_ERR;
     return true;
 }
 
@@ -614,7 +625,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     {
         sa.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     sa.sin_addr.s_addr = INADDR_ANY;
     if (0 != ip.size())
     {
@@ -627,7 +638,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     int32_t error = connect(socket_id_, (struct sockaddr *)&sa, sizeof(struct sockaddr));
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     if (error < 0 && ((WSAEWOULDBLOCK != GetSysErrNo()) && (WSAEISCONN != GetSysErrNo())))
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
 #endif
     {
@@ -642,7 +653,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     {
         return false;
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
     socket_state_ = SocketState::SOCK_STATE_CONNECTING;
     // 用于主动连接的 socket 可接受 "发送","接收","错误" 事件.
@@ -683,7 +694,7 @@ void TcpSocket::Send(const char* data, size_t len)
         send_ring_buffer_.Write(data + sended, len - sended);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         ReAddSocketToIocp(SOCKET_EVENT_SEND);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #endif
     }   
     // MemPoolMgr->GiveBack(const_cast<char*>(data), "TcpSocket::Send");
@@ -701,7 +712,7 @@ int32_t TcpSocket::SetNonBlocking(int32_t fd)
     {
         return 1;
     }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     if (fd < 0)
     {
         return 1;
@@ -741,10 +752,13 @@ int32_t TcpSocket::SetReuseAddrOn(int32_t fd)
 int32_t TcpSocket::SetDeferAccept(int32_t fd)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    // TODO
     return 0;
 #elif defined(__linux__)
     int32_t secs = 1;
     return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &secs, sizeof(secs));
+#elif defined(__APPLE__)
+    return 0;
 #endif
 }
 
@@ -769,7 +783,7 @@ int32_t TcpSocket::GetSysErrNo()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     return GetLastError();
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     return errno;
 #endif
 }

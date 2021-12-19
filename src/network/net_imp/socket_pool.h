@@ -72,7 +72,7 @@ public:
     * @param conn_id 连接ID
     * @return socket
     */
-    SocketType* GetEpollSocket(uint32_t conn_id)
+    SocketType* GetSocket(uint32_t conn_id)
     {
         uint16_t index = GetLoWord(conn_id);
         if(index < max_socket_count_)

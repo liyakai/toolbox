@@ -1,6 +1,6 @@
 #pragma once
 #ifdef __linux__
-#include "src/network/network.h"
+#include "src/network/net_imp/imp_network.h"
 #include <unordered_map>
 #include "epoll_ctrl.h"
 #include "src/network/net_imp/socket_pool.h"
@@ -10,34 +10,26 @@ class UdpAddress;
 /*
 * 定义基于 UDP 和 Epoll 的网络
 */
-class UdpEpollNetwork : public INetwork
+class UdpEpollNetwork : public ImpNetwork<UdpSocket>
 {
 public:
     /*
     * 构造
     */
-    UdpEpollNetwork();
+    UdpEpollNetwork() = default;
     /*
     * 析构
     */
-    virtual ~UdpEpollNetwork();
+    virtual ~UdpEpollNetwork() = default;
     /*
     * 初始化
     */
     virtual void Init(NetworkMaster* master, NetworkType network_type) override;
     /*
-    * 逆初始化网络
-    */
-    virtual void UnInit() override;
-    /*
     * 执行一次网络循环
     */
     virtual void Update() override;
 public:
-    /*
-    * @brief 获取Epoll
-    */
-    EpollCtrl& GetEpollCtrl(){ return epoll_ctrl_;}
     /*
     * @brief UdpAddress 是否存在
     * @param udp_address 远端udp地址
@@ -82,8 +74,6 @@ protected:
     virtual void OnSend(uint64_t address_id, const char* data, std::size_t size) override;
 
 private:
-    EpollCtrl epoll_ctrl_;              // epoll控制器
-    SocketPool<UdpSocket> sock_mgr_;    // socket池
     std::unordered_map<uint64_t, uint32_t> address_to_connect_;      // 地址转换的ID 到 SocketPool管理的连接ID的映射
     bool is_kcp_open_ = false;      // KCP是否开启
 };

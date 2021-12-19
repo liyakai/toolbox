@@ -38,7 +38,7 @@ public:
     /*
     * 重置
     */
-    void Reset();
+    void Reset() override;
     // /*
     // * 设置远端IP
     // */
@@ -57,7 +57,7 @@ public:
     /*
     * 获取 persocket
     */
-    PerSockContext& GetPerSocket() { return per_socket_; }
+    PerSockContext* GetPerSocket() { return &per_socket_; }
     /*
     * socket 是否有效
     */
@@ -73,11 +73,11 @@ public:
     /*
     * 重置接收 PerSocket
     */
-    inline void ResetRecvPerSocket();
+    void ResetRecvPerSocket() override;
     /*
     * 重置发送 PerSocket
     */
-    inline void ResetSendPerSocket();
+    void ResetSendPerSocket() override;
     /*
     * 将 socket 建立与 iocp 的关联,只调用一次.
     */
@@ -95,7 +95,7 @@ public:
     /*
     * 获取socket状态
     */
-    SocketState GetSocketState() { return socket_state_; }
+    SocketState GetSocketState() override { return socket_state_; }
     /*
     * 更新 epoll 事件
     * @params event_type 事件类型
@@ -108,28 +108,24 @@ public:
     * @param port 监听端口
     * @retval 初始化是否成功
     */
-    bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+    bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
     /*
     * 初始化新的连接器
     * @param ip 连接IP
     * @param port 连接端口
     * @retval 初始化是否成功
     */
-    bool InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+    bool InitNewConnecter(const std::string &ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
     /*
     * 发送数据
     * @param data 发送数据指针
     * @param len 发送数据长度
     */
-    void Send(const char* data, size_t len);
+    void Send(const char* data, size_t len) override;
     /*
     * 关闭套接字
     */
-    void Close(ENetErrCode net_err, int32_t sys_err = 0);
-    /*
-    * 发送错误,向主线程报告
-    */
-    void OnErrored(ENetErrCode err_code, int32_t err_no);
+    void Close(ENetErrCode net_err, int32_t sys_err = 0) override;
 
 private:
     /*

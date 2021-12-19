@@ -14,6 +14,7 @@ enum class ENetErrCode
 {
     NET_NO_ERROR = 0,
     NET_SYS_ERROR,            // 系统错误，同时会返回errno
+    NET_INVALID_NETWORK_TYPE, // 发送非法的网络类型.合法范围见 NetworkType
     NET_INVALID_PACKET_SIZE,  // 错误的包长
     NET_CONNECT_FAILED,       // 连接出错
     NET_LISTEN_FAILED,        // 监听出错
