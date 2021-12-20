@@ -159,7 +159,7 @@ void UdpSocket::Close(ENetErrCode net_err, int32_t sys_err)
 {
     if (IsSocketValid())
     {
-        BaseSocket::Close();
+        BaseSocket::Close(net_err, sys_err);
         // 通知主线程 socket 关闭
         if (UdpType::ACCEPTOR == type_)
         {
