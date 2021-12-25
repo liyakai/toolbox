@@ -29,6 +29,8 @@ subgraph Server
     C(EchoNet) <--> B
 end
 ```
+[](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_test_frame_echo_forward.svg)
+
 ##### 2.1.2.1 机器人每秒向服务器发送一个数据块
 
 | 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
@@ -49,7 +51,7 @@ end
 *机器人的TCP接收回声数据处理后再sleep 1000ms再次发送数据,带宽会低于理论值.这里的数据都是机器人在正确完整接收回声数据的前提下进行.
 
 ##### 2.1.2 1000机器人下forward服务器的火焰图.
-
+[](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_forward_on_1000_robots.svg)
 
 ### 2.1.2.3 小结
 在回声+转发测试模型下,在直观表现上,转发服务器的CPU占用率达到了135%.通过火焰图可以看到,网络库的对象池和内存池成为了限制因素,因此下一步需要将其改造为无锁队列.
