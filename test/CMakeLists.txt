@@ -13,10 +13,3 @@ aux_source_directory(./unit_test_frame TEST_SRC)
 add_executable(test_tools ${TEST_SRC})
 
 target_link_libraries(test_tools ${TEST_LIBS})
-
-# gperftools
-option(CMAKE_GPERF_TOOLS "Use Gperf Tools" OFF)
-if(CMAKE_GPERF_TOOLS)
-    add_definitions(-DUSE_GPERF_TOOLS)
-    target_link_libraries(test_tools libtcmalloc.a libprofiler.a)
-endif()
