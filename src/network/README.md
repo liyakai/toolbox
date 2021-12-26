@@ -52,7 +52,12 @@ end
 
 ##### 2.1.2.3 1000机器人下forward服务器的火焰图
 
-[1000机器人压力下转发服务器火焰图](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_forward_on_1000_robots.svg)
+![1000机器人压力下转发服务器火焰图](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_forward_on_1000_robots.svg)
+
+20211226 Updtes:
+将网络库使用的对象池和内存池替换为无锁形式.其火焰图为:
+![1000机器人压力下转发服务器火焰图(lockfree)](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_forward_on_1000_robots_lock_free.svg)
+
 
 ##### 2.1.2.4 小结
 在回声+转发测试模型下,在直观表现上,转发服务器的CPU占用率达到了135%.通过火焰图可以看到,网络库的对象池和内存池成为了限制因素,因此下一步需要将其改造为无锁队列.
