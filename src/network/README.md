@@ -29,7 +29,7 @@ subgraph Server
     C(EchoNet) <--> B
 end
 ```
-[](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_test_frame_echo_forward.svg)
+![tcp_epoll_回声_转发测试架构图](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_test_frame_echo_forward.svg)
 
 ##### 2.1.2.1 机器人每秒向服务器发送一个数据块
 
