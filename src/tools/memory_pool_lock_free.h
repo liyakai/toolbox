@@ -5,33 +5,33 @@
 #include <unordered_map>
 #include <algorithm>
 #include "debug_print.h"
-
+#include "queuelockfree/concurrentqueue.h"
 
 #define ENABLE_MEMORY_POOL 1
 #define ENABLE_DEBUG_MEMORY_POOL 0
 
-#define MemPoolMgr Singleton<MemoryPool>::Instance()
+#define MemPoolLockFreeMgr Singleton<MemoryPoolLockFree>::Instance()
 
 /*
 *  相同大小内存块的管理
 */
-class Chunk : public DebugPrint
+class ChunkLockFree : public DebugPrint
 {
 public:
     /*
     * 构造函数
     */
-    Chunk(){};
+    ChunkLockFree(){};
     /*
     * 析构
     */
-    ~Chunk()
+    ~ChunkLockFree()
     {
-        for (auto p : mem_list_)
+        char* pointer = nullptr;
+        while (mem_list_.try_dequeue(pointer))
         {
-            delete p;
+            delete pointer;
         }
-        mem_list_.clear();
     }
     /*
     * 设置内存块大小[只有第一次设置非零值有效]
@@ -54,69 +54,49 @@ public:
     */
     char* GetMemory()
     {
-        bool is_empry = false;
-        do 
+        char* pointer = nullptr;
+        if(mem_list_.try_dequeue(pointer))
         {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (mem_list_.empty())
-            {
-                is_empry = true;
-                break;
-            }
-            auto pointer = mem_list_.front();
-            mem_list_.pop_front();
             return pointer;
-        } while (true);
-        if (is_empry)
-        {   char* new_char = new char[chunk_size_];
-            return new_char;
         }
-        return nullptr;
+        char* new_char = new char[chunk_size_];
+        return new_char;
     }
     /*
     * 归还内存块
     */
     void GiveBack(char* pointer, std::string debug_tag = "")
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-#if ENABLE_DEBUG_MEMORY_POOL
-        auto iter = find(mem_list_.begin(), mem_list_.end(), pointer);
-        if(iter != mem_list_.end())
-        {
-            Print("[内存池] tag:%s 重复归还内存块[size:%zu]: %p\n", debug_tag.c_str(), chunk_size_, pointer);
-            return;
-        }
-#endif // ENABLE_DEBUG_MEMORY_POOL
-        mem_list_.push_back(pointer);
+        mem_list_.enqueue(pointer);
     }
     /*
     * 剩余内存块个数
     */
     std::size_t Size()
     {
-        return mem_list_.size();
+        return mem_list_.size_approx();
     }
 
 private:
     std::size_t chunk_size_ = 0;
     std::mutex mutex_;
-    std::list<char*> mem_list_;
+    moodycamel::ConcurrentQueue<char*> mem_list_;
 };
 
 /*
 * 内存池
 */
-class MemoryPool : public DebugPrint
+class MemoryPoolLockFree : public DebugPrint
 {
 public:
     /*
     * 构造函数
     */
-    MemoryPool(){};
+    MemoryPoolLockFree(){};
     /*
     * 析构
     */
-    ~MemoryPool()
+    ~MemoryPoolLockFree()
     {
         pool_.clear();
     }
@@ -195,6 +175,6 @@ private:
         return n < 0 ? 1 : n + 1;
     }
 private:
-    std::unordered_map<std::size_t, Chunk> pool_;
+    std::unordered_map<std::size_t, ChunkLockFree> pool_;
 };
 

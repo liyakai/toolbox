@@ -1,6 +1,6 @@
 #include "event.h"
-#include "src/tools/memory_pool.h"
-#include "src/tools/object_pool.h"
+#include "src/tools/memory_pool_lock_free.h"
+#include "src/tools/object_pool_lock_free.h"
 #include <string.h>
 
 Event::Event(EventID id)
@@ -29,7 +29,7 @@ NetEventWorker::~NetEventWorker()
     switch(GetID())
     {
         case EID_MainToWorkerSend:
-            MemPoolMgr->GiveBack(net_req_.stream_.data_, "NetEventWorker::~NetEventWorker");
+            MemPoolLockFreeMgr->GiveBack(net_req_.stream_.data_, "NetEventWorker::~NetEventWorker");
             break;
         default:
             break;
@@ -39,7 +39,7 @@ NetEventWorker::~NetEventWorker()
 
 void NetEventWorker::SetIP(const std::string& ip)
 {
-    net_req_.address_.ip_ = GetObject<std::string>(ip);
+    net_req_.address_.ip_ = GetObjectLockFree<std::string>(ip);
 }
 
 std::string NetEventWorker::GetIP() const
@@ -116,7 +116,7 @@ NetEventMain::~NetEventMain()
     switch(GetID())
     {
         case EID_WorkerToMainRecv:
-            MemPoolMgr->GiveBack((char*)net_evt_.recv_.data_, "NetEventMain::~NetEventMain");
+            MemPoolLockFreeMgr->GiveBack((char*)net_evt_.recv_.data_, "NetEventMain::~NetEventMain");
             break;
         default:
             break;
@@ -134,7 +134,7 @@ NetEventMain::~NetEventMain()
 
 // void NetEventMain::SetData(const char* data, uint32_t size)
 // {
-//     net_evt_.stream_.data_ = MemPoolMgr->GetMemory(size);
+//     net_evt_.stream_.data_ = MemPoolLockFreeMgr->GetMemory(size);
 //     net_evt_.stream_.size_ = size;
 //     memmove(net_evt_.stream_.data_, data, size);
 // }

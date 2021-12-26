@@ -5,6 +5,8 @@
 
 FIXTURE_BEGIN(ObjectPoolLockFree)
 
+// TODO 增加多线程测试用例 
+
 /*
 测试类
 */

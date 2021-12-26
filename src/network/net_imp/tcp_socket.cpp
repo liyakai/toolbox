@@ -271,7 +271,7 @@ ErrCode TcpSocket::ProcessRecvData()
             // return ErrCode::ERR_INSUFFICIENT_LENGTH;
             break;
         }
-        char* buff_block = MemPoolMgr->GetMemory(len);
+        char* buff_block = MemPoolLockFreeMgr->GetMemory(len);
         recv_ring_buffer_.Read(buff_block, len);
         p_network_->OnReceived(GetConnID(), buff_block, len);
     }
@@ -697,7 +697,6 @@ void TcpSocket::Send(const char* data, size_t len)
 #elif defined(__linux__) || defined(__APPLE__)
 #endif
     }   
-    // MemPoolMgr->GiveBack(const_cast<char*>(data), "TcpSocket::Send");
 }
 
 int32_t TcpSocket::SetNonBlocking(int32_t fd)

@@ -69,7 +69,7 @@ public:
             uint64_t connect_id = 0;
             memmove(&connect_id, data + sizeof(uint32_t), sizeof(connect_id));
 
-            char* send_data = MemPoolMgr->GetMemory(size - sizeof(uint64_t));
+            char* send_data = MemPoolLockFreeMgr->GetMemory(size - sizeof(uint64_t));
             uint32_t send_data_size = size - sizeof(uint64_t);  
             uint64_t client_conn_id = 0;
             memmove(send_data, &send_data_size, sizeof(uint32_t));  // buff len
@@ -81,7 +81,7 @@ public:
             // Print("\n\n");
             Send(NT_UDP, client_conn_id, send_data, send_data_size);
             
-            MemPoolMgr->GiveBack(send_data, "test_send_data1");
+            MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data1");
         } else 
         {
             // 客户端发来的消息
@@ -89,7 +89,7 @@ public:
             //  Print("收到 client 数据长度为%d\n", size);
             //  PrintData(data, 32);
 
-            char* send_data = MemPoolMgr->GetMemory(size + sizeof(uint64_t));
+            char* send_data = MemPoolLockFreeMgr->GetMemory(size + sizeof(uint64_t));
             uint32_t send_data_size = size + sizeof(uint64_t);  
             memmove(send_data, &send_data_size, sizeof(uint32_t));  // buff len
             memmove(send_data + sizeof(uint32_t), &conn_id, sizeof(uint64_t));  // conn_id
@@ -97,7 +97,7 @@ public:
             // Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
             //PrintData(send_data, 16);
             Send(NT_UDP, echo_conn_id_, send_data, send_data_size);
-            MemPoolMgr->GiveBack(send_data, "test_send_data2");
+            MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data2");
         }
 
     };

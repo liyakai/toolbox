@@ -2,7 +2,7 @@
 
 #ifdef __linux__
 
-#include <src/tools/object_pool.h>
+#include <src/tools/object_pool_lock_free.h>
 #include "src/network/net_imp/net_epoll/udp_epoll_network.h"
 
 
@@ -64,7 +64,7 @@ void UdpSocket::Reset()
 {
     for(const auto& buffer : send_list_)
     {
-        GiveBackObject(buffer);
+        GiveBackObjectLockFree(buffer);
     }
 
     send_list_.clear();
@@ -127,7 +127,7 @@ void UdpSocket::Send(const char* buffer, std::size_t length)
     }
     if(false == send_list_.empty())
     {
-        send_list_.emplace_back(GetObject<Buffer>(buffer, length));
+        send_list_.emplace_back(GetObjectLockFree<Buffer>(buffer, length));
         UpdateSend();
         return;
     }
@@ -137,7 +137,7 @@ void UdpSocket::Send(const char* buffer, std::size_t length)
     {
         if(length < send_length)
         {
-            send_list_.emplace_back(GetObject<Buffer>(buffer + length, send_length - length));
+            send_list_.emplace_back(GetObjectLockFree<Buffer>(buffer + length, send_length - length));
         } 
     } else 
     {
@@ -256,7 +256,7 @@ void UdpSocket::KcpRecv(const char* buffer, std::size_t length, const UdpAddress
     auto bytes_size = ikcp_recv(kcp_, out_buffer, sizeof(out_buffer));
     if(bytes_size > 0)
     {
-        char *buff_block = MemPoolMgr->GetMemory(bytes_size);
+        char *buff_block = MemPoolLockFreeMgr->GetMemory(bytes_size);
         memcpy(buff_block, out_buffer, bytes_size);
         p_network_->OnReceived(UdpAddress(address).GetID(), buff_block, bytes_size);
     }
@@ -284,7 +284,7 @@ void UdpSocket::UpdateRecv()
             }
             if(nullptr == kcp_)     // 原始 udp 模式
             {
-                char *buff_block = MemPoolMgr->GetMemory(size);
+                char *buff_block = MemPoolLockFreeMgr->GetMemory(size);
                 memcpy(buff_block, array.data(), size);
                 p_network_->OnReceived(UdpAddress(address).GetID(), buff_block, size);
             } else                  // 开启了kcp
@@ -315,7 +315,7 @@ void UdpSocket::UpdateSend()
         {
             if(size == buffer->size_)
             {
-                GiveBackObject(buffer);
+                GiveBackObjectLockFree(buffer);
                 iter = send_list_.erase(iter);
             } else 
             {
