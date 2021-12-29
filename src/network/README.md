@@ -3,6 +3,40 @@
 ## 2. 网络库测试数据
 ### 2.1 Tcp+epoll 承载能力测试
 #### 2.1.1 回声模型测试
+    测试环境: 8核[2.0GHz] 32G内存
+    测试模型:
+
+```mermaid
+graph LR
+
+F[tcp+epoll网络库测试架构图]
+
+A1[Robot1] --> B(ForwardNet)
+B(ForwardNet) --> A1[Robot1]
+
+A2[Robot1] --> B(ForwardNet)
+B(ForwardNet) --> A2[Robot2]
+
+A3[Robot1] --> B(ForwardNet)
+B(ForwardNet) --> A3[Robot3]
+
+A4[Robot1] --> B(ForwardNet)
+B(ForwardNet) --> A4[RobotN]
+
+subgraph Server
+    B(EchoNet)
+end
+```
+![tcp_epoll_回声_转发测试架构图](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_test_frame_echo.svg)
+##### 2.1.1.1 机器人每秒向服务器发送一个数据块
+测试日期: 2021/12/29. 此测试版本为无锁对象池及无锁内存池.
+| 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
+| --- | --- | --- | --- | --- |
+| 2000 | 1400Byte | 22.3Mbps | echo:23.8%| echo:%|
+| 5000 | 1400Byte | 54.9Mbps | echo:37.4%| echo:%|
+| 10000 | 1400Byte | 110Mbps | echo:47.7%| echo:15.9%|
+| 20000 | 1400Byte | Mbps | echo:%| echo:0.0%|
+
 #### 2.1.2 回声+转发模型测试
     测试环境: 8核[2.0GHz] 32G内存
     测试模型:
