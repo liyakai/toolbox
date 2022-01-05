@@ -34,12 +34,10 @@ public:
         Print("\nvptr值:%p\n", *vptr);
         int64_t* vtable = reinterpret_cast<int64_t*>(*vptr);
         Print("\n虚表地址:%p \n", vtable);
-        Print("\n虚表地址:%p %p\n", vtable, vtable+1);
         if (nullptr != vtable)
         {
             int i = 0;
             while(nullptr != reinterpret_cast<FUNC>(*vtable))
-            // while(nullptr != static_cast<FUNC>(*vtable))
             {
                 Print("第 %d 个虚函数地址: 0X%x ->", ++i, vtable);
                 FUNC f = reinterpret_cast<FUNC>(*vtable);
