@@ -129,7 +129,7 @@ CASE(test_tcp_echo)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 24*3600*1000;
+    uint32_t run_mill_seconds = 120*1000;
     while(true)
     {
         if(used_time > run_mill_seconds) break;
@@ -157,7 +157,7 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    // return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
 #endif // USE_GPERF_TOOLS

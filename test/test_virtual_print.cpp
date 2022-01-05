@@ -33,16 +33,17 @@ CASE(PrintBase)
 {
     Base obj;
     Virtual<Base> v_obj(obj);
-    v_obj.SetDebugPrint(false);
-    v_obj.PrintVirtFunc(); 
+    v_obj.SetDebugPrint(true);
+    v_obj.PrintVirtFunc();
 }
 // 打印 Derive 类型的虚函数.
 CASE(PrintDerive)
 {
     Derive obj;
     Virtual<Derive> v_obj(obj);
-    v_obj.SetDebugPrint(false);
+    v_obj.SetDebugPrint(true);
     v_obj.PrintVirtFunc(); 
+    std::this_thread::sleep_for(std::chrono::milliseconds(10000000));
 }
 
 

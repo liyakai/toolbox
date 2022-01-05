@@ -28,21 +28,27 @@ public:
     void PrintVirtFunc()
     {
 #ifdef __linux__
-        int32_t* vtable = (int32_t*)(*(int32_t*)&object);
-        Print("\n虚表地址:%p\n", vtable);
+        Print("函数指针长度%d,对象的大小:%d\n", sizeof(FUNC), sizeof(object));
+        // 取 vptr值,如果有的话
+        int32_t* vptr = reinterpret_cast<int32_t*>(&object);
+        Print("\nvptr值:%p\n", *vptr);
+        int64_t* vtable = reinterpret_cast<int64_t*>(*vptr);
+        Print("\n虚表地址:%p \n", vtable);
+        Print("\n虚表地址:%p %p\n", vtable, vtable+1);
         if (nullptr != vtable)
         {
             int i = 0;
-            while(nullptr != (FUNC)*vtable)
+            while(nullptr != reinterpret_cast<FUNC>(*vtable))
+            // while(nullptr != static_cast<FUNC>(*vtable))
             {
                 Print("第 %d 个虚函数地址: 0X%x ->", ++i, vtable);
-                FUNC f = (FUNC)*vtable;
+                FUNC f = reinterpret_cast<FUNC>(*vtable);
                 //Print(" FUNC:%x f:%x ",*vtable, f);
                 if(nullptr != f && true == GetDebugStatus())
                 {
                     f();
                 }
-                vtable = vtable + 2;
+                vtable = vtable + 1;
                 
             }
         } 
