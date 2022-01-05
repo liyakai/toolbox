@@ -1,5 +1,8 @@
 #pragma once
 #include <algorithm>
+#include <unordered_map>
+#include <list>
+#include <mutex>
 
 
 /*
@@ -134,13 +137,13 @@ public:
     bool Contains(const Key& key) const
     {
         Guard g(lock_);
-        return cache_.find(k) != chache_.end();
+        return cache_.find(key) != cache_.end();
     }
     /*
     * @brief ±éÀú
     */
-    template<trypename Func>
-    void Foreach(Func& func)
+    template<typename Func>
+    void Foreach(Func& func) const
     {
         Guard g(lock_);
         std::for_each(keys_.begin(), keys_.end(), func);
