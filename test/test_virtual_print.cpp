@@ -43,7 +43,7 @@ CASE(PrintDerive)
     Virtual<Derive> v_obj(obj);
     v_obj.SetDebugPrint(true);
     v_obj.PrintVirtFunc(); 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10000000));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(10000000));
 }
 
 
