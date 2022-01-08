@@ -45,10 +45,11 @@ public:
     */
     void Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size);
     /*
-    * 工作线程投递事件到主线程
+    * 工作线程投递事件到主线程接口
     * @param event 事件
+    * @return bool 是否成功
     */
-   void NotifyMain(NetEventMain* event);
+    bool NotifyMain(NetEventMain* event);
 protected:
     /*
     * 主线程内处理接受新连接事件
@@ -121,8 +122,8 @@ private:
 
 private:
     Event2Main event2main_;     // 主线程网络事件队列
-    std::atomic_bool stop_;     // 线程退出
-    std::unique_ptr<std::thread> worker_ = nullptr;   // 工作线程
+    std::atomic_bool stop_;     // 工作线程是否退出
+    std::unique_ptr<std::thread> worker_ = nullptr;   // 工作线程,执行网络动作.
     using NetworkArray = std::array<std::unique_ptr<INetwork>, NetworkType::NT_MAX>;
     NetworkArray networks_;     // 网络实现 
 };

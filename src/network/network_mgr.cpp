@@ -51,7 +51,7 @@ void NetworkMaster::StopWait()
     }
     while (!event2main_.Empty())
     {
-        GiveBackObjectLockFree(event2main_.Pop(),"NetworkMaster::StopWait");
+        GiveBackObjectLockFree(event2main_.Pop());
     }
     for(auto& network : networks_)
     {
@@ -110,9 +110,14 @@ void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
     }
     networks_[index]->PushEvent(std::move(event));
 }
-void NetworkMaster::NotifyMain(NetEventMain* event)
+bool NetworkMaster::NotifyMain(NetEventMain* event)
 {
-    event2main_.Push(std::move(event));
+    if(!event2main_.Full())
+    {
+        event2main_.Push(std::move(event));
+        return true;
+    }
+    return false;
 }
 
 
@@ -159,7 +164,7 @@ void NetworkMaster::DispatchMainEvent_()
         default:
             break;
         }
-        GiveBackObjectLockFree(event, "NetworkMaster::DispatchMainEvent_");
+        GiveBackObjectLockFree(event);
     }
 }
 

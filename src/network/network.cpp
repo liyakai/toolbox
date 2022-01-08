@@ -19,7 +19,7 @@ INetwork::~INetwork()
         NetEventWorker* event = event2worker_.Pop();
         if(!event)
         {
-            GiveBackObjectLockFree(event, "INetwork::~INetwork");
+            GiveBackObjectLockFree(event);
         }
         
     }
@@ -146,7 +146,7 @@ void INetwork::HandleEvents_()
         if(nullptr != event)
         {
             HandleEvent(event);
-            GiveBackObjectLockFree(event, "INetwork::HandleEvents_");
+            GiveBackObjectLockFree(event);
         } 
         else
         {

@@ -116,51 +116,12 @@ NetEventMain::~NetEventMain()
     switch(GetID())
     {
         case EID_WorkerToMainRecv:
-            MemPoolLockFreeMgr->GiveBack((char*)net_evt_.recv_.data_, "NetEventMain::~NetEventMain");
+            MemPoolLockFreeMgr->GiveBack((char*)net_evt_.recv_.data_);
             break;
         default:
             break;
     }
 }
-
-// void NetEventMain::SetConnectID(const uint64_t conn_id)
-// {
-//     net_evt_.stream_.connect_id_ = conn_id;
-// }
-// uint64_t NetEventMain::GetConnectID() const
-// {
-//     return net_evt_.stream_.connect_id_;
-// }
-
-// void NetEventMain::SetData(const char* data, uint32_t size)
-// {
-//     net_evt_.stream_.data_ = MemPoolLockFreeMgr->GetMemory(size);
-//     net_evt_.stream_.size_ = size;
-//     memmove(net_evt_.stream_.data_, data, size);
-// }
-// char* NetEventMain::GetData() const
-// {
-//     return net_evt_.stream_.data_;
-// }
-// uint32_t NetEventMain::GetDataSize() const
-// {
-//     return net_evt_.stream_.size_;
-// }
-
-// void NetEventMain::SetConnectFailed(ENetErrCode net_err, int32_t sys_err)
-// {
-//     net_evt_.connect_failed_.net_err_code = net_err;
-//     net_evt_.connect_failed_.sys_err_code = sys_err;
-// }
-
-// ENetErrCode NetEventMain::GetNetErr()
-// {
-//     return net_evt_.connect_failed_.net_err_code;
-// }
-// int32_t NetEventMain::GetSysErr()
-// {
-//     return net_evt_.connect_failed_.sys_err_code;
-// }
 
 EventBasedObject::EventBasedObject()
 {
