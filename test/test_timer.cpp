@@ -3,7 +3,7 @@
 
 FIXTURE_BEGIN(Timer)
 
-class TestTimer : public ITimer
+class TestTimer : public ToolBox::ITimer
 {
 public:
     void OnTimer(uint32_t id, uint32_t count) override
@@ -16,11 +16,11 @@ public:
 CASE(TimerCase1){
     return;
     auto timer = std::make_shared<TestTimer>();
-    TimerMgr->AddTimer(timer, 10086, 1000, 10, __FILE__, __LINE__);
+    ToolBox::TimerMgr->AddTimer(timer, 10086, 1000, 10, __FILE__, __LINE__);
     while(true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TimerMgr->Update();
+        ToolBox::TimerMgr->Update();
     }
 }
 
@@ -28,11 +28,11 @@ CASE(TimerCase1){
 CASE(TimerCase2){
     return;
     auto timer = std::make_shared<TestTimer>();
-    TimerMgr->AddTimer(timer, 10087, 1000, -1, __FILE__, __LINE__);
+    ToolBox::TimerMgr->AddTimer(timer, 10087, 1000, -1, __FILE__, __LINE__);
     while(true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TimerMgr->Update();
+        ToolBox::TimerMgr->Update();
     }
 }
 
@@ -40,23 +40,23 @@ CASE(TimerCase2){
 CASE(TimerCase3){
     return;
     auto timer = std::make_shared<TestTimer>();
-    TimerMgr->AddTimer(timer, 10087, 1000, 10, __FILE__, __LINE__);
+    ToolBox::TimerMgr->AddTimer(timer, 10087, 1000, 10, __FILE__, __LINE__);
     timer.reset();
     while(false) // 打开测试将这里改为 true
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         fprintf(stderr, "[定时器测试3] TimerMgr->Update() \n");
-        TimerMgr->Update();
+        ToolBox::TimerMgr->Update();
     }
 }
 
-class LambdaArgs : public IArgs
+class LambdaArgs : public ToolBox::IArgs
 {
 public:
     int32_t arg1 = 0;
     std::string arg2;
 };
-static auto lambda = [](std::weak_ptr<IArgs> iargs, std::weak_ptr<void> arg)->bool{
+static auto lambda = [](std::weak_ptr<ToolBox::IArgs> iargs, std::weak_ptr<void> arg)->bool{
         auto args = iargs.lock();
         if(nullptr == args)
         {
@@ -78,11 +78,11 @@ CASE(TimerCase4){
     auto largs = std::make_shared<LambdaArgs>();
     largs->arg1 = 100;
     largs->arg2 = "参数2";
-    TimerMgr->AddTimer(lambda, largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    ToolBox::TimerMgr->AddTimer(lambda, largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
     while(true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TimerMgr->Update();
+        ToolBox::TimerMgr->Update();
     }
 }
 
@@ -92,19 +92,19 @@ CASE(TimerCase5){
     auto largs = std::make_shared<LambdaArgs>();
     largs->arg1 = 100;
     largs->arg2 = "参数2";
-    TimerMgr->AddTimer(lambda, largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    ToolBox::TimerMgr->AddTimer(lambda, largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
     largs.reset();
     while(true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TimerMgr->Update();
+        ToolBox::TimerMgr->Update();
     }
 }
 
 class TestTimerDelegate
 {
 public:
-    bool OnTimer(std::weak_ptr<IArgs> iargs, std::weak_ptr<void> arg)
+    bool OnTimer(std::weak_ptr<ToolBox::IArgs> iargs, std::weak_ptr<void> arg)
     {
         auto args = iargs.lock();
         if(nullptr == args)
@@ -130,11 +130,11 @@ CASE(TimerCase6){
     auto largs = std::make_shared<LambdaArgs>();
     largs->arg1 = 100;
     largs->arg2 = "参数2";
-    TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, timer), largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    ToolBox::TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, timer), largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
     while(true) // 打开测试将这里改为 true
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TimerMgr->Update();
+        ToolBox::TimerMgr->Update();
     }
 }
 
@@ -145,13 +145,13 @@ CASE(TimerCase7){
     auto largs = std::make_shared<LambdaArgs>();
     largs->arg1 = 100;
     largs->arg2 = "参数2";
-    TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, timer), largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
+    ToolBox::TimerMgr->AddTimer(DelegateCombination(TestTimerDelegate, OnTimer, timer), largs, std::weak_ptr<void>(), 1000, -1, __FILE__, __LINE__);
     timer.reset();
     largs.reset();
     while(true) // 打开测试将这里改为 true
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TimerMgr->Update();
+        ToolBox::TimerMgr->Update();
     }
 }
 

@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <string.h>
 
+namespace ToolBox{
+
 EpollCtrl::EpollCtrl(uint max_events)
     : max_events_(max_events)
 {
@@ -48,5 +50,6 @@ int EpollCtrl::EpollWait(int msec)
     return epoll_wait(epoll_fd_, events_, max_events_, msec);
 }
 
+};  // ToolBox
 
 #endif  // __linux__

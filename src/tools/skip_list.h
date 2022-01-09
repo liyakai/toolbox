@@ -2,6 +2,9 @@
 #include <stdint.h>
 #include <list>
 #include <unordered_map>
+
+namespace ToolBox{
+
 /*
 * @brief 定义跳表节点
 */
@@ -535,3 +538,6 @@ private:
     constexpr static int32_t SKIPLIST_MAX_LEVEL = 32;
     constexpr static double SKIPLIST_P = 0.25;
 };
+
+
+};  // ToolBox

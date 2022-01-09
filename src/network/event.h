@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <functional>
 
+namespace ToolBox{
+
 enum class ENetErrCode;
 
 enum EventID
@@ -225,3 +227,5 @@ private:
     using EventFuncMap = std::unordered_map<std::uint32_t, EventHandle>;
     EventFuncMap event_func_map_; // 事件处理函数表
 };
+
+};  // ToolBox

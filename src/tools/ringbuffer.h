@@ -5,6 +5,9 @@
 #include <atomic>
 #include <array>
 #include "debug_print.h"
+
+namespace ToolBox{
+    
 /*
 * 非线程安全的环形队列
 * Type 数据类型
@@ -369,3 +372,4 @@ private:
     std::atomic<std::size_t> count_;    // 元素数量
 };
 
+};  // ToolBox

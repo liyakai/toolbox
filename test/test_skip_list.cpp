@@ -88,7 +88,7 @@ public:
 // 测试数据插入、删除、获取排名
 CASE(SkipListCase){
     // 创建一个长度为100的排行榜跳表
-    RankSkipList<Score,int32_t>* rank_skip_list = new RankSkipList<Score, int32_t>(10);
+    ToolBox::RankSkipList<Score,int32_t>* rank_skip_list = new ToolBox::RankSkipList<Score, int32_t>(10);
     // 随机插入十万条数据
     for(int32_t i = 15; i <= 100000; i++)
     {
@@ -109,7 +109,7 @@ CASE(SkipListCase){
     // 打印排行榜
     fprintf(stderr,"[跳表排行榜] 元素数量:%" PRIu64" \n", rank_skip_list->Length());
     int32_t i = 1;
-    SkipListNode<Score, int32_t>* node = rank_skip_list->GetNodeByRank(i);
+    ToolBox::SkipListNode<Score, int32_t>* node = rank_skip_list->GetNodeByRank(i);
     do{
         if(nullptr != node)
         {
@@ -163,7 +163,7 @@ CASE(SkipListCase){
 // 测试其他零碎的功能
 CASE(SkipListCase2){
     // 创建一个长度为100的排行榜跳表
-    RankSkipList<Score,int32_t>* rank_skip_list = new RankSkipList<Score, int32_t>(10);
+    ToolBox::RankSkipList<Score,int32_t>* rank_skip_list = new ToolBox::RankSkipList<Score, int32_t>(10);
     // 随机插入十万条数据
     for(int32_t i = 15; i <= 100000; i++)
     {
@@ -190,7 +190,7 @@ CASE(SkipListCase2){
 
     // 打印排行榜
     int32_t i = 1;
-    SkipListNode<Score, int32_t>* node = rank_skip_list->GetNodeByRank(i);
+    ToolBox::SkipListNode<Score, int32_t>* node = rank_skip_list->GetNodeByRank(i);
     do{
         if(nullptr != node)
         {

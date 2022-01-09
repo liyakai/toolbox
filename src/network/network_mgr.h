@@ -6,7 +6,7 @@
 #include "event.h"
 #include "network.h"
 
-
+namespace ToolBox{
 class INetwork;
 
 using Event2Main = RingBufferSPSC<NetEventMain*, NETWORK_EVENT_QUEUE_MAX_COUNT>;
@@ -127,4 +127,6 @@ private:
     using NetworkArray = std::array<std::unique_ptr<INetwork>, NetworkType::NT_MAX>;
     NetworkArray networks_;     // 网络实现 
 };
+
+};  // ToolBox
 

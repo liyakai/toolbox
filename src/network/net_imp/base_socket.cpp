@@ -3,6 +3,8 @@
 #include <ioapiset.h>
 #endif
 
+namespace ToolBox{
+
 BaseSocket::BaseSocket()
 {
 
@@ -60,3 +62,5 @@ void BaseSocket::OnErrored(ENetErrCode err_code, int32_t err_no)
 {
     p_network_->OnErrored(GetConnID(), err_code, err_no);
 }
+
+};  // ToolBox

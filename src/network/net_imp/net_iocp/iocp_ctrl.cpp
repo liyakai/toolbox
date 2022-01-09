@@ -5,6 +5,8 @@
 #include "src/network/net_imp/net_imp_define.h"
 #include <timer.h>
 
+namespace ToolBox{
+
 IocpCtrl::IocpCtrl()
 {
 
@@ -195,5 +197,7 @@ bool IocpCtrl::RunOnce()
 
     return true;
 }
+
+};  // ToolBox
 
 #endif // defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)

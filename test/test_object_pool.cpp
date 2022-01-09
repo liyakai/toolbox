@@ -26,41 +26,41 @@ private:
 CASE(ObjectPool1)
 {
     // 开启打印
-    GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
     // 打印对象池初始状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
     // 取一个 object
-    auto* object = GetObject<TestObjectPool>(1.1,2.2,3.3);
+    auto* object = ToolBox::GetObject<TestObjectPool>(1.1,2.2,3.3);
     // 打印对象数据
     // object->Print();
     // 打印对象池状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
     // 归还对象
-    GiveBackObject<TestObjectPool>(object);
+    ToolBox::GiveBackObject<TestObjectPool>(object);
     // 打印对象池状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
 }
 
 // 测试 [取一个,归还一个] 200次
 CASE(ObjectPool2)
 {
     // 开启打印
-    GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
     // 打印对象池初始状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
     for(int i = 0; i < 100; i++)
     {
             // 取一个 object
-            auto* object = GetObject<TestObjectPool>(1.1,2.2,3.3);
+            auto* object = ToolBox::GetObject<TestObjectPool>(1.1,2.2,3.3);
             // 打印对象数据
             // object->Print();
             // 打印对象池状态
             //GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
             // 归还对象
-            GiveBackObject<TestObjectPool>(object);
+            ToolBox::GiveBackObject<TestObjectPool>(object);
     }
     // 打印对象池状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
 }
 
 
@@ -68,48 +68,48 @@ CASE(ObjectPool2)
 CASE(ObjectPool3)
 {
     // 开启打印
-    GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
     // 打印对象池初始状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
     std::vector<TestObjectPool*> temp_object;
     for(int i = 0; i < 200; i++)
     {
             // 取一个 object
-            auto* object = GetObject<TestObjectPool>(1.1,2.2,3.3);
+            auto* object = ToolBox::GetObject<TestObjectPool>(1.1,2.2,3.3);
             temp_object.emplace_back(object);
     }
     for(auto* object : temp_object)
     {
             // 归还对象
-            GiveBackObject<TestObjectPool>(object);
+            ToolBox::GiveBackObject<TestObjectPool>(object);
     }
     temp_object.clear();
     // 打印对象池状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
 }
 
 // 测试 取 1000 个,归还 1000 个
 CASE(ObjectPool4)
 {
     // 开启打印
-    GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().SetDebugPrint(false);
     // 打印对象池初始状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
     std::vector<TestObjectPool*> temp_object;
     for(int i = 0; i < 1000; i++)
     {
             // 取一个 object
-            auto* object = GetObject<TestObjectPool>(1.1,2.2,3.3);
+            auto* object = ToolBox::GetObject<TestObjectPool>(1.1,2.2,3.3);
             temp_object.emplace_back(object);
     }
     for(auto* object : temp_object)
     {
             // 归还对象
-            GiveBackObject<TestObjectPool>(object);
+            ToolBox::GiveBackObject<TestObjectPool>(object);
     }
     temp_object.clear();
     // 打印对象池状态
-    GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
+    ToolBox::GetObjectPoolMgrRef<TestObjectPool>().DebugPrint();
 }
 
 FIXTURE_END(ObjectPool)

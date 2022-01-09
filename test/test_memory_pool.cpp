@@ -5,31 +5,31 @@ FIXTURE_BEGIN(MemPool)
 
 CASE(TestMemPool1){
     //
-    MemPoolMgr->DebugPrint();
-    char* mem = MemPoolMgr->GetMemory(1);
-    MemPoolMgr->DebugPrint();
-    MemPoolMgr->GiveBack(mem);
-    MemPoolMgr->DebugPrint();
+    ToolBox::MemPoolMgr->DebugPrint();
+    char* mem = ToolBox::MemPoolMgr->GetMemory(1);
+    ToolBox::MemPoolMgr->DebugPrint();
+    ToolBox::MemPoolMgr->GiveBack(mem);
+    ToolBox::MemPoolMgr->DebugPrint();
 
-    mem = MemPoolMgr->GetMemory(2*1000);
-    MemPoolMgr->DebugPrint();
-    MemPoolMgr->GiveBack(mem);
-    MemPoolMgr->DebugPrint();
+    mem = ToolBox::MemPoolMgr->GetMemory(2*1000);
+    ToolBox::MemPoolMgr->DebugPrint();
+    ToolBox::MemPoolMgr->GiveBack(mem);
+    ToolBox::MemPoolMgr->DebugPrint();
 
-    mem = MemPoolMgr->GetMemory(2 * 1000*1000);
-    MemPoolMgr->DebugPrint();
-    MemPoolMgr->GiveBack(mem);
-    MemPoolMgr->DebugPrint();
+    mem = ToolBox::MemPoolMgr->GetMemory(2 * 1000*1000);
+    ToolBox::MemPoolMgr->DebugPrint();
+    ToolBox::MemPoolMgr->GiveBack(mem);
+    ToolBox::MemPoolMgr->DebugPrint();
 
     //mem = MemPoolMgr->GetMemory(2*1000*1000*1000);    // Windows 上测试不通过
     //MemPoolMgr->DebugPrint();
     //MemPoolMgr->GiveBack(mem);
     //MemPoolMgr->DebugPrint();
 
-    mem = MemPoolMgr->GetMemory(2 * 1000 * 1000);
-    MemPoolMgr->DebugPrint();
-    MemPoolMgr->GiveBack(mem);
-    MemPoolMgr->DebugPrint();
+    mem = ToolBox::MemPoolMgr->GetMemory(2 * 1000 * 1000);
+    ToolBox::MemPoolMgr->DebugPrint();
+    ToolBox::MemPoolMgr->GiveBack(mem);
+    ToolBox::MemPoolMgr->DebugPrint();
 
 
 

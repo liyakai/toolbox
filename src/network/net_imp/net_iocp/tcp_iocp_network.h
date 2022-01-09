@@ -7,6 +7,8 @@
 #include "src/network/net_imp/tcp_socket.h"
 #include "iocp_ctrl.h"
 
+namespace ToolBox{
+
 /*
 * 定义基于 TCP 和 IOCP 的网络
 */
@@ -26,5 +28,7 @@ public:
     */
     virtual void Init(NetworkMaster* master, NetworkType network_type) override;
 };
+
+};  // ToolBox
 
 #endif // defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)

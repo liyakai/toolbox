@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include "debug_print.h"
 
+namespace ToolBox{
+
 typedef unsigned long DWORD;
 struct TypeDescriptor
 {
@@ -131,3 +133,5 @@ public:
 private:
     ClassType& object;
 };
+
+};  // ToolBox

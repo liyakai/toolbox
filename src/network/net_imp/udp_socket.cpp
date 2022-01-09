@@ -5,6 +5,7 @@
 #include <src/tools/object_pool_lock_free.h>
 #include "src/network/net_imp/net_epoll/udp_epoll_network.h"
 
+namespace ToolBox{
 
 UdpAddress::UdpAddress(const std::string& ip, uint16_t port)
 {
@@ -406,5 +407,7 @@ int32_t UdpSocket::Output(const char* buf, int32_t len, ikcpcb* kcp, void*user)
     socket->Send(buf, len);
     return 0;
 }
+
+};  // ToolBox
 
 #endif // __linux__

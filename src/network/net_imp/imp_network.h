@@ -3,6 +3,9 @@
 #include "socket_pool.h"
 #include "base_ctrl.h"
 #include "udp_socket.h"
+
+namespace ToolBox{
+
 /*
 * @file brief 网络基类 INetwork 作为纯虚函数,更多的是作为接口的存在,不关心实现细节.但各种类型的具体实现又有很多相同的地方.
 * 故,中间增加一层实现层,将据悉实现共通的部分提出,单独作为一层.
@@ -171,3 +174,5 @@ void ImpNetwork<SocketType>::OnSend(uint64_t connect_id, const char* data, std::
     }
     socket->Send(data, size);
 }
+
+};  // ToolBox

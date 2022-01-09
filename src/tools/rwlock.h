@@ -11,7 +11,7 @@
 #include <atomic>
 #include <functional>
 
-
+namespace ToolBox{
 /*
 * 仅使用互斥锁实现读写锁
 */
@@ -165,3 +165,7 @@ private:
     std::size_t read_cnt_;                      // 读者数量
     bool is_write_ = false;                     // 是否在写
 };
+
+
+
+};  // ToolBox

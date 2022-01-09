@@ -8,7 +8,7 @@
 FIXTURE_BEGIN(LRUCache)
 
 CASE(TestLRUCacheWithoutLock){
-    using KVCache = LRUCache<std::string, int32_t>;
+    using KVCache = ToolBox::LRUCache<std::string, int32_t>;
     using KVNode = KVCache::node_type;
     auto CachePrint = [&](const KVCache& kvc){
         fprintf(stderr, "Cache(size:%zu)(max:%zu)(e=%zu)(allowed:%zu)\n", kvc.Size(), kvc.GetMaxSize(), kvc.GetElasticity(), kvc.GetMaxAllowedSize());
@@ -40,7 +40,7 @@ CASE(TestLRUCacheWithoutLock){
 }
 
 CASE(TestLRUCacheWithLock){
-    using LKVCache = LRUCache<std::string, std::string, std::mutex>;
+    using LKVCache = ToolBox::LRUCache<std::string, std::string, std::mutex>;
     using LKVNode = LKVCache::node_type;
     auto CachePrint = [&](const LKVCache& kvc){
         fprintf(stderr, "Cache(size:%zu)(max:%zu)(e=%zu)(allowed:%zu)\n", kvc.Size(), kvc.GetMaxSize(), kvc.GetElasticity(), kvc.GetMaxAllowedSize());

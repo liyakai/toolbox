@@ -6,6 +6,8 @@
 #include "src/network/net_imp/udp_socket.h"
 #include "time_util.h"
 
+namespace ToolBox{
+
 void UdpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
 {
     base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
@@ -128,5 +130,7 @@ void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, std::size_t 
         socket->Send(data, size);
     }
 }
+
+};  // ToolBox
 
 #endif // __linux__

@@ -2,6 +2,7 @@
 
 #if defined(__APPLE__)
 
+namespace ToolBox{
 
 KqueueCtrl::KqueueCtrl(uint32_t max_events)
     : fd_num_(max_events)
@@ -97,6 +98,6 @@ int32_t KqueueCtrl::Kevent(int msec)
     return kevent(kqueue_fd_, nullptr, 0, events_, fd_num_, &ts);
 }
 
-
+};  // ToolBox
 
 #endif // defined(__APPLE__)

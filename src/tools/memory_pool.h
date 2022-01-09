@@ -6,11 +6,12 @@
 #include <algorithm>
 #include "debug_print.h"
 
+namespace ToolBox{
 
 #define ENABLE_MEMORY_POOL 1
 #define ENABLE_DEBUG_MEMORY_POOL 0
 
-#define MemPoolMgr Singleton<MemoryPool>::Instance()
+#define MemPoolMgr Singleton<ToolBox::MemoryPool>::Instance()
 
 /*
 *  相同大小内存块的管理
@@ -198,3 +199,4 @@ private:
     std::unordered_map<std::size_t, Chunk> pool_;
 };
 
+};  // ToolBox

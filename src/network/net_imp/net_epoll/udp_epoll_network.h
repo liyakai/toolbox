@@ -5,6 +5,8 @@
 #include "epoll_ctrl.h"
 #include "src/network/net_imp/socket_pool.h"
 
+namespace ToolBox{
+
 class UdpSocket;
 class UdpAddress;
 /*
@@ -77,5 +79,7 @@ private:
     std::unordered_map<uint64_t, uint32_t> address_to_connect_;      // 地址转换的ID 到 SocketPool管理的连接ID的映射
     bool is_kcp_open_ = false;      // KCP是否开启
 };
+
+};  // ToolBox
 
 #endif // __linux__

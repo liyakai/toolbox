@@ -3,6 +3,8 @@
 #include "event.h"
 #include <functional>
 
+namespace ToolBox{
+
 INetwork::INetwork()
 {
     RegistereventHandler(EID_MainToWorkerNewAccepter,std::bind(&INetwork::OnMainToWorkerNewAccepter_,this, std::placeholders::_1));
@@ -154,3 +156,5 @@ void INetwork::HandleEvents_()
         }
     }
 }
+
+};  // ToolBox

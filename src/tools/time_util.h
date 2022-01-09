@@ -2,6 +2,8 @@
 #include <chrono>
 #include <ctime>
 
+namespace ToolBox{
+
 /// 获取毫秒级时间戳(ms)
 static inline std::time_t GetMillSecondTimeStamp()
 {
@@ -9,3 +11,5 @@ static inline std::time_t GetMillSecondTimeStamp()
     auto duraion = std::chrono::duration_cast<std::chrono::milliseconds>(point.time_since_epoch());
     return duraion.count();
 }
+
+};  // ToolBox

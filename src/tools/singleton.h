@@ -4,6 +4,8 @@
 #include <atomic>
 #include <mutex>
 
+namespace ToolBox{
+
 /*
 *   懒汉模式创建单例
 */
@@ -66,3 +68,6 @@ std::mutex Singleton<T>::lock_;
 
 template <typename T>
 std::atomic<T*> Singleton<T>::instance_;
+
+
+};  // ToolBox

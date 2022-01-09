@@ -3,6 +3,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <string>
+
+namespace ToolBox{
+
 /*
 * 定义 debug 打印基类
 */
@@ -85,3 +88,5 @@ public:
         printf("\n");
     }
 };
+
+};  // ToolBox

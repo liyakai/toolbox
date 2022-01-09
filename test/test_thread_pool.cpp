@@ -8,7 +8,7 @@ FIXTURE_BEGIN(TestThreadPool)
 CASE(TestThreadPoolCase1_num){
     std::mutex mtx;
     try{
-        ThreadPool thread_pool;
+        ToolBox::ThreadPool thread_pool;
         std::vector<std::future<int32_t>> v_future;
         for (int32_t i = 0; i < 10; i++)
         {
@@ -30,7 +30,7 @@ CASE(TestThreadPoolCase1_num){
 CASE(TestThreadPoolCase1_num_str){
     std::mutex mtx;
     try{
-        ThreadPool thread_pool;
+        ToolBox::ThreadPool thread_pool;
         std::vector<std::future<void>> v_future;
         for (int32_t i = 0; i <= 5; i++)
         {

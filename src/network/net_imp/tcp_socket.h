@@ -8,6 +8,8 @@
 #include "src/network/net_imp/net_iocp/iocp_define.h"
 #include "src/network/network_def.h"
 
+namespace ToolBox{
+
 class TcpEpollNetwork;
 class TcpSocket;
 
@@ -224,3 +226,5 @@ private:
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 
 };
+
+};  // ToolBox

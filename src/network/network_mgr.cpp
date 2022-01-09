@@ -8,6 +8,9 @@
 #include "src/network/net_imp/net_kqueue/tcp_kqueue_network.h"
 #endif
 #include "src/tools/object_pool_lock_free.h"
+
+namespace ToolBox{
+
 NetworkMaster::NetworkMaster()
 {
     stop_.store(false);
@@ -212,4 +215,4 @@ INetwork* NetworkMaster::GetNetwork_(NetworkType type)
     return nullptr;
 }
 
-
+};  // ToolBox

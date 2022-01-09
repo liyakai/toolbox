@@ -1,6 +1,9 @@
 #pragma once
 #include "net_imp_define.h"
 #include "base_socket.h"
+
+namespace ToolBox{
+
 /*
 * @brief IOMultiplexingInterface 是io多路复用的接口.
 */
@@ -39,3 +42,5 @@ public:
     virtual bool AssociateSocketToIocp(BaseSocket& socket) { return true; };
 #endif 
 };
+
+};  // ToolBox

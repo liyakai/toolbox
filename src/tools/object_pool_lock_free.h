@@ -7,6 +7,9 @@
 #include "src/tools/singleton.h"
 #include "debug_print.h"
 #include "queuelockfree/concurrentqueue.h"
+
+namespace ToolBox{
+    
 #define ENABLE_DEBUG_OBJECT_POOL 0
 
 /*
@@ -140,3 +143,4 @@ static void GiveBackObjectLockFree(ObjectType* object, std::string debug_tag = "
     GetObjectPoolLockFreeMgrRef<ObjectType>().GiveBackLockFree(object, debug_tag);
 }
 
+};  // ToolBox

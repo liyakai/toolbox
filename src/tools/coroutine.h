@@ -9,6 +9,8 @@
 #include <vector>
 #include <string.h>
 
+namespace ToolBox{
+
 using  CoroutineFunc = std::function< void (class Schedule*, void *ud) >; 
 
 enum class COROUTINE_STATUS
@@ -307,5 +309,7 @@ private:
     int32_t running_;                // 正在运行的协程ID
     std::vector<Coroutine*> co_vec_;     // 一个一维数组,用于存放所有协程。其长度等于cap
 };
+
+};  // ToolBox
 
 #endif // __linux__

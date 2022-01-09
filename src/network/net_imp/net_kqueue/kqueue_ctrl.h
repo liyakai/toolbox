@@ -3,6 +3,9 @@
 #if defined(__APPLE__)
 #include "src/network/net_imp/net_imp_define.h"
 #include "src/network/net_imp/base_ctrl.h"
+
+namespace ToolBox{
+
 /*
 * 定义 kqueue 管理类
 */
@@ -43,5 +46,6 @@ private:
     struct kevent *events_;     // kevent返回的事件列表
 };
 
+};  // ToolBox
 
 #endif // defined(__APPLE__)

@@ -6,6 +6,8 @@
 #include "epoll_ctrl.h"
 #include "src/network/net_imp/socket_pool.h"
 
+namespace ToolBox{
+
 /*
 * 定义基于 TCP 和 Epoll 的网络
 */
@@ -25,5 +27,7 @@ public:
     */
     virtual void Init(NetworkMaster* master, NetworkType network_type) override;
 };
+
+};  // ToolBox
 
 #endif // __linux__

@@ -7,6 +7,8 @@
 #include "src/tools/singleton.h"
 #include "debug_print.h"
 
+namespace ToolBox{
+
 #define ENABLE_DEBUG_OBJECT_POOL 0
 
 /*
@@ -144,3 +146,4 @@ static void GiveBackObject(ObjectType* object, std::string debug_tag = "")
     GetObjectPoolMgrRef<ObjectType>().GiveBack(object, debug_tag);
 }
 
+};  // ToolBox

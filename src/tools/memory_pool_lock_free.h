@@ -7,10 +7,12 @@
 #include "debug_print.h"
 #include "queuelockfree/concurrentqueue.h"
 
+namespace ToolBox{
+
 #define ENABLE_MEMORY_POOL 1
 #define ENABLE_DEBUG_MEMORY_POOL 0
 
-#define MemPoolLockFreeMgr Singleton<MemoryPoolLockFree>::Instance()
+#define MemPoolLockFreeMgr Singleton<ToolBox::MemoryPoolLockFree>::Instance()
 
 /*
 *  相同大小内存块的管理
@@ -178,3 +180,4 @@ private:
     std::unordered_map<std::size_t, ChunkLockFree> pool_;
 };
 
+};  // ToolBox

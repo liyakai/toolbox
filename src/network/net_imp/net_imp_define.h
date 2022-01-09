@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+
 //#include <windows.h>
 #include <cstddef>
 #include <WinSock2.h>
@@ -19,9 +20,12 @@
 #include <unistd.h>
 #include <sys/event.h>
 #include <time.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 #endif  // #if (defined(WIN32) || defined(_WIN64))
 
+namespace ToolBox{
 
 constexpr std::size_t MAX_SOCKET_COUNT = 40000;
 constexpr std::size_t INVALID_CONN_ID = UINT32_MAX;
@@ -90,6 +94,7 @@ enum class UdpType
     REMOTE = 3,
 };
 
+};  // ToolBox
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #include "src/network/net_imp/net_iocp/iocp_define.h"

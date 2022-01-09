@@ -8,6 +8,8 @@
 #include <condition_variable>
 #include <stdint.h>
 
+namespace ToolBox{
+
 /*
 *  定义线程池
 */
@@ -118,3 +120,6 @@ ThreadPool::Add(Function&& func, Args&&... args)
     cond_.notify_one();
     return ret;
 }
+
+
+};  // ToolBox

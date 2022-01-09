@@ -10,6 +10,8 @@
 //#include "udp_epoll_network.h"
 #include "kcp/ikcp.h"
 
+namespace ToolBox{
+
 class UdpSocket;
 using UdpSocketPool = SocketPool<UdpSocket>;
 
@@ -241,5 +243,7 @@ private:
     ikcpcb* kcp_ = nullptr;     // kcp实例
     UdpSocketPool *p_sock_pool_ = nullptr;          // socket 池子
 };
+
+};  // ToolBox
 
 #endif // __linux__

@@ -6,6 +6,8 @@
 #include "network_mgr.h"
 #include "network_def.h"
 
+namespace ToolBox{
+
 class NetworkMaster;
 
 /// 事件队列
@@ -121,3 +123,5 @@ private:
     Event2Worker event2worker_;         // 主线程到工作线程的事件队列
     NetworkMaster *master_;             // 主线程中的网络管理器
 };
+
+};  // ToolBox

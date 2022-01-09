@@ -6,8 +6,8 @@ FIXTURE_BEGIN(NetEpoll)
 CASE(TestNetEpoll){
 
 
-    EpollCtrlMgr->CreateIOMultiplexing();
-    EpollCtrlMgr->DestroyIOMultiplexing();
+    ToolBox::EpollCtrlMgr->CreateIOMultiplexing();
+    ToolBox::EpollCtrlMgr->DestroyIOMultiplexing();
 
 
 }

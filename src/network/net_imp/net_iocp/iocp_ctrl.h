@@ -4,6 +4,9 @@
 #include "src/network/net_imp/base_ctrl.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+
+namespace ToolBox{
+
 /*
 * 定义管理 iocp 的类
 */
@@ -65,5 +68,7 @@ public:
 private:
     HANDLE iocp_fd_;            // iocp 文件描述符
 };
+
+};  // ToolBox
 
 #endif  // defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)

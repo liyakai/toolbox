@@ -25,6 +25,8 @@
 #include "src/network/net_imp/net_kqueue/tcp_kqueue_network.h"
 #include "imp_network.h"
 
+namespace ToolBox{
+
 TcpSocket::TcpSocket()
 {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -544,7 +546,7 @@ bool TcpSocket::InitNewAccepter(const std::string &ip, const uint16_t port, int3
         return false;
     }
 
-    struct sockaddr_in sa;
+    SocketAddress sa;
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
@@ -615,7 +617,7 @@ bool TcpSocket::InitNewConnecter(const std::string &ip, uint16_t port, int32_t s
     // ip_ = ip;
     // // 设置对端端口
     // port_ = port;
-    struct sockaddr_in sa;
+    SocketAddress sa;
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
@@ -786,6 +788,8 @@ int32_t TcpSocket::GetSysErrNo()
     return errno;
 #endif
 }
+
+};  // ToolBox
 
 // TCP之Nagle算法&&延迟ACK
 

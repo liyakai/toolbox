@@ -5,6 +5,8 @@
 #include <set>
 #include "net_imp_define.h"
 
+namespace ToolBox{
+
 /*
 * socket 池子
 */
@@ -177,3 +179,5 @@ private:
     SlotIndexList active_slot_list_;        // 可用的 socket 索引
     SlotIndexList free_slot_list_;          // 回收的管理器索引
 };
+
+};  // ToolBox

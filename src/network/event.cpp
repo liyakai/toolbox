@@ -3,6 +3,8 @@
 #include "src/tools/object_pool_lock_free.h"
 #include <string.h>
 
+namespace ToolBox{
+
 Event::Event(EventID id)
     : id_(id)
     {
@@ -153,3 +155,5 @@ void EventBasedObject::UnregisterEventHandler(EventID event_id)
         event_func_map_.erase(event_id);
     }
 }
+
+};  // ToolBox

@@ -7,6 +7,8 @@
 #include "src/network/net_imp/tcp_socket.h"
 #include "kqueue_ctrl.h"
 
+namespace ToolBox{
+
 /*
 * 定义基于 TCP 和 Kqueue 的网络
 */
@@ -31,5 +33,7 @@ public:
     */
     virtual void CloseListenInMultiplexing(int32_t socket_id) override;
 };
+
+};  // ToolBox
 
 #endif // defined(__APPLE__)

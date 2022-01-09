@@ -8,6 +8,8 @@
 #include <string>
 #include <memory>
 
+namespace ToolBox{
+
 // 实现五层时间轮算法
 
 /*
@@ -55,7 +57,7 @@ public:
 };
 
 using TMethod = std::function<bool(std::weak_ptr<IArgs>, std::weak_ptr<void>)>;
-#define DelegateCombination(T_, Func_, Instance_) (XDelegate::RegisterMethod(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
+#define DelegateCombination(T_, Func_, Instance_) (ToolBox::XDelegate::RegisterMethod(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
 
 /*
 * 定义委托
@@ -666,9 +668,9 @@ uint64_t TimerWheel::GetMilliSecond()
 /*
 * 定义定时器管理器单件
 */
-#define TimerMgr Singleton<TimerWheel>::Instance()
+#define TimerMgr Singleton<ToolBox::TimerWheel>::Instance()
 
-
+};  // ToolBox
 
 
 

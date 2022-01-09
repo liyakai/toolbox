@@ -8,7 +8,7 @@ FIXTURE_BEGIN(VirtualPrint)
 CASE(PrintInt)
 {
     int obj = 0;
-    Virtual<int> v_obj(obj);
+    ToolBox::Virtual<int> v_obj(obj);
     v_obj.SetDebugPrint(false);
     v_obj.PrintVirtFunc(); 
 }
@@ -32,7 +32,7 @@ public:
 CASE(PrintBase)
 {
     Base obj;
-    Virtual<Base> v_obj(obj);
+    ToolBox::Virtual<Base> v_obj(obj);
     v_obj.SetDebugPrint(true);
     v_obj.PrintVirtFunc();
 }
@@ -40,7 +40,7 @@ CASE(PrintBase)
 CASE(PrintDerive)
 {
     Derive obj;
-    Virtual<Derive> v_obj(obj);
+    ToolBox::Virtual<Derive> v_obj(obj);
     v_obj.SetDebugPrint(true);
     v_obj.PrintVirtFunc(); 
     // std::this_thread::sleep_for(std::chrono::milliseconds(10000000));

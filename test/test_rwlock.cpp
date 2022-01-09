@@ -3,8 +3,8 @@
 
 FIXTURE_BEGIN(TestRWLock)
 
-RWLock rw_lock;
-CRWLock crw_lock;
+ToolBox::RWLock rw_lock;
+ToolBox::CRWLock crw_lock;
 constexpr int32_t target_num = 100;
 
 void ReadThread_RWLock(int32_t& n)

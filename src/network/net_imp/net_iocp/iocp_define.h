@@ -2,6 +2,8 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 
+namespace ToolBox{
+
 using ACCEPTEX = LPFN_ACCEPTEX;  // AcceptEx 函数指针,详见MSDN
 // MSDN: The number of bytes reserved for the local address information. 
 // This value must be at least 16 bytes more than the maximum address length for the transport protocol in use.
@@ -37,4 +39,7 @@ struct PerSockContext
     PerIOContext   io_recv;     // 接收请求
     PerIOContext   io_send;     // 发送请求
 };
+
+};  // ToolBox
+
 #endif

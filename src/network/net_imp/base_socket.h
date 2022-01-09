@@ -2,6 +2,8 @@
 #include "net_imp_define.h"
 #include "network.h"
 
+namespace ToolBox{
+
 /*
 * 定义 socket 基类
 */
@@ -159,3 +161,5 @@ protected:
     int32_t event_type_ = SOCKET_EVENT_INVALID;     // socket 可响应的事件类型
     INetwork* p_network_ = nullptr;                 // 工作线程
 };
+
+};  // ToolBox

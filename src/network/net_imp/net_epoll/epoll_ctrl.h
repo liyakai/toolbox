@@ -8,6 +8,8 @@
 #include "src/network/net_imp/tcp_socket.h"
 #include "src/network/net_imp/base_ctrl.h"
 
+namespace ToolBox{
+
 /*
 * epoll 类
 */
@@ -123,5 +125,7 @@ private:
 };
 
 #define EpollCtrlMgr Singleton<EpollCtrl>::Instance(10240)
+
+};  // ToolBox
 
 #endif // __linux__

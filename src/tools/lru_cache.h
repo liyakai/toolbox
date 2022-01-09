@@ -4,6 +4,7 @@
 #include <list>
 #include <mutex>
 
+namespace ToolBox{
 
 /*
 * 定义一个无锁之锁.[仿造互斥锁 std::mutex]
@@ -192,3 +193,5 @@ private:
     std::size_t max_size_ = 0;
     std::size_t elasticity_ = 0;
 };
+
+};  // ToolBox
