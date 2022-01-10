@@ -6,7 +6,7 @@
 
 #ifdef __linux__
 
-class TestNetworkEcho : public NetworkMaster, public DebugPrint
+class TestNetworkEcho : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override 
@@ -17,11 +17,11 @@ public:
     {
         Print("主动连接成功:%llu\n", conn_id);
     };
-    void OnConnectedFailed(ENetErrCode err_code, int32_t err_no) override
+    void OnConnectedFailed(ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
-    void OnErrored(uint64_t conn_id, ENetErrCode err_code, int32_t err_no) override
+    void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
@@ -29,16 +29,16 @@ public:
     {
         Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         PrintData(data, 16);
-        Send(NT_KCP, conn_id, data, size);
+        Send(ToolBox::NT_KCP, conn_id, data, size);
     };
-    void OnClose(uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
 };
 
 
-class TestNetworkForward : public NetworkMaster, public DebugPrint
+class TestNetworkForward : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override 
@@ -50,11 +50,11 @@ public:
         Print("主动连接成功:%llu\n", conn_id);
         echo_conn_id_ = conn_id;
     };
-    void OnConnectedFailed(ENetErrCode err_code, int32_t err_no) override
+    void OnConnectedFailed(ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
-    void OnErrored(uint64_t conn_id, ENetErrCode err_code, int32_t err_no) override
+    void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
@@ -81,7 +81,7 @@ public:
             // Print("转发给 client 的数据长度为%d,conn_id:%lu\n", send_data_size, client_conn_id);
             // PrintData(send_data, 32);
             // Print("\n\n");
-            Send(NT_KCP, client_conn_id, send_data, send_data_size);
+            Send(ToolBox::NT_KCP, client_conn_id, send_data, send_data_size);
             
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data1");
         } else 
@@ -98,12 +98,12 @@ public:
             memmove(send_data + sizeof(uint32_t) + sizeof(uint64_t), data + sizeof(uint32_t), size - sizeof(uint32_t)); // data
             // Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
             //PrintData(send_data, 16);
-            Send(NT_KCP, echo_conn_id_, send_data, send_data_size);
+            Send(ToolBox::NT_KCP, echo_conn_id_, send_data, send_data_size);
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data2");
         }
 
     };
-    void OnClose(uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
@@ -123,15 +123,15 @@ CASE(test_kcp_echo)
     ProfilerStart("test_kcp_echo.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr,"网络库测试用例: test_kcp_echo \n");
-    Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, NT_KCP, 10*1024*1024, 10*1024*1024);
-    Singleton<TestNetworkEcho>::Instance()->Start();
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_KCP, 10*1024*1024, 10*1024*1024);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start();
     bool run = true;
     std::thread t([&](){
         while(run)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            Singleton<TestNetworkEcho>::Instance()->Update();
+            ToolBox::Singleton<TestNetworkEcho>::Instance()->Update();
         }
     });
     uint32_t used_time = 0;
@@ -154,7 +154,7 @@ CASE(test_kcp_echo)
     }
 
     run = false;
-    Singleton<TestNetworkEcho>::Instance()->StopWait();
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->StopWait();
     t.join();
 #ifdef USE_GPERF_TOOLS
     ProfilerStop();
@@ -170,16 +170,16 @@ CASE(test_kcp_forward)
     ProfilerStart("test_udp_forward.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr,"网络库测试用例: test_udp_forward \n");
-    Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
-    Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, NT_KCP);
-    Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, NT_KCP, 10*1024*1024, 10*1024*1024);
-    Singleton<TestNetworkForward>::Instance()->Start();
+    ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, ToolBox::NT_KCP);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_KCP, 10*1024*1024, 10*1024*1024);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&](){
         while(run)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            Singleton<TestNetworkForward>::Instance()->Update();
+            ToolBox::Singleton<TestNetworkForward>::Instance()->Update();
         }
     });
     uint32_t used_time = 0;
@@ -203,7 +203,7 @@ CASE(test_kcp_forward)
 
     run = false;
     t.join();
-    Singleton<TestNetworkForward>::Instance()->StopWait();
+    ToolBox::Singleton<TestNetworkForward>::Instance()->StopWait();
 #ifdef USE_GPERF_TOOLS
     ProfilerStop();
 #endif // USE_GPERF_TOOLS

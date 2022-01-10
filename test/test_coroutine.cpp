@@ -10,7 +10,7 @@ struct Args
     int n;
 };
 
-static void foo(Schedule* sch, void *ud)
+static void foo(ToolBox::Schedule* sch, void *ud)
 {
     if(nullptr == sch)
     {
@@ -27,9 +27,7 @@ static void foo(Schedule* sch, void *ud)
 
 
 CASE(CoroutineCase1){
-
-
-    Schedule sch;
+    ToolBox::Schedule sch;
     Args arg1 = { 0 };
     Args arg2 = { 100 };
     
@@ -37,7 +35,7 @@ CASE(CoroutineCase1){
     int co2 = sch.CoroutineNew(foo,&arg2);
 
     printf("main start\n");
-    while (COROUTINE_STATUS::COROUTINE_DEAD != sch.CoroutineStatus(co1) && COROUTINE_STATUS::COROUTINE_DEAD != sch.CoroutineStatus(co2))
+    while (ToolBox::COROUTINE_STATUS::COROUTINE_DEAD != sch.CoroutineStatus(co1) && ToolBox::COROUTINE_STATUS::COROUTINE_DEAD != sch.CoroutineStatus(co2))
     {
         sch.CoroutineResume(co1);
         sch.CoroutineResume(co2);
