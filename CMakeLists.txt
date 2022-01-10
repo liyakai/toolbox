@@ -1,5 +1,5 @@
-# cmake verson
-cmake_minimum_required(VERSION 2.8.12.2)
+# cmake verson windows需要版本3的cmake. Linux可以降为版本2的cmake
+cmake_minimum_required(VERSION 3.18.2)  
 
 # project name
 PROJECT(toolbox)

@@ -36,7 +36,7 @@ constexpr std::size_t DEFAULT_BACKLOG_SIZE = 256;
 constexpr int32_t KCP_TRANSPORT_MTU = 1000;
 constexpr uint32_t KCP_CONV = 0x01020304;          // kcp»á»°ID, must equal in two endpoint from the same connection
 
-using SocketAddress = struct sockaddr_in;
+typedef struct sockaddr_in SocketAddress;
 /*
 * ´íÎóÂë
 */

@@ -7,7 +7,7 @@ namespace ToolBox{
 using ACCEPTEX = LPFN_ACCEPTEX;  // AcceptEx 函数指针,详见MSDN
 // MSDN: The number of bytes reserved for the local address information. 
 // This value must be at least 16 bytes more than the maximum address length for the transport protocol in use.
-constexpr std::size_t ACCEPTEX_ADDR_SIZE = sizeof(sockaddr_in) + 16;
+constexpr std::size_t ACCEPTEX_ADDR_SIZE = sizeof(SocketAddress) + 16;
 constexpr std::size_t ACCEPTEX_BUFF_SIZE = 2014;
 
 /*
@@ -17,7 +17,7 @@ struct PerIOContext
 {
     OVERLAPPED      over_lapped;    // windows 重叠I/O数据结构
     WSABUF          wsa_buf;        // 存储数据的缓冲区,用来给重叠操作传递参数.
-    SocketState  io_type;           // 当前的I/O类型. IOCP没有像epoll那样的EPOLLIN,EPOLLOUT,只能通过自身携带的类型做标记.
+    SocketState     io_type;        // 当前的I/O类型. IOCP没有像epoll那样的EPOLLIN,EPOLLOUT,只能通过自身携带的类型做标记.
 };
 
 /*

@@ -1,3 +1,4 @@
+
 #include "src/tools/lru_cache.h"
 #include "unit_test_frame/unittest.h"
 #include <iostream>
@@ -5,7 +6,7 @@
 #include <vector>
 
 
-FIXTURE_BEGIN(LRUCache)
+FIXTURE_BEGIN(LRUCacheTest)
 
 CASE(TestLRUCacheWithoutLock){
     using KVCache = ToolBox::LRUCache<std::string, int32_t>;
@@ -33,10 +34,10 @@ CASE(TestLRUCacheWithoutLock){
     int32_t value_out;
     kvc.Get("github",value_out);
     fprintf(stderr, "github 应该移动到第一个.\n");
-	CachePrint(kvc);
+    CachePrint(kvc);
     kvc.Get("foo",value_out);
     fprintf(stderr, "world 应该移动到第一个.\n");
-	CachePrint(kvc);
+    CachePrint(kvc);
 }
 
 CASE(TestLRUCacheWithLock){
@@ -78,4 +79,5 @@ CASE(TestLRUCacheWithLock){
     CachePrint(lkvc);
 }
 
-FIXTURE_END(LRUCache)
+FIXTURE_END(AWLRUCacheTest)
+
