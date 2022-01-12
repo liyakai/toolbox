@@ -1,4 +1,4 @@
-#include "src/tool/debug_new.h"
+#include "src/tools/debug_new.h"
 #include "unit_test_frame/unittest.h"
 
 FIXTURE_BEGIN(TestDebugNew)

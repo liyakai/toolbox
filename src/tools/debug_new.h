@@ -1,6 +1,9 @@
 #pragma once
 #include <new>
 #include <mutex>
+#include <unordered_map>
+#include <map>
+#include<string.h>
 
 #define ENABLE_CHECK_LEAKS 1
 
@@ -9,17 +12,17 @@
 // 定义文件名长度
 #ifndef DEBUG_NEW_FILENAME_LEN
 #define DEBUG_NEW_FILENAME_LEN 32
-#endif
+#endif // DEBUG_NEW_FILENAME_LEN
 
 // 定义表的长度
 #ifndef DEBUG_NEW_TABLESIZE
 #define DEBUG_NEW_TABLESIZE (16*024*100)
-#endif
+#endif   // DEBUG_NEW_TABLESIZE
 
 // 定义一个hash函数
 #ifndef DEBUG_NEW_HASH
 #define DEBUG_NEW_HASH(p) ((reinterpret_cast<uint64_t>(p) >> 8) % DEBUG_NEW_TABLESIZE)
-
+#endif // DEBUG_NEW_HASH
 // 统计打印输出内存使用情况
 #define CHECK_LEAKS CheckLeaks();
 
@@ -46,13 +49,13 @@ static std::mutex g_mutex;
 void AddNewAddr(void* pointer, const char* file, int32_t line, std::size_t size)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    g_new_addr_map.insert(std::make_pair(static_cast<uint64_t>(pointer), NewAddr(file,line,size)));
+    g_new_addr_map.insert(std::make_pair(reinterpret_cast<uint64_t>(pointer), NewAddr(file,line,size)));
 }
 
 void RemoveNewAddr(void* pointer)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    g_new_addr_map.erase(static_cast<uint64_t>(pointer));
+    g_new_addr_map.erase(reinterpret_cast<uint64_t>(pointer));
 }
 
 /*
@@ -67,11 +70,11 @@ struct NewPtrList
     NewPtrList()
     {
         next = nullptr;
-        nzero(filename, DEBUG_NEW_FILENAME_LEN);
+        bzero(filename, DEBUG_NEW_FILENAME_LEN);
         line = 0;
         size = 0;
     }
-}
+};
 
 static NewPtrList* g_new_ptr_list[DEBUG_NEW_TABLESIZE];
 std::size_t list_size = 0;
@@ -82,14 +85,14 @@ bool CheckLeaks()
     {
         char name[DEBUG_NEW_FILENAME_LEN + 8];
         int32_t size;
-    }
+    };
     bool f_leaked = false;
     std::size_t index = 0;
     ListEntry* tmp_list = nullptr;
     
     {
         std::lock_guard<std::mutex> lock(g_mutex);
-        tmp_list = (ListEntry*)malloc(sizeof(ListEntry) * list_size)
+        tmp_list = (ListEntry*)malloc(sizeof(ListEntry) * list_size);
         if (nullptr != tmp_list)
         {
             return false;
@@ -106,7 +109,7 @@ bool CheckLeaks()
             {
                 if(index < list_size)
                 {
-                    snprintf(tmp_list[index].name, DEBUG_NEW_FILENAME_LEN + 8,"%s:%d", ptr->fn, ptr->line);
+                    snprintf(tmp_list[index].name, DEBUG_NEW_FILENAME_LEN + 8,"%s:%d", ptr->filename, ptr->line);
                     tmp_list[index].size = ptr->size;
                     index++;
                 }
@@ -133,7 +136,7 @@ bool CheckLeaks()
         for (auto iter = g_new_addr_map.begin(); iter != g_new_addr_map.end(); iter++)
         {
             f_leaked = true;
-            fprintf(stderr, "[内存泄漏分类统计] %s:%u size:%lu", iter->second.file, iterr->second.line, iter->second.size);
+            fprintf(stderr, "[内存泄漏分类统计] %s:%u size:%lu", iter->second.na_file, iter->second.na_line, iter->second.na_size);
         }
     }
     if (!f_leaked)
@@ -159,9 +162,9 @@ void* operator new(std::size_t size, const char* file, int32_t line)
     ptr->size = size;
 
     {
-        std::lock_guard<std::mutex> lock(mem_mutex);
-        ptr->next = NewPtrList[hash_index];
-        NewPtrList[hash_index] = ptr;
+        std::lock_guard<std::mutex> lock(g_mem_mutex);
+        ptr->next = g_new_ptr_list[hash_index];
+        g_new_ptr_list[hash_index] = ptr;
         list_size++;
     }
     return pointer;
@@ -201,7 +204,7 @@ void operator delete(void* pointer)
     NewPtrList* ptr_pre = nullptr;
 
     {
-        std::lock_guard<std::mutex> lock(mem_mutex);
+        std::lock_guard<std::mutex> lock(g_mem_mutex);
         NewPtrList* ptr = g_new_ptr_list[hash_index];
         while(ptr)
         {
@@ -219,7 +222,7 @@ void operator delete(void* pointer)
                 free(ptr);
                 return;
             }
-            ptr_ptr = ptr;
+            ptr_pre = ptr;
             ptr = ptr->next;
         }
     }
