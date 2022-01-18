@@ -5,6 +5,7 @@ toolbox
 linux/macos 系统:  
     debug版本: `sh build_debug.sh`
     release版本: `sh build_release.sh`
+
 windows 系统:
     在vs2019开始界面选择右侧下面的小字"继续但无需代码",然后选择文件-打开-cmake,选择 Cmakelists.txt
     vs会自动展开cmake项目,可以直接编译运行.
