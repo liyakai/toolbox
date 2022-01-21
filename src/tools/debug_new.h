@@ -20,15 +20,7 @@
 #define DEBUG_NEW_FILENAME_LEN 128
 #endif // DEBUG_NEW_FILENAME_LEN
 
-// 定义表的长度
-#ifndef DEBUG_NEW_TABLESIZE
-#define DEBUG_NEW_TABLESIZE (16*1024*100)
-#endif   // DEBUG_NEW_TABLESIZE
 
-// 定义一个hash函数
-#ifndef DEBUG_NEW_HASH
-#define DEBUG_NEW_HASH(p) ((reinterpret_cast<uint64_t>(p) >> 8) % DEBUG_NEW_TABLESIZE)
-#endif // DEBUG_NEW_HASH
 // 统计打印输出内存使用情况
 #define CHECK_LEAKS CheckLeaks();
 
