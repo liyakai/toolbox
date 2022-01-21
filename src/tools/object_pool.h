@@ -9,8 +9,8 @@
 
 namespace ToolBox{
 
-#ifndef ENABLE_MEMORY_POOL
-#define ENABLE_MEMORY_POOL 1
+#ifndef ENABLE_OBJECT_POOL
+#define ENABLE_OBJECT_POOL 1
 #endif
 
 #ifndef ENABLE_DEBUG_OBJECT_POOL
@@ -53,7 +53,7 @@ public:
     template<typename...Args>
     ObjectType* GetObject(Args...args)
     {
-#if ENABLE_MEMORY_POOL
+#if ENABLE_OBJECT_POOL
         ObjectType* mem = nullptr;
         allocated_count_.fetch_add(1);
         {
@@ -69,14 +69,14 @@ public:
         return object;
 #else 
         return new ObjectType(args...);
-#endif    // ENABLE_MEMORY_POOL
+#endif    // ENABLE_OBJECT_POOL
     }
     /*
     * 回收对象
     */
    void GiveBack(ObjectType* object, std::string debug_tag = "")
    {
-#if ENABLE_MEMORY_POOL
+#if ENABLE_OBJECT_POOL
        allocated_count_.fetch_sub(1);
        object->~ObjectType();
        std::lock_guard<std::mutex> lock(lock_);
@@ -92,7 +92,8 @@ public:
        free_objects_.emplace_back(object);
 #else 
         delete object;
-#endif    // ENABLE_MEMORY_POOL
+        object = nullptr;
+#endif    // ENABLE_OBJECT_POOL
    }
 
     /*

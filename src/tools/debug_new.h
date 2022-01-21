@@ -7,13 +7,16 @@
 #include <inttypes.h>
 #include <stdint.h>
 
-#define ENABLE_CHECK_LEAKS 1
+#define ENABLE_CHECK_LEAKS 0
 
+#ifndef ENABLE_CHECK_LEAKS
+#define ENABLE_CHECK_LEAKS 1
+#endif
 /*
 * @file brief 接管系统的new和delete,统计内存使用情况.
 */
 
-#ifdef ENABLE_CHECK_LEAKS
+#if ENABLE_CHECK_LEAKS
 
 // 定义文件名长度
 #ifndef DEBUG_NEW_FILENAME_LEN

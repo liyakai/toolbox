@@ -9,8 +9,15 @@
 
 namespace ToolBox{
 
-#define ENABLE_MEMORY_POOL 1
-#define ENABLE_DEBUG_MEMORY_POOL 0
+#define ENABLE_MEMORY_POOL_LOCK_FREE 0
+
+#ifndef ENABLE_MEMORY_POOL_LOCK_FREE
+#define ENABLE_MEMORY_POOL_LOCK_FREE 1
+#endif
+
+#ifndef ENABLE_DEBUG_MEMORY_POOL_LOCK_FREE
+#define ENABLE_DEBUG_MEMORY_POOL_LOCK_FREE 0
+#endif
 
 #define MemPoolLockFreeMgr Singleton<ToolBox::MemoryPoolLockFree>::Instance()
 
@@ -41,9 +48,9 @@ public:
     */
     bool SetChunkSize(std::size_t size)
     {
-#if ENABLE_DEBUG_MEMORY_POOL
+#if ENABLE_DEBUG_MEMORY_POOL_LOCK_FREE
         SetDebugPrint(true);
-#endif // ENABLE_DEBUG_MEMORY_POOL
+#endif // ENABLE_DEBUG_MEMORY_POOL_LOCK_FREE
         if (0 == chunk_size_)
         {
             chunk_size_ = size;
@@ -109,9 +116,9 @@ public:
     char* GetMemory(std::size_t size)
     {
         size = RebuildNum(size + sizeof(std::uint32_t));
-#if !ENABLE_MEMORY_POOL
+#if !ENABLE_MEMORY_POOL_LOCK_FREE
         return new char[size];
-#endif // !ENABLE_MEMORY_POOL
+#endif // !ENABLE_MEMORY_POOL_LOCK_FREE
         auto iter = pool_.find(size);
         if (iter == pool_.end())
         {
@@ -131,10 +138,10 @@ public:
     */
     void GiveBack(char* pointer, std::string debug_tag = "")
     {
-#if !ENABLE_MEMORY_POOL
+#if !ENABLE_MEMORY_POOL_LOCK_FREE
         delete pointer;
         return;
-#endif  // !ENABLE_MEMORY_POOL
+#endif  // !ENABLE_MEMORY_POOL_LOCK_FREE
         if(nullptr == pointer)
         {
             return;

@@ -10,7 +10,16 @@
 
 namespace ToolBox{
     
-#define ENABLE_DEBUG_OBJECT_POOL 0
+#define ENABLE_OBJECT_POOL 0
+
+#ifndef ENABLE_OBJECT_POOL
+#define ENABLE_OBJECT_POOL 1
+#endif
+
+#ifndef ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE
+#define ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE 0
+#endif
+
 
 /*
 * 定义对象池
@@ -29,9 +38,9 @@ public:
     ObjectPoolLockFree()
     // : allocated_count_(0)
     {
-#if ENABLE_DEBUG_OBJECT_POOL
+#if ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE
         SetDebugPrint(true);
-#endif // ENABLE_DEBUG_OBJECT_POOL
+#endif // ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE
         Expand();
     };
     /*
@@ -46,6 +55,7 @@ public:
     template<typename...Args>
     ObjectType* GetObjectLockFree(Args...args)
     {
+#if ENABLE_OBJECT_POOL
         ObjectType* mem = nullptr;
         // allocated_count_.fetch_add(1);
         {
@@ -58,15 +68,19 @@ public:
         }
         auto* object = new(mem)ObjectType(args...);
         return object;
+#else 
+        return new ObjectType(args...);
+#endif 
     }
     /*
     * 回收对象
     */
    void GiveBackLockFree(ObjectType* object, std::string debug_tag = "")
    {
+#if ENABLE_OBJECT_POOL
        // allocated_count_.fetch_sub(1);
        object->~ObjectType();
-#if ENABLE_DEBUG_OBJECT_POOL
+#if ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE
        auto iter = find(free_objects_.begin(), free_objects_.end(), object);
        if(iter != free_objects_.end())
        {
@@ -74,8 +88,12 @@ public:
            std::this_thread::sleep_for(std::chrono::milliseconds(1000*1000));
            return;
        }
-#endif // ENABLE_DEBUG_OBJECT_POOL
+#endif // ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE
        free_objects_.enqueue(object);
+#else
+        delete object;
+        object = nullptr;
+#endif 
    }
 
     /*
