@@ -53,7 +53,7 @@ public:
         }
         
         std::lock_guard<std::mutex> lock(mutex_);
-        new_addr_map_.erase(reinterpret_cast<uint64_t>(pointer));
+        new_addr_map_.erase(iter);
         return true;
     }
 
