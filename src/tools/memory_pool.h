@@ -8,8 +8,13 @@
 
 namespace ToolBox{
 
+#ifndef ENABLE_MEMORY_POOL
 #define ENABLE_MEMORY_POOL 1
+#endif
+
+#ifndef ENABLE_DEBUG_MEMORY_POOL
 #define ENABLE_DEBUG_MEMORY_POOL 0
+#endif
 
 #define MemPoolMgr Singleton<ToolBox::MemoryPool>::Instance()
 
