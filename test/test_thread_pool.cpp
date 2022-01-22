@@ -4,7 +4,7 @@
 
 FIXTURE_BEGIN(TestThreadPool)
 
-// ²âÊÔÊý×ÖÓÐ·µ»Ø
+// æµ‹è¯•æ•°å­—æœ‰è¿”å›ž
 CASE(TestThreadPoolCase1_num){
     std::mutex mtx;
     try{
@@ -26,7 +26,7 @@ CASE(TestThreadPoolCase1_num){
     }
 }
 
-// ²âÊÔ×Ö·û´®ÎÞ·µ»Ø
+// æµ‹è¯•å­—ç¬¦ä¸²æ— è¿”å›ž
 CASE(TestThreadPoolCase1_num_str){
     std::mutex mtx;
     try{
