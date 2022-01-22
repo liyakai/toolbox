@@ -91,6 +91,15 @@ end
 | 10000 | 1400Byte | 113Mbps | echo:70.5% forward:40.9% | echo:0.0% forward11.8% |
 | 20000 | 1400Byte | 219Mbps | echo:47.4% forward:111.9% | echo:0.1% forward:17.3% |
 
+20220122 Updtes:
+将网络库使用的对象池和内存池替换为原生的new和delete.其测试结果:
+| 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
+| --- | --- | --- | --- | --- |
+| 2000 | 1400Byte | 22.3 Mbps | echo:15.6% forward:29.1% | echo:0.0% forward:1.6% |
+| 5000 | 1400Byte |  57.0 Mbps | echo:24.8% forward:41.4% | echo:0.0% forward:4.0% |
+| 10000 | 1400Byte | 110 Mbps | echo: 33.1 % forward: 53.5 % | echo:0.0% forward:8.0% |
+| 20000 | 1400Byte | 220 Mbps | echo: 40.5% forward:86.4% | echo:0.0% forward: 16.0% |
+
 ##### 2.1.2.2 机器人每秒向服务器发送十个数据块
 
 | 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
