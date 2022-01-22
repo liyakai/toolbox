@@ -1,10 +1,10 @@
-# cmake verson windowsĞèÒª°æ±¾3µÄcmake. Linux¿ÉÒÔ½µÎª°æ±¾2µÄcmake
+# cmake verson windowséœ€è¦ç‰ˆæœ¬3çš„cmake. Linuxå¯ä»¥é™ä¸ºç‰ˆæœ¬2çš„cmake
 cmake_minimum_required(VERSION 3.12.0)  
 
 # project name
 PROJECT(toolbox)
 
-# ¸ù¾İºêÈ·¶¨²»Í¬µÄ²Ù×÷ÏµÍ³
+# æ ¹æ®å®ç¡®å®šä¸åŒçš„æ“ä½œç³»ç»Ÿ
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Configuring on/for Linux")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -18,15 +18,17 @@ else()
 endif()
 
 
-# ÉèÖÃ±àÒëÑ¡Ïî
+# è®¾ç½®ç¼–è¯‘é€‰é¡¹
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11  -lpthread ")
 
-# ÉèÖÃ±àÒëµ÷ÊÔĞÅÏ¢
+# è®¾ç½®ç¼–è¯‘è°ƒè¯•ä¿¡æ¯
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
     add_definitions(-DDEBUG -g)
+else()
+    add_definitions(-O2)
 endif()
 
-# Í·ÎÄ¼ş
+# å¤´æ–‡ä»¶
 INCLUDE_DIRECTORIES(
     .
     ./src/tools
@@ -39,7 +41,7 @@ INCLUDE_DIRECTORIES(
     ./src/thirdparty
 )
 
-# Ô´ÎÄ¼ş
+# æºæ–‡ä»¶
 AUX_SOURCE_DIRECTORY(./src/tools DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/thirdparty/kcp DIR_SRCS)
@@ -48,7 +50,7 @@ AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_epoll DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_iocp DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_kqueue DIR_SRCS)
 
-# ÉèÖÃÊä³öÂ·¾¶
+# è®¾ç½®è¾“å‡ºè·¯å¾„
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 # set environment variable
@@ -59,10 +61,10 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 # add library
 ADD_LIBRARY(toolbox ${DIR_SRCS})
 
-# µ¥Ôª²âÊÔ
+# å•å…ƒæµ‹è¯•
 add_subdirectory(test)
 
-# ±àÒëÑ¡Ïî
+# ç¼–è¯‘é€‰é¡¹
 option(CMAKE_GPERF_TOOLS_CPU "Use Gperf Tools cpu-profiler" OFF)
 if(CMAKE_GPERF_TOOLS_CPU)
     message(STATUS "Use Gperf Tools cpu-profiler")
