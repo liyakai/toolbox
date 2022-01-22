@@ -1,6 +1,8 @@
 #pragma once
 #include "src/tools/object_pool.h"
 #include "src/tools/object_pool_lock_free.h"
+#include "src/tools/memory_pool.h"
+#include "src/tools/memory_pool_lock_free.h"
 
 namespace ToolBox{
 
@@ -41,15 +43,15 @@ constexpr std::size_t NETWORK_EVENT_QUEUE_MAX_COUNT = 32 * 1024;
 
 
 /************************************************************
-**********     获取对象的三种方法      **********************
+**********     网络库获取对象的三种方法       ****************
 ************************************************************/
 
 // 宏定义获取对象的方法[调用入口]
 #define GET_NET_OBJECT(OBJECT_TYPE, ...) \
-    GET_NET_OBJECT_OELF(OBJECT_TYPE, __VA_ARGS__)
+    GET_NET_OBJECT_RAW(OBJECT_TYPE, __VA_ARGS__)
 // 宏定义释放对象的方法[调用入口]
 #define GIVE_BACK_OBJECT(POINTER)   \
-    GIVE_BACK_OBJECT_OELF(POINTER)
+    GIVE_BACK_OBJECT_RAW(POINTER)
 
 //-----------[下面是三种内部实现选项]-----------------
 
@@ -62,17 +64,54 @@ constexpr std::size_t NETWORK_EVENT_QUEUE_MAX_COUNT = 32 * 1024;
 
 
 // 宏定义从对象池中获取网络事件对象[选项2]
-#define GET_NET_OBJECT_OE(OBJECT_TYPE, ...) \
+#define GET_NET_OBJECT_OP(OBJECT_TYPE, ...) \
     GetObject<OBJECT_TYPE>(__VA_ARGS__)
 // 宏定义释放对象到对象池中[选项2]
-#define GIVE_BACK_OBJECT_OE(POINTER)    \
+#define GIVE_BACK_OBJECT_OP(POINTER)    \
     GiveBackObject(POINTER);
 
 // 宏定义从无锁对象池中获取网络事件对象[选项3]
-#define GET_NET_OBJECT_OELF(OBJECT_TYPE, ...) \
+#define GET_NET_OBJECT_OPLF(OBJECT_TYPE, ...) \
     GetObjectLockFree<OBJECT_TYPE>(__VA_ARGS__)
 // 宏定义释放对象到无锁对象池中[选项3]
-#define GIVE_BACK_OBJECT_OELF(POINTER)  \
+#define GIVE_BACK_OBJECT_OPLF(POINTER)  \
     GiveBackObjectLockFree(POINTER);
+
+
+
+/************************************************************
+**********     网络库获取内存的三种方法       ****************
+************************************************************/
+
+// 宏定义获取对象的方法[调用入口]
+#define GET_NET_MEMORY(SIZE) \
+    GET_NET_MEMORY_RAW(SIZE)
+// 宏定义释放对象的方法[调用入口]
+#define GIVE_BACK_MEMORY(POINTER, ...)   \
+    GIVE_BACK_MEMORY_RAW(POINTER, __VA_ARGS__)
+
+//-----------[下面是三种内部实现选项]-----------------
+
+// 宏定义获取原生内存[选项1]
+#define GET_NET_MEMORY_RAW(SIZE) \
+    new char[SIZE]
+// 宏定义释放原生内存[选项1]
+#define GIVE_BACK_MEMORY_RAW(POINTER,...)   \
+    delete POINTER;
+
+
+// 宏定义从内存池中获取内存[选项2]
+#define GET_NET_MEMORY_MP(SIZE) \
+    MemPoolMgr->GetMemory(SIZE);
+// 宏定义释放内存到内存池中[选项2]
+#define GIVE_BACK_MEMORY_MP(POINTER,...)    \
+    MemPoolMgr->GiveBack((char*)POINTER, __VA_ARGS__);
+
+// 宏定义从无锁对象池中获取网络事件对象[选项3]
+#define GET_NET_OBJECT_MPLF(SIZE) \
+    MemPoolLockFreeMgr->GetMemory(SIZE);
+// 宏定义释放对象到无锁对象池中[选项3]
+#define GIVE_BACK_OBJECT_MPLF(POINTER,...)  \
+    MemPoolLockFreeMgr->GiveBack((char*)POINTER, __VA_ARGS__);
 
 };  // ToolBox

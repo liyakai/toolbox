@@ -2,7 +2,6 @@
 
 #ifdef __linux__
 
-#include <src/tools/object_pool_lock_free.h>
 #include "src/network/net_imp/net_epoll/udp_epoll_network.h"
 
 namespace ToolBox{
@@ -257,7 +256,7 @@ void UdpSocket::KcpRecv(const char* buffer, std::size_t length, const UdpAddress
     auto bytes_size = ikcp_recv(kcp_, out_buffer, sizeof(out_buffer));
     if(bytes_size > 0)
     {
-        char *buff_block = MemPoolLockFreeMgr->GetMemory(bytes_size);
+        char *buff_block = GET_NET_MEMORY(bytes_size);
         memcpy(buff_block, out_buffer, bytes_size);
         p_network_->OnReceived(UdpAddress(address).GetID(), buff_block, bytes_size);
     }
@@ -285,7 +284,7 @@ void UdpSocket::UpdateRecv()
             }
             if(nullptr == kcp_)     // 原始 udp 模式
             {
-                char *buff_block = MemPoolLockFreeMgr->GetMemory(size);
+                char *buff_block = GET_NET_MEMORY(size);
                 memcpy(buff_block, array.data(), size);
                 p_network_->OnReceived(UdpAddress(address).GetID(), buff_block, size);
             } else                  // 开启了kcp

@@ -1,6 +1,5 @@
 #include "event.h"
-#include "src/tools/memory_pool_lock_free.h"
-#include "src/tools/object_pool_lock_free.h"
+#include "src/network/network_def.h"
 #include <string.h>
 
 namespace ToolBox{
@@ -31,7 +30,7 @@ NetEventWorker::~NetEventWorker()
     switch(GetID())
     {
         case EID_MainToWorkerSend:
-            MemPoolLockFreeMgr->GiveBack(net_req_.stream_.data_, "NetEventWorker::~NetEventWorker");
+            GIVE_BACK_MEMORY_RAW(net_req_.stream_.data_, "NetEventWorker::~NetEventWorker");
             break;
         default:
             break;
@@ -118,7 +117,7 @@ NetEventMain::~NetEventMain()
     switch(GetID())
     {
         case EID_WorkerToMainRecv:
-            MemPoolLockFreeMgr->GiveBack((char*)net_evt_.recv_.data_);
+            GIVE_BACK_MEMORY_RAW((char*)net_evt_.recv_.data_);
             break;
         default:
             break;

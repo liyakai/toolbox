@@ -73,7 +73,7 @@ void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
 }
 void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size) 
 {
-    auto* data_to_worker = MemPoolLockFreeMgr->GetMemory(size);
+    auto* data_to_worker = GET_NET_MEMORY(size);
     memmove(data_to_worker, data, size);
     auto* event = GET_NET_OBJECT(NetEventWorker,EID_MainToWorkerSend);
     event->SetConnectID(conn_id);
