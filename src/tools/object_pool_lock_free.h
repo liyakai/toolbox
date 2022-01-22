@@ -10,10 +10,10 @@
 
 namespace ToolBox{
     
-#define ENABLE_OBJECT_POOL 0
+#define ENABLE_OBJECT_POOL_LOCK_FREE 0
 
-#ifndef ENABLE_OBJECT_POOL
-#define ENABLE_OBJECT_POOL 1
+#ifndef ENABLE_OBJECT_POOL_LOCK_FREE
+#define ENABLE_OBJECT_POOL_LOCK_FREE 1
 #endif
 
 #ifndef ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE
@@ -55,7 +55,7 @@ public:
     template<typename...Args>
     ObjectType* GetObjectLockFree(Args...args)
     {
-#if ENABLE_OBJECT_POOL
+#if ENABLE_OBJECT_POOL_LOCK_FREE
         ObjectType* mem = nullptr;
         // allocated_count_.fetch_add(1);
         {
@@ -77,7 +77,7 @@ public:
     */
    void GiveBackLockFree(ObjectType* object, std::string debug_tag = "")
    {
-#if ENABLE_OBJECT_POOL
+#if ENABLE_OBJECT_POOL_LOCK_FREE
        // allocated_count_.fetch_sub(1);
        object->~ObjectType();
 #if ENABLE_DEBUG_OBJECT_POOL_LOCK_FREE
