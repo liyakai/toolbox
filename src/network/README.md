@@ -37,12 +37,29 @@ end
 | 10000 | 1400Byte | 110Mbps | echo:47.7%| echo:15.9%|
 | 20000 | 1400Byte | Mbps | echo:%| echo:0.0%|
 
+20220122 Updtes:
+将网络库使用的对象池和内存池替换为原生的new和delete.其测试结果:
+| 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
+| --- | --- | --- | --- | --- |
+| 2000 | 1400Byte |22.2 Mbps | echo:20.5%| echo:1.6%|
+| 5000 | 1400Byte | 54.8Mbps | echo:34.1%| echo:4.0%|
+| 10000 | 1400Byte | 110Mbps | echo:42.2%| echo:8.0%|
+| 20000 | 1400Byte | 220Mbps | echo:60.9%| echo:16.0%|
+
 ##### 2.1.1.2 机器人每秒向服务器发送十个数据块
 
 | 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
 | --- | --- | --- | --- | --- |
 | 2000 | 1400Byte | 210Mbps | echo: 68.8 % | echo:2.4% |
 | 5000 | 1400Byte | 551Mbps | echo: 124.9%| echo:4.3% |
+| 10000 | 1400Byte |  |  |  |
+
+20220122 Updtes:
+将网络库使用的对象池和内存池替换为原生的new和delete.其测试结果:
+| 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
+| --- | --- | --- | --- | --- |
+| 2000 | 1400Byte | 210Mbps | echo: 54.0% | echo:1.6% |
+| 5000 | 1400Byte | 447Mbps | echo: 112.3%| echo: 4.0% |
 | 10000 | 1400Byte |  |  |  |
 
 #### 2.1.2 回声+转发模型测试
@@ -71,7 +88,7 @@ subgraph Server
     C(EchoNet) <--> B
 end
 ```
-![tcp_epoll_回声_转发测试架构图](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_test_frame_echo_forward.svg)
+![tcp_epoll_回声_转发测试架构图](../../doc/picture/tcp_epoll_test_frame_echo_forward.svg)
 
 ##### 2.1.2.1 机器人每秒向服务器发送一个数据块
 
@@ -108,15 +125,26 @@ end
 | 5000 | 1400Byte | 320Mbps | echo:60.5% forward:131.9% | echo:0.0% forward:5.1% |
 | 10000 | 1400Byte |  |  |  |
 
+20220122 Updtes:
+| 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
+| --- | --- | --- | --- | --- |
+| 2000 | 1400Byte | 212 Mbps | echo:41.5% forward:85.5% | echo:0.0% forward:1.6%  |
+| 5000 | 1400Byte | 554  Mbps | echo:42.5 % forward: 129.5% | echo:0.2% forward: 4.2% |
+| 10000 | 1400Byte |  |  |  |
+
 *机器人的TCP接收回声数据处理后再sleep 1000ms再次发送数据,带宽会低于理论值.这里的数据都是机器人在正确完整接收回声数据的前提下进行.
 
 ##### 2.1.2.3 1000机器人下forward服务器的火焰图
 
-![1000机器人压力下转发服务器火焰图](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_forward_on_1000_robots.svg)
+![1000机器人压力下转发服务器火焰图](../../doc/picture/tcp_epoll_forward_on_1000_robots.svg)
 
 20211226 Updtes:
 将网络库使用的对象池和内存池替换为无锁形式.其火焰图为:
-![1000机器人压力下转发服务器火焰图(lockfree)](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_forward_on_1000_robots_lock_free.svg)
+![1000机器人压力下转发服务器火焰图(lockfree)](../../doc/picture/tcp_epoll_forward_on_1000_robots_lock_free.svg)
+
+20220122 Updtes:
+网络库不使用对象池和内存池的情况下,其火焰图为:
+![1000机器人压力下转发服务器火焰图(raw)](../../doc/picture/tcp_epoll_forward_on_1000_robots_raw.svg)
 
 
 ##### 2.1.2.4 小结
@@ -126,3 +154,6 @@ end
 将网络库使用的对象池和内存池替换为无锁形式. 
 通过火焰图和每秒一个数据块的测试数据对比,其表现与有锁版本基本一致.这说明对象池和内存池中的锁并不是限制因素,否定了之前的猜测.
 
+20220122 Updtes:
+网络库不使用对象池和内存池,使用原生的new和delete
+此次测试结果显示,多线程情况下使用原生的new和delete的性能较使用内存池和对象池的情况下有所改善,并且在压力较大的情况下改善较为显著.
