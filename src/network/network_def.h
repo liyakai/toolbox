@@ -1,4 +1,7 @@
 #pragma once
+#include "src/tools/object_pool.h"
+#include "src/tools/object_pool_lock_free.h"
+
 namespace ToolBox{
 
 // 网络类型
@@ -33,7 +36,43 @@ enum class ENetErrCode
     NET_RECV_PIPE_OVERFLOW, // 接收ringbuffer满
 };
 
+// 主线程与网络线程之间的队列的最大数量
+constexpr std::size_t NETWORK_EVENT_QUEUE_MAX_COUNT = 32 * 1024; 
 
-constexpr std::size_t NETWORK_EVENT_QUEUE_MAX_COUNT = 32 * 1024; // 主线程与网络线程之间的队列的最大数量
+
+/************************************************************
+**********     获取对象的三种方法      **********************
+************************************************************/
+
+// 宏定义获取对象的方法[调用入口]
+#define GET_NET_OBJECT(OBJECT_TYPE, ...) \
+    GET_NET_OBJECT_OELF(OBJECT_TYPE, __VA_ARGS__)
+// 宏定义释放对象的方法[调用入口]
+#define GIVE_BACK_OBJECT(POINTER)   \
+    GIVE_BACK_OBJECT_OELF(POINTER)
+
+//-----------[下面是三种内部实现选项]-----------------
+
+// 宏定义获取原生网络事件对象[选项1]
+#define GET_NET_OBJECT_RAW(OBJECT_TYPE, ...) \
+    new OBJECT_TYPE(__VA_ARGS__)
+// 宏定义释放原生网络事件对象[选项1]
+#define GIVE_BACK_OBJECT_RAW(POINTER)   \
+    delete POINTER;
+
+
+// 宏定义从对象池中获取网络事件对象[选项2]
+#define GET_NET_OBJECT_OE(OBJECT_TYPE, ...) \
+    GetObject<OBJECT_TYPE>(__VA_ARGS__)
+// 宏定义释放对象到对象池中[选项2]
+#define GIVE_BACK_OBJECT_OE(POINTER)    \
+    GiveBackObject(POINTER);
+
+// 宏定义从无锁对象池中获取网络事件对象[选项3]
+#define GET_NET_OBJECT_OELF(OBJECT_TYPE, ...) \
+    GetObjectLockFree<OBJECT_TYPE>(__VA_ARGS__)
+// 宏定义释放对象到无锁对象池中[选项3]
+#define GIVE_BACK_OBJECT_OELF(POINTER)  \
+    GiveBackObjectLockFree(POINTER);
 
 };  // ToolBox

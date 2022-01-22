@@ -7,7 +7,6 @@
 #elif defined(__APPLE__)
 #include "src/network/net_imp/net_kqueue/tcp_kqueue_network.h"
 #endif
-#include "src/tools/object_pool_lock_free.h"
 
 namespace ToolBox{
 
@@ -54,7 +53,7 @@ void NetworkMaster::StopWait()
     }
     while (!event2main_.Empty())
     {
-        GiveBackObjectLockFree(event2main_.Pop());
+        GIVE_BACK_OBJECT(event2main_.Pop());
     }
     for(auto& network : networks_)
     {
@@ -68,7 +67,7 @@ void NetworkMaster::StopWait()
 }
 void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
 {
-    auto* event = GetObjectLockFree<NetEventWorker>(EID_MainToWorkerClose);
+    auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerClose);
     event->SetConnectID(conn_id);
     NotifyWorker(event,type);
 }
@@ -76,7 +75,7 @@ void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, u
 {
     auto* data_to_worker = MemPoolLockFreeMgr->GetMemory(size);
     memmove(data_to_worker, data, size);
-    auto* event = GetObjectLockFree<NetEventWorker>(EID_MainToWorkerSend);
+    auto* event = GET_NET_OBJECT(NetEventWorker,EID_MainToWorkerSend);
     event->SetConnectID(conn_id);
     event->SetData(data_to_worker, size);
     NotifyWorker(event, type);
@@ -84,7 +83,7 @@ void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, u
 
 void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
 {
-    auto* event = GetObjectLockFree<NetEventWorker>(EID_MainToWorkerNewAccepter);
+    auto* event = GET_NET_OBJECT(NetEventWorker,EID_MainToWorkerNewAccepter);
     event->SetIP(ip);
     event->SetAddressPort(port);
     event->SetBuffSize(send_buff_size, recv_buff_size);
@@ -92,7 +91,7 @@ void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType typ
 }
 void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
 {
-    auto* event = GetObjectLockFree<NetEventWorker>(EID_MainToWorkerNewConnecter);
+    auto* event = GET_NET_OBJECT(NetEventWorker,EID_MainToWorkerNewConnecter);
     event->SetIP(ip);
     event->SetAddressPort(port);
     event->SetBuffSize(send_buff_size, recv_buff_size);
@@ -167,7 +166,7 @@ void NetworkMaster::DispatchMainEvent_()
         default:
             break;
         }
-        GiveBackObjectLockFree(event);
+        GIVE_BACK_OBJECT(event);
     }
 }
 

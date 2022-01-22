@@ -128,7 +128,7 @@ void UdpSocket::Send(const char* buffer, std::size_t length)
     }
     if(false == send_list_.empty())
     {
-        send_list_.emplace_back(GetObjectLockFree<Buffer>(buffer, length));
+        send_list_.emplace_back(GET_NET_OBJECT(Buffer, buffer, length));
         UpdateSend();
         return;
     }
@@ -138,7 +138,7 @@ void UdpSocket::Send(const char* buffer, std::size_t length)
     {
         if(length < send_length)
         {
-            send_list_.emplace_back(GetObjectLockFree<Buffer>(buffer + length, send_length - length));
+            send_list_.emplace_back(GET_NET_OBJECT(Buffer, buffer + length, send_length - length));
         } 
     } else 
     {
@@ -316,7 +316,7 @@ void UdpSocket::UpdateSend()
         {
             if(size == buffer->size_)
             {
-                GiveBackObjectLockFree(buffer);
+                GIVE_BACK_OBJECT(buffer);
                 iter = send_list_.erase(iter);
             } else 
             {

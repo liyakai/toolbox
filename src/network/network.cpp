@@ -21,7 +21,7 @@ INetwork::~INetwork()
         NetEventWorker* event = event2worker_.Pop();
         if(!event)
         {
-            GiveBackObjectLockFree(event);
+            GIVE_BACK_OBJECT(event);
         }
         
     }
@@ -51,20 +51,20 @@ void INetwork::PushEvent(NetEventWorker* event)
 
 void INetwork::OnAccepted(uint64_t connect_id)
 {
-    auto* accept_event = GetObjectLockFree<NetEventMain>(EID_WorkerToMainAccepted);
+    auto* accept_event = GET_NET_OBJECT(NetEventMain,EID_WorkerToMainAccepted);
     accept_event->net_evt_.accept_.connect_id_ = connect_id;
     master_->NotifyMain(accept_event);
 }
 void INetwork::OnConnected(uint64_t connect_id)
 {
-    auto* connected_event = GetObjectLockFree<NetEventMain>(EID_WorkerToMainConnected);
+    auto* connected_event = GET_NET_OBJECT(NetEventMain,EID_WorkerToMainConnected);
     connected_event->net_evt_.connect_sucessed_.connect_id_ = connect_id;
     master_->NotifyMain(connected_event);
 }
 
 void INetwork::OnConnectedFailed(ENetErrCode err_code, int32_t err_no)
 {
-    auto* connected_failed_event = GetObjectLockFree<NetEventMain>(EID_WorkerToMainConnectFailed);
+    auto* connected_failed_event = GET_NET_OBJECT(NetEventMain,EID_WorkerToMainConnectFailed);
     connected_failed_event->net_evt_.connect_failed_.net_err_code = err_code;
     connected_failed_event->net_evt_.connect_failed_.sys_err_code = err_no;
     master_->NotifyMain(connected_failed_event);
@@ -72,7 +72,7 @@ void INetwork::OnConnectedFailed(ENetErrCode err_code, int32_t err_no)
 
 void INetwork::OnErrored(uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
 {
-    auto* errored_event = GetObjectLockFree<NetEventMain>(EID_WorkerToMainErrored);
+    auto* errored_event = GET_NET_OBJECT(NetEventMain,EID_WorkerToMainErrored);
     errored_event->net_evt_.error_.connect_id_ = connect_id;
     errored_event->net_evt_.error_.net_err_code = err_code;
     errored_event->net_evt_.error_.sys_err_code = err_no;
@@ -81,7 +81,7 @@ void INetwork::OnErrored(uint64_t connect_id, ENetErrCode err_code, int32_t err_
 
 void INetwork::OnClosed(uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
 {
-    auto* close_event = GetObjectLockFree<NetEventMain>(EID_WorkerToMainClose);
+    auto* close_event = GET_NET_OBJECT(NetEventMain,EID_WorkerToMainClose);
     close_event->net_evt_.close_.connect_id_ = connect_id;
     close_event->net_evt_.close_.net_err_ = err_code;
     close_event->net_evt_.close_.sys_err_ = err_no;
@@ -90,7 +90,7 @@ void INetwork::OnClosed(uint64_t connect_id, ENetErrCode err_code, int32_t err_n
 
 void INetwork::OnReceived(uint64_t connect_id, const char* data, uint32_t size)
 {
-    auto* receive_event = GetObjectLockFree<NetEventMain>(EID_WorkerToMainRecv);
+    auto* receive_event = GET_NET_OBJECT(NetEventMain,EID_WorkerToMainRecv);
     receive_event->net_evt_.recv_.connect_id_ = connect_id;
     receive_event->net_evt_.recv_.data_ = data;
     receive_event->net_evt_.recv_.size_ = size;
@@ -105,7 +105,7 @@ void INetwork::OnMainToWorkerNewAccepter_(Event* event)
         return;
     }
     auto conn_id = OnNewAccepter(accepter_event->GetIP(), accepter_event->GetPort(), accepter_event->GetSendBuffSize(), accepter_event->GetRecvBuffSize());
-    auto bind_tcp = GetObjectLockFree<NetEventMain>(EID_WorkerToMainBinded);
+    auto bind_tcp = GET_NET_OBJECT(NetEventMain,EID_WorkerToMainBinded);
     bind_tcp->net_evt_.bind_.connect_id_ = conn_id;
     master_->NotifyMain(bind_tcp);
 }
@@ -148,7 +148,7 @@ void INetwork::HandleEvents_()
         if(nullptr != event)
         {
             HandleEvent(event);
-            GiveBackObjectLockFree(event);
+            GIVE_BACK_OBJECT(event);
         } 
         else
         {
