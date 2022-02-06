@@ -1,5 +1,14 @@
 ## 1. 网络库架构图
-    // TODO
+网络库中实现的跨平台网络库的基础架构皆相同,如下所示:
+![网络库基础架构图](../../doc/picture/network_base_frame.svg)
+
+其中分发器(Dispatcher)在Linux和MacOS下采用的是reactor模型,如下所示
+![reactor分发器](../../doc/picture/network_reactor_dispatcher.svg)
+
+分发器(Dispatcher)在Windows下采用的是proactor模型,区别既是监听文件描述符时,就准备好内存,分发器通知时内存块已被系统异步读取数据,无需再次读取.
+
+
+
 ## 2. 网络库测试数据
 ### 2.1 Tcp+epoll 承载能力测试
 #### 2.1.1 回声模型测试
@@ -27,7 +36,7 @@ subgraph Server
     B(EchoNet)
 end
 ```
-![tcp_epoll_回声_转发测试架构图](https://github.com/liyakai/toolbox/blob/main/doc/picture/tcp_epoll_test_frame_echo.svg)
+![tcp_epoll_回声_转发测试架构图](../../doc/picture/tcp_epoll_test_frame_echo.svg)
 ##### 2.1.1.1 机器人每秒向服务器发送一个数据块
 此测试版本为无锁对象池及无锁内存池.
 | 连接数 | 数据块大小 | 带宽 | CPU | 内存[占比] |
