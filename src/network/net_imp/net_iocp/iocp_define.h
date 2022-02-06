@@ -4,40 +4,40 @@
 
 namespace ToolBox{
 
-using ACCEPTEX = LPFN_ACCEPTEX;  // AcceptEx º¯ÊıÖ¸Õë,Ïê¼ûMSDN
+using ACCEPTEX = LPFN_ACCEPTEX;  // AcceptEx å‡½æ•°æŒ‡é’ˆ,è¯¦è§MSDN
 // MSDN: The number of bytes reserved for the local address information. 
 // This value must be at least 16 bytes more than the maximum address length for the transport protocol in use.
 constexpr std::size_t ACCEPTEX_ADDR_SIZE = sizeof(SocketAddress) + 16;
 constexpr std::size_t ACCEPTEX_BUFF_SIZE = 2014;
 
 /*
-* ¶¨Òå per-I/O Êı¾İ
+* å®šä¹‰ per-I/O æ•°æ®
 */
 struct PerIOContext
 {
-    OVERLAPPED      over_lapped;    // windows ÖØµşI/OÊı¾İ½á¹¹
-    WSABUF          wsa_buf;        // ´æ´¢Êı¾İµÄ»º³åÇø,ÓÃÀ´¸øÖØµş²Ù×÷´«µİ²ÎÊı.
-    SocketState     io_type;        // µ±Ç°µÄI/OÀàĞÍ. IOCPÃ»ÓĞÏñepollÄÇÑùµÄEPOLLIN,EPOLLOUT,Ö»ÄÜÍ¨¹ı×ÔÉíĞ¯´øµÄÀàĞÍ×ö±ê¼Ç.
+    OVERLAPPED      over_lapped;    // windows é‡å I/Oæ•°æ®ç»“æ„
+    WSABUF          wsa_buf;        // å­˜å‚¨æ•°æ®çš„ç¼“å†²åŒº,ç”¨æ¥ç»™é‡å æ“ä½œä¼ é€’å‚æ•°.
+    SocketState     io_type;        // å½“å‰çš„I/Oç±»å‹. IOCPæ²¡æœ‰åƒepollé‚£æ ·çš„EPOLLIN,EPOLLOUT,åªèƒ½é€šè¿‡è‡ªèº«æºå¸¦çš„ç±»å‹åšæ ‡è®°.
 };
 
 /*
-* ¶¨Òå AcceptEx º¯ÊıÏà¹Ø
+* å®šä¹‰ AcceptEx å‡½æ•°ç›¸å…³
 */
 struct AcceptEx_t
 {
-    ACCEPTEX accept_ex_fn = nullptr;      // AcceptEx º¯ÊıÖ¸Õë
-    SOCKET   socket_fd;         // µ±Ç°Î´¾öµÄ¿Í»§¶ËÌ×½Ó×Ö  -AcceptEx
-    char     buffer[ACCEPTEX_BUFF_SIZE];           // ²ÎÊı AcceptEx
+    ACCEPTEX accept_ex_fn = nullptr;      // AcceptEx å‡½æ•°æŒ‡é’ˆ
+    SOCKET   socket_fd;         //  å½“å‰æœªå†³çš„å®¢æˆ·ç«¯å¥—æ¥å­—  -AcceptEx
+    char     buffer[ACCEPTEX_BUFF_SIZE];           // å‚æ•° AcceptEx
 };
 
 /*
-* ¶¨Òå per-socket Êı¾İ
+* å®šä¹‰ per-socket æ•°æ®
 */
 struct PerSockContext
 {
-    AcceptEx_t* accept_ex = nullptr;      // AcceptEx_tÖ¸Õë
-    PerIOContext   io_recv;     // ½ÓÊÕÇëÇó
-    PerIOContext   io_send;     // ·¢ËÍÇëÇó
+    AcceptEx_t* accept_ex = nullptr;      // AcceptEx_tæŒ‡é’ˆ
+    PerIOContext   io_recv;     // æ¥æ”¶è¯·æ±‚
+    PerIOContext   io_send;     // å‘é€è¯·æ±‚
 };
 
 };  // ToolBox
