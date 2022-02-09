@@ -1,4 +1,5 @@
 ## 1. 网络库架构图
+### 1.1 架构图
 网络库中实现的跨平台网络库的基础架构皆相同,如下所示:
 ![网络库基础架构图](../../doc/picture/network_base_frame.svg)
 
@@ -6,7 +7,9 @@
 ![reactor分发器](../../doc/picture/network_reactor_dispatcher.svg)
 
 分发器(Dispatcher)在Windows下采用的是proactor模型,区别既是监听文件描述符时,就准备好内存,分发器通知时内存块已被系统异步读取数据,无需再次读取.
-
+### 1.2 网络库类图
+类图如下:
+![网络库类图](../../doc/picture/network_uml.svg)
 
 
 ## 2. 网络库测试数据
