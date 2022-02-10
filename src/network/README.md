@@ -3,7 +3,8 @@
 网络库中实现的跨平台网络库的基础架构皆相同,如下所示:
 ![网络库基础架构图](../../doc/picture/network_base_frame.svg)
 
-其中分发器(Dispatcher)在Linux和MacOS下采用的是reactor模型,如下所示
+其中分发器(Dispatcher)在Linux和MacOS下采用的是reactor模型,如下所示:
+
 ![reactor分发器](../../doc/picture/network_reactor_dispatcher.svg)
 
 分发器(Dispatcher)在Windows下采用的是proactor模型,区别既是监听文件描述符时,就准备好内存,分发器通知时内存块已被系统异步读取数据,无需再次读取.
