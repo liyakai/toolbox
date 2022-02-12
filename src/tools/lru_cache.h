@@ -7,7 +7,7 @@
 namespace ToolBox{
 
 /*
-* ¶¨ÒåÒ»¸öÎŞËøÖ®Ëø.[·ÂÔì»¥³âËø std::mutex]
+* å®šä¹‰ä¸€ä¸ªæ— é”ä¹‹é”.[ä»¿é€ äº’æ–¥é” std::mutex]
 */
 class NullLock
 {
@@ -18,7 +18,7 @@ public:
 };
 
 /*
-* ¶¨Òå KeyValue ¶Ô
+* å®šä¹‰ KeyValue å¯¹
 */
 template<typename K, typename V>
 struct KeyValuePair
@@ -33,12 +33,12 @@ public:
 };
 
 /*
-* ¶¨ÒåÄ£°å LRU Cache
-* Key keyÀàĞÍ
-* Value valueÀàĞÍ
-* Lock ËøÀàĞÍ,Ä¬ÈÏÎŞËø.
-* MapType Ò»¸ö¹ØÁªÊ½ÈİÆ÷,±ÈÈç std::unordered_map
-* Ä¬ÈÏµÄËøÀàĞÍ NullLock ²»ÊÇÏß³Ì°²È«µÄ,Èç¹û´«µİÒ»¸ö»¥³âËø[e.g. Lock=std::mutex]£¬Ôò»á±äÎªÏß³Ì°²È«µÄ.
+* å®šä¹‰æ¨¡æ¿ LRU Cache
+* Key keyç±»å‹
+* Value valueç±»å‹
+* Lock é”ç±»å‹,é»˜è®¤æ— é”.
+* MapType ä¸€ä¸ªå…³è”å¼å®¹å™¨,æ¯”å¦‚ std::unordered_map
+* é»˜è®¤çš„é”ç±»å‹ NullLock ä¸æ˜¯çº¿ç¨‹å®‰å…¨çš„,å¦‚æœä¼ é€’ä¸€ä¸ªäº’æ–¥é”[e.g. Lock=std::mutex]ï¼Œåˆ™ä¼šå˜ä¸ºçº¿ç¨‹å®‰å…¨çš„.
 */
 template <typename Key, typename Value, typename Lock = NullLock, 
           typename Map = std::unordered_map<Key, typename std::list<KeyValuePair<Key,Value>>::iterator>>
@@ -52,16 +52,16 @@ public:
     using Guard = std::lock_guard<lock_type>;
 
     /*
-    * @brief ¹¹Ôì
+    * @brief æ„é€ 
     */
     explicit LRUCache(std::size_t max_size = 64, std::size_t elasticity = 10)
         : max_size_(max_size), elasticity_(elasticity){}
     /*
-    * @brief Îö¹¹
+    * @brief ææ„
     */
     virtual ~LRUCache() = default;
     /*
-    * @brief »º´æ´óĞ¡
+    * @brief ç¼“å­˜å¤§å°
     */
     std::size_t Size() const 
     {
@@ -69,7 +69,7 @@ public:
         return cache_.size();
     }
     /*
-    * @brief »º´æÊÇ·ñÎª¿Õ
+    * @brief ç¼“å­˜æ˜¯å¦ä¸ºç©º
     */
     bool Empty()
     {
@@ -77,7 +77,7 @@ public:
         return cache_.size();
     }
     /*
-    * @brief Çå¿Õ
+    * @brief æ¸…ç©º
     */
     void Clear()
     {
@@ -86,7 +86,7 @@ public:
         keys_.clear();
     }
     /*
-    * @brief ²åÈë
+    * @brief æ’å…¥
     */
     void Insert(const Key& k, Value v)
     {
@@ -103,7 +103,7 @@ public:
         Prune();
     }
     /*
-    * @brief »ñÈ¡
+    * @brief è·å–
     */
     bool Get(const Key& key_in, Value& value_out)
     {
@@ -118,7 +118,7 @@ public:
         return true;
     }
     /*
-    * @brief É¾³ı
+    * @brief åˆ é™¤
     */
     bool Remove(const Key& key)
     {
@@ -133,7 +133,7 @@ public:
         return true;
     }
     /*
-    * @breif ÊÇ·ñ°üº¬ÔªËØ
+    * @breif æ˜¯å¦åŒ…å«å…ƒç´ 
     */
     bool Contains(const Key& key) const
     {
@@ -141,7 +141,7 @@ public:
         return cache_.find(key) != cache_.end();
     }
     /*
-    * @brief ±éÀú
+    * @brief éå†
     */
     template<typename Func>
     void Foreach(Func& func) const
@@ -150,20 +150,20 @@ public:
         std::for_each(keys_.begin(), keys_.end(), func);
     }
     /*
-    * @brief »ñÈ¡×î´óÖµ
+    * @brief è·å–æœ€å¤§å€¼
     */
     std::size_t GetMaxSize() const { return max_size_; }
     /*
-    * @brief »ñÈ¡µ¯ĞÔÖµ
+    * @brief è·å–å¼¹æ€§å€¼
     */
     std::size_t GetElasticity() const { return elasticity_; }
     /*
-    * @brief »ñÈ¡ÔÊĞíµÄ×î´óÖµ
+    * @brief è·å–å…è®¸çš„æœ€å¤§å€¼
     */
     std::size_t GetMaxAllowedSize() const { return max_size_ + elasticity_; }
 protected:
     /*
-    * @brief ĞŞ¼ô,É¾³ı³¬³öµÄÊı¾İ
+    * @brief ä¿®å‰ª,åˆ é™¤è¶…å‡ºçš„æ•°æ®
     */
     std::size_t Prune()
     {
@@ -183,7 +183,7 @@ protected:
     }
 
 private:
-    // ½ûÖ¹¿½±´¹¹ÔìÓë¸³Öµ
+    // ç¦æ­¢æ‹·è´æ„é€ ä¸èµ‹å€¼
     LRUCache(const LRUCache&) = delete;
     LRUCache& operator=(const LRUCache&) = delete;
 

@@ -7,19 +7,19 @@
 namespace ToolBox{
 
 /*
-* ¶¨Òå debug ´òÓ¡»ùÀà
+* å®šä¹‰ debug æ‰“å°åŸºç±»
 */
 class DebugPrint
 {
 private:
-    // ÊÇ·ñ¿ªÆô debug ´òÓ¡
+    // æ˜¯å¦å¼€å¯ debug æ‰“å°
     bool debug_print_ = false;
 
 public:
     DebugPrint(){};
     virtual ~DebugPrint(){};
     /*
-    * ×Ô¶¨Òå ´òÓ¡º¯Êı
+    * è‡ªå®šä¹‰ æ‰“å°å‡½æ•°
     */
     void Print(const char *format, ...)
     {
@@ -36,22 +36,22 @@ public:
         }
     }
     /*
-    * ¿ª¹Ø DebugPrint
-    * @param enable ÊÇ·ñ¿ªÆô
+    * å¼€å…³ DebugPrint
+    * @param enable æ˜¯å¦å¼€å¯
     */
     void SetDebugPrint(bool enable)
     {
         debug_print_ = enable;
     }
     /*
-    * »ñÈ¡ debug print ×´Ì¬
+    * è·å– debug print çŠ¶æ€
     */
     bool GetDebugStatus()
     {
         return debug_print_;
     }
     /*
-    * ´òÓ¡¶ş½øÖÆÄÚÈİ
+    * æ‰“å°äºŒè¿›åˆ¶å†…å®¹
     */
     void PrintData(const char *data, size_t size, std::string msg = "")
     {
