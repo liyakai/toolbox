@@ -15,6 +15,7 @@ class U_Ptr
 {
 private:
     friend class SmartPtr<T>;
+    friend class WeakPtr<T>;
     /* 构造 */
     U_Ptr(T* p)
         : ptr_(p), strong_count_(1), weak_count_(0)
@@ -26,8 +27,8 @@ private:
 
 private:
     T* ptr_ = nullptr;   // 对象的指针
-    int32_t strong_count_ = 0; // share_ptr 引用计数
-    int32_t weak_count_ = 0;  // weak_ptr 的引用计数
+    std::atomic<int32_t> strong_count_ = 0; // share_ptr 引用计数
+    std::atomic<int32_t> weak_count_ = 0;  // weak_ptr 的引用计数
 };
 
 
@@ -105,6 +106,54 @@ public:
     }
 
 
+private:
+    U_Ptr<T>* rp_;
+};
+
+/*
+* 定义 WeakPtr
+*/
+template<typename T>
+class WeakPtr
+{
+public:
+    /*
+    * 拷贝构造函数
+    */
+    WeakPtr(const SmartPtr &sp)
+    : rp_(sp.rp_)
+    {
+        rp_->weak_count_++;
+    }
+    /*析构*/
+    ~WeakPtr()
+    {
+        if(--rp_->weak_count_ == 0)
+        {
+            if(rp_->strong_count_ == 0)
+            {
+                delete rp_;     // 当强引用计数器和弱引用计数器都为0时,删除辅助类,且删除对象
+                rp_ = nullptr;
+            }
+        }
+    }
+    /*
+    * 赋值
+    */
+    WeakPtr& operator=(const SmartPtr& rhs)
+    {
+        rhs.rp_->weak_count_++;
+        if(--rp_->weak_count_ == 0)
+        {
+            if(rp_->strong_count_ == 0)
+            {
+                delete rp_;     // 当强引用计数器和弱引用计数器都为0时,删除服务类
+                rp_ = nullptr;
+            }
+        }
+        rp_ = rhs.rp_;
+        return *this;
+    }
 private:
     U_Ptr<T>* rp_;
 };
