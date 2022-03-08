@@ -3,10 +3,11 @@
 #ifdef __linux__
 
 #include "src/network/net_imp/imp_network.h"
-#include "src/network/net_imp/tcp_socket.h"
 
 
 namespace ToolBox{
+
+class TcpSocket;
 
 /*
 * 定义基于 TCP 和 Epoll 的网络

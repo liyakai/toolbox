@@ -10,12 +10,27 @@ IOUringCtrl::IOUringCtrl(uint max_events)
 
 bool IOUringCtrl::CreateIOMultiplexing()
 {
-    epoll_fd_ = epoll_create(max_events_);
-    if (epoll_fd_ < 0)
-    {
+    // initialize io_uring
+    struct io_uring_params params;
+    memset(&params, 0, sizeof(params));
+    if (io_uring_queue_init_params(max_events_, &ring, &params) < 0) {
         return false;
     }
-    events_ = new epoll_event[max_events_];
+
+    // check if IORING_FEAT_FAST_POLL is supported
+    if (!(params.features & IORING_FEAT_FAST_POLL)) {
+        printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+        exit(0);
+    }
+
+    // check if buffer selection is supported
+    struct io_uring_probe *probe;
+    probe = io_uring_get_probe_ring(&ring);
+    if (!probe || !io_uring_opcode_supported(probe, IORING_OP_PROVIDE_BUFFERS)) {
+        printf("Buffer select not supported, skipping...\n");
+        exit(0);
+    }
+    free(probe);
 
     return true;
 }
@@ -33,16 +48,16 @@ void IOUringCtrl::DestroyIOMultiplexing()
     }
 }
 
-bool IOUringCtrl::DelEvent(int socket_fd)
-{
-    epoll_event evt;
-    return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
-}
+// bool IOUringCtrl::DelEvent(int socket_fd)
+// {
+//     epoll_event evt;
+//     return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
+// }
 
-int IOUringCtrl::EpollWait(int msec)
-{
-    return epoll_wait(epoll_fd_, events_, max_events_, msec);
-}
+// int IOUringCtrl::EpollWait(int msec)
+// {
+//     return epoll_wait(epoll_fd_, events_, max_events_, msec);
+// }
 
 };  // ToolBox
 

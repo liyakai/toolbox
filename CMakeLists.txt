@@ -38,6 +38,7 @@ INCLUDE_DIRECTORIES(
     ./src/net_work/network/net_imp/net_epoll
 	./src/net_work/network/net_imp/net_iocp
     ./src/net_work/network/net_imp/net_kqueue
+    ./src/net_work/network/net_imp/net_io_uring
     ./src/thirdparty
 )
 
@@ -49,6 +50,7 @@ AUX_SOURCE_DIRECTORY(./src/network/net_imp DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_epoll DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_iocp DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_kqueue DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./src/network/net_imp/net_io_uring DIR_SRCS)
 
 # 设置输出路径
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
