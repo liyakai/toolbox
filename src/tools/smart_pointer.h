@@ -1,11 +1,15 @@
 #pragma once
 #include <stdint.h>
 #include <utility>
+#include <atomic>
+
+
 namespace ToolBox{
 
 template<typename T>
 class SmartPtr;
-
+template<typename T>
+class WeakPtr;
 /*
 * 定义辅助类
 * 辅助类用以封装使用计数与基础对象指针
@@ -120,7 +124,7 @@ public:
     /*
     * 拷贝构造函数
     */
-    WeakPtr(const SmartPtr &sp)
+    WeakPtr(const SmartPtr<T> &sp)
     : rp_(sp.rp_)
     {
         rp_->weak_count_++;
@@ -140,7 +144,7 @@ public:
     /*
     * 赋值
     */
-    WeakPtr& operator=(const SmartPtr& rhs)
+    WeakPtr& operator=(const SmartPtr<T>& rhs)
     {
         rhs.rp_->weak_count_++;
         if(--rp_->weak_count_ == 0)

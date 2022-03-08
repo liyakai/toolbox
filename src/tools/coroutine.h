@@ -5,6 +5,7 @@
 
 #include <ucontext.h>
 #include <functional>
+#include <stdint.h>
 #include <stddef.h>
 #include <vector>
 #include <string.h>
