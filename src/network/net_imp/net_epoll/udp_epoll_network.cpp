@@ -5,6 +5,8 @@
 #include "epoll_define.h"
 #include "src/network/net_imp/udp_socket.h"
 #include "time_util.h"
+#include "epoll_ctrl.h"
+#include "src/network/net_imp/socket_pool.h"
 
 namespace ToolBox{
 
