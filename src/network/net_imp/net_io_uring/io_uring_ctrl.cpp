@@ -2,7 +2,10 @@
 
 #ifdef __linux__
 
+<<<<<<< HEAD
 namespace ToolBox{
+=======
+>>>>>>> c2803ad0cb55b0eabee5064c500c1bec08bd70db
 
 IOUringCtrl::IOUringCtrl(uint max_events)
     : max_events_(max_events)
@@ -14,7 +17,11 @@ bool IOUringCtrl::CreateIOMultiplexing()
     // initialize io_uring
     struct io_uring_params params;
     memset(&params, 0, sizeof(params));
+<<<<<<< HEAD
     if (io_uring_queue_init_params(max_events_, &ring_, &params) < 0) {
+=======
+    if (io_uring_queue_init_params(max_events_, &ring, &params) < 0) {
+>>>>>>> c2803ad0cb55b0eabee5064c500c1bec08bd70db
         return false;
     }
 
@@ -37,6 +44,7 @@ bool IOUringCtrl::CreateIOMultiplexing()
 }
 void IOUringCtrl::DestroyIOMultiplexing()
 {
+
     // if (events_ != nullptr)
     // {
     //     delete[] events_;
