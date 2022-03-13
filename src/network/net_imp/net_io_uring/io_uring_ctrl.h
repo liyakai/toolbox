@@ -123,6 +123,8 @@ private:
     // int epoll_fd_;            // epoll 文件描述符
     // epoll_event *events_;     // epoll 事件数组
     struct io_uring ring_;       // io_uring 全局句柄
+    char bufs[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
+    int group_id = 1337;
 };
 
 #define EpollCtrlMgr Singleton<ToolBox::EpollCtrl>::Instance(10240)
