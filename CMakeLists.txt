@@ -31,6 +31,7 @@ endif()
 # 头文件
 INCLUDE_DIRECTORIES(
     .
+    ./include/
     ./src/tools
     ./src/network
     ./src/net_work/network
@@ -67,6 +68,14 @@ ADD_LIBRARY(toolbox ${DIR_SRCS})
 add_subdirectory(test)
 
 # 编译选项
+
+#第三方库 libiouring
+option(CMAKE_USE_LIBIOURING "Use thirdparty libiouring" OFF)
+if(CMAKE_USE_LIBIOURING)
+    message(STATUS "Use thirdparty libiouring")
+endif()
+
+# CPU评测工具
 option(CMAKE_GPERF_TOOLS_CPU "Use Gperf Tools cpu-profiler" OFF)
 if(CMAKE_GPERF_TOOLS_CPU)
     message(STATUS "Use Gperf Tools cpu-profiler")
@@ -75,6 +84,7 @@ if(CMAKE_GPERF_TOOLS_CPU)
     target_link_libraries(${PROJECT_NAME}  profiler.a)
 endif()
 
+# 内存泄漏评测工具
 option(CMAKE_GPERF_TOOLS_HEAP "Use Gperf Tools heap checker" OFF)
 if(CMAKE_GPERF_TOOLS_HEAP)
     message(STATUS "Use Gperf Tools heap checker")

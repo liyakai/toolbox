@@ -34,37 +34,37 @@ constexpr std::size_t DEFAULT_RING_BUFF_SIZE = 256 * 1024;        /* 256 k */
 constexpr std::size_t DEFAULT_BACKLOG_SIZE = 256;
 // 
 constexpr int32_t KCP_TRANSPORT_MTU = 1000;
-constexpr uint32_t KCP_CONV = 0x01020304;          // kcp»á»°ID, must equal in two endpoint from the same connection
+constexpr uint32_t KCP_CONV = 0x01020304;          //  kcpä¼šè¯ID, must equal in two endpoint from the same connection
 
 typedef struct sockaddr_in SocketAddress;
 /*
-* ´íÎóÂë
+* é”™è¯¯ç 
 */
 enum class ErrCode
 {
     ERR_SUCCESS = 0,
-    ERR_MALLOC_FAILED, // ·ÖÅäÄÚ´æÊ§°Ü
-    ERR_PARAM_NULLPTR, // ²ÎÊıÎª¿ÕÖ¸Õë
-    ERR_INSUFFICIENT_LENGTH,    // ³¤¶È²»×ã
-    ERR_INVALID_PACKET_SIZE,    // °ü³¤¶È·Ç·¨
+    ERR_MALLOC_FAILED, // åˆ†é…å†…å­˜å¤±è´¥
+    ERR_PARAM_NULLPTR, // å‚æ•°ä¸ºç©ºæŒ‡é’ˆ
+    ERR_INSUFFICIENT_LENGTH,    // é•¿åº¦ä¸è¶³
+    ERR_INVALID_PACKET_SIZE,    // åŒ…é•¿åº¦éæ³•
 
 };
 
 /*
-* socketµÄ×´Ì¬
+* socket çš„çŠ¶æ€
 */
 enum SocketState
 {
-    SOCK_STATE_INVALIED     = 1 << 0,   // ³õÊ¼×´Ì¬
-    SOCK_STATE_LISTENING    = 1 << 1,   // ¼àÌı
-    SOCK_STATE_CONNECTING   = 1 << 2,   // Ö÷¶¯Á¬½Ó
-    SOCK_STATE_ESTABLISHED  = 1 << 3,   // Á¬½Ó½¨Á¢
-    SOCK_STATE_RECV         = 1 << 4,   // ½ÓÊÕ[iocpÖĞpersocketµÄÏ¸·Ö×´Ì¬]
-    SOCK_STATE_SEND         = 1 << 5,   // ·¢ËÍ[iocpÖĞpersocketµÄÏ¸·Ö×´Ì¬]
+    SOCK_STATE_INVALIED     = 1 << 0,   // åˆå§‹çŠ¶æ€
+    SOCK_STATE_LISTENING    = 1 << 1,   // ç›‘å¬
+    SOCK_STATE_CONNECTING   = 1 << 2,   // ä¸»åŠ¨è¿æ¥
+    SOCK_STATE_ESTABLISHED  = 1 << 3,   // è¿æ¥å»ºç«‹
+    SOCK_STATE_RECV         = 1 << 4,   // æ¥æ”¶[iocpä¸­persocketçš„ç»†åˆ†çŠ¶æ€]
+    SOCK_STATE_SEND         = 1 << 5,   // å‘é€[iocpä¸­persocketçš„ç»†åˆ†çŠ¶æ€]
 };
 
 /*
-* Event ²Ù×÷
+* Event æ“ä½œ
 */
 enum class EventOperType
 {
@@ -73,7 +73,7 @@ enum class EventOperType
 };
 
 /*
-* socket ¿ÉÍ¶µİÊÂ¼ş
+* socket å¯æŠ•é€’äº‹ä»¶
 */
 enum SockEventType
 {
@@ -84,7 +84,7 @@ enum SockEventType
 };
 
 /*
-* UDP socket ÀàĞÍ
+* UDP socket ç±»å‹
 */
 enum class UdpType
 {
@@ -100,6 +100,7 @@ enum class UdpType
 #include "src/network/net_imp/net_iocp/iocp_define.h"
 #elif defined(__linux__)
 #include "src/network/net_imp/net_epoll/epoll_define.h"
+#include "src/network/net_imp/net_io_uring/io_uring_define.h"
 #elif defined(__APPLE__)
 #include "src/network/net_imp/net_kqueue/kqueue_define.h"
 #endif
