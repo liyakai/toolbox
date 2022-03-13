@@ -20,18 +20,33 @@ bool IOUringCtrl::CreateIOMultiplexing()
 
     // check if IORING_FEAT_FAST_POLL is supported
     if (!(params.features & IORING_FEAT_FAST_POLL)) {
-        printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
-        exit(0);
+        // printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+        return false;
     }
 
     // check if buffer selection is supported
     struct io_uring_probe *probe;
     probe = io_uring_get_probe_ring(&ring_);
     if (!probe || !io_uring_opcode_supported(probe, IORING_OP_PROVIDE_BUFFERS)) {
-        printf("Buffer select not supported, skipping...\n");
-        exit(0);
+        // printf("Buffer select not supported, skipping...\n");
+        return false;
     }
     free(probe);
+
+    // register buffers for buffer selection
+    struct io_uring_sqe *sqe;
+    struct io_uring_cqe *cqe;
+
+    sqe = io_uring_get_sqe(&ring_);
+    io_uring_prep_provide_buffers(sqe, bufs, MAX_MESSAGE_LEN, BUFFERS_COUNT, group_id_, 0);
+
+    io_uring_submit(&ring_);
+    io_uring_wait_cqe(&ring_, &cqe);
+    if (cqe->res < 0) {
+        // printf("cqe->res = %d\n", cqe->res);
+        exit(1);
+    }
+    io_uring_cqe_seen(&ring_, cqe)
 
     return true;
 }
