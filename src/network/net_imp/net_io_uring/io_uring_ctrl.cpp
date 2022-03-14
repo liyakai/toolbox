@@ -44,9 +44,9 @@ bool IOUringCtrl::CreateIOMultiplexing()
     io_uring_wait_cqe(&ring_, &cqe);
     if (cqe->res < 0) {
         // printf("cqe->res = %d\n", cqe->res);
-        exit(1);
+        return false;
     }
-    io_uring_cqe_seen(&ring_, cqe)
+    io_uring_cqe_seen(&ring_, cqe);
 
     return true;
 }
@@ -71,10 +71,10 @@ void IOUringCtrl::DestroyIOMultiplexing()
 //     return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
 // }
 
-// int IOUringCtrl::EpollWait(int msec)
-// {
-//     return epoll_wait(epoll_fd_, events_, max_events_, msec);
-// }
+int32_t IOUringCtrl::EpollWait(int msec)
+{
+    return io_uring_submit_and_wait(&ring_, msec);
+}
 
 };  // ToolBox
 

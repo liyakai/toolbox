@@ -2,3 +2,7 @@
 /out
 /bin
 /build
+*.a
+*.so
+*.so.*
+
