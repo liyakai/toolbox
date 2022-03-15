@@ -114,6 +114,10 @@ public:
     * @params bool
     */
     void SetCtrlAdd(bool value) { is_ctrl_add_ = value; }
+    /*
+    * 获取 uringsocket
+    */
+    UringSockContext* GetUringSocket() { return nullptr; }
 #elif defined(__APPLE__)
     /*
     * 获取 socket id
