@@ -59,8 +59,9 @@ enum SocketState
     SOCK_STATE_LISTENING    = 1 << 1,   // 监听
     SOCK_STATE_CONNECTING   = 1 << 2,   // 主动连接
     SOCK_STATE_ESTABLISHED  = 1 << 3,   // 连接建立
-    SOCK_STATE_RECV         = 1 << 4,   // 接收[iocp中persocket的细分状态]
-    SOCK_STATE_SEND         = 1 << 5,   // 发送[iocp中persocket的细分状态]
+    SOCK_STATE_RECV         = 1 << 4,   // 接收[异步IO所用的细分状态]
+    SOCK_STATE_SEND         = 1 << 5,   // 发送[异步IO所用的细分状态]
+    SOCK_STATE_PROV_BUF     = 1 << 6,   //     [异步IO所用的细分状态]
 };
 
 /*

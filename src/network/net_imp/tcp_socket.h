@@ -89,6 +89,10 @@ public:
     */
     bool ReAddSocketToIocp(SockEventType event_type);
 #elif defined(__linux__)
+    /*
+    * 获取 uringsocket
+    */
+    UringSockContext* GetUringSocket() { return &uring_socket_; }
 #endif
     /*
     * 设置socket状态
@@ -222,6 +226,7 @@ private:
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     PerSockContext per_socket_;                     
 #elif defined(__linux__)
+    UringSockContext uring_socket_;
 #endif
     SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
 
