@@ -71,7 +71,7 @@ bool IocpCtrl::OnRecv(BaseSocket& socket)
         }
         if (nullptr == accept_ex->accept_ex_fn)
         {
-            // »ñÈ¡ AcceptExÖ¸Õë
+            // è·å– AcceptExæŒ‡é’ˆ
             DWORD bytes = 0;
             GUID guid_accept_ex = WSAID_ACCEPTEX;
             int32_t error_code = WSAIoctl(socket.GetSocketID(), SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex),
@@ -81,14 +81,14 @@ bool IocpCtrl::OnRecv(BaseSocket& socket)
                 return false;
             }
         }
-        // ½¨Á¢Ò»¸öÖ§³ÖÖØµşI/OµÄÌ×½Ó×Ö
+        // å»ºç«‹ä¸€ä¸ªæ”¯æŒé‡å I/Oçš„å¥—æ¥å­—
         accept_ex->socket_fd = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
         if (INVALID_SOCKET == accept_ex->socket_fd)
         {
             return false;
         }
         // MSDN: https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-acceptex
-        // Í¶µİÒ»¸ö accept ÇëÇó
+        // æŠ•é€’ä¸€ä¸ª accept è¯·æ±‚
         per_socket->io_recv.io_type = SocketState::SOCK_STATE_LISTENING;
         bool result = accept_ex->accept_ex_fn(socket.GetSocketID(), accept_ex->socket_fd, accept_ex->buffer, 0,
             ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &per_socket->io_recv.over_lapped);
@@ -106,7 +106,7 @@ bool IocpCtrl::OnRecv(BaseSocket& socket)
     }
     else if (SocketState::SOCK_STATE_ESTABLISHED == socket.GetSocketState())
     {
-        // Í¶µİÒ»¸ö³¤¶ÈÎª0µÄÇëÇó
+        // æŠ•é€’ä¸€ä¸ªé•¿åº¦ä¸º0çš„è¯·æ±‚
         DWORD bytes = 0;
         DWORD flags = 0;
         auto& io_recv = per_socket->io_recv;
@@ -125,7 +125,7 @@ bool IocpCtrl::OnRecv(BaseSocket& socket)
     return false;
 }
 /*
-* @brief  ´¦Àí·¢ËÍÏûÏ¢
+* @brief  å¤„ç†å‘é€æ¶ˆæ¯
 */
 bool IocpCtrl::OnSend(BaseSocket& socket)
 {
@@ -139,7 +139,7 @@ bool IocpCtrl::OnSend(BaseSocket& socket)
     {
         io_send.io_type = SocketState::SOCK_STATE_SEND;
     }
-    // Í¶µİÒ»¸ösendÇëÇó
+    // æŠ•é€’ä¸€ä¸ªsendè¯·æ±‚
     DWORD bytes = 0;
     DWORD flags = 0;
     int32_t result = WSASend(socket.GetSocketID(), &io_send.wsa_buf, 1, &bytes, flags, &io_send.over_lapped, 0);
@@ -157,7 +157,7 @@ bool IocpCtrl::OnSend(BaseSocket& socket)
 
 bool IocpCtrl::RunOnce()
 {
-    time_t      time_stamp = time(0);    // Ê±¼ä´Á
+    time_t      time_stamp = time(0);    // æ—¶é—´æˆ³
     DWORD       bytes = 0;
     BaseSocket* socket = nullptr;
     PerIOContext* per_io = nullptr;
