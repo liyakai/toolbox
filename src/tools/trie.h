@@ -1,4 +1,4 @@
 #pragma once
 
-// Ë«Êı×éÇ°×ºÊ÷(double array trie)ÊµÏÖ
+// åŒæ•°ç»„å‰ç¼€æ ‘(double array trie)å®ç°
 
