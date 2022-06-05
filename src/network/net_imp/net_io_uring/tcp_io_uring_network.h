@@ -1,5 +1,5 @@
 #pragma once
-#ifdef __linux__
+#ifdef LINUX_IO_URING
 
 #include "src/network/net_imp/imp_network.h"
 
@@ -27,7 +27,7 @@ public:
 
 };  // ToolBox
 
-#endif // __linux__
+#endif // LINUX_IO_URING
 
 
 

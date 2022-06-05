@@ -119,7 +119,7 @@ public:
     NetworkType GetNetworkType(){ return network_type_; };
 
 private:
-    NetworkType network_type_;          // 网络类型: TCP,UDP,KCP,IOCP
+    NetworkType network_type_;          // 网络类型: TCP,UDP,KCP
     Event2Worker event2worker_;         // 主线程到工作线程的事件队列
     NetworkMaster *master_;             // 主线程中的网络管理器
 };
