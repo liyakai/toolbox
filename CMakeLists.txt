@@ -61,11 +61,15 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 # add executable file
 # ADD_EXECUTABLE(${PROJECT_NAME} )
 
+# 指定库的路径
+# link_directories(
+#     ${PROJECT_SOURCE_DIR}/lib
+# )
+
 # add library
 ADD_LIBRARY(toolbox ${DIR_SRCS})
 
-# 单元测试
-add_subdirectory(test)
+
 
 # 编译选项
 
@@ -73,6 +77,7 @@ add_subdirectory(test)
 option(CMAKE_USE_LIBIOURING "Use thirdparty libiouring" OFF)
 if(CMAKE_USE_LIBIOURING)
     message(STATUS "Use thirdparty libiouring")
+    add_definitions(-DLINUX_IO_URING)           # linux 下使用 io_uring
 endif()
 
 # CPU评测工具
@@ -91,3 +96,10 @@ if(CMAKE_GPERF_TOOLS_HEAP)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltcmalloc ")
     target_link_libraries(${PROJECT_NAME} libtcmalloc.a )
 endif()
+
+
+# 单元测试
+add_subdirectory(test)
+
+
+
