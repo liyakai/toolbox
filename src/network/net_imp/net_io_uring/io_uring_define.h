@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef __linux__
+#ifdef LINUX_IO_URING
 
 namespace ToolBox{
 
@@ -42,4 +42,4 @@ struct UringSockContext
 
 }
 
-#endif  // __linux__
+#endif  // LINUX_IO_URING

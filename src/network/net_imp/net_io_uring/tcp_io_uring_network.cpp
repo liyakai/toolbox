@@ -1,6 +1,6 @@
 #include "tcp_io_uring_network.h"
 
-#ifdef __linux__
+#ifdef LINUX_IO_URING
 
 #include "io_uring_ctrl.h"
 #include "src/network/net_imp/socket_pool.h"
@@ -17,7 +17,7 @@ void TcpIOUringNetwork::Init(NetworkMaster* master, NetworkType network_type)
 
 };  // ToolBox
 
-#endif // __linux__
+#endif // LINUX_IO_URING
 
 
 

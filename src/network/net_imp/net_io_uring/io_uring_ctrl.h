@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef __linux__
+#ifdef LINUX_IO_URING
 
 #include "src/tools/singleton.h"
 #include "src/network/net_imp/net_imp_define.h"
@@ -115,4 +115,4 @@ private:
 
 };  // ToolBox
 
-#endif // __linux__
+#endif // LINUX_IO_URING
