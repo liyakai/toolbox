@@ -20,7 +20,7 @@ public:
     };
     void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d.\n", conn_id,  err_code, err_no);
+        Print("发生错误, connect_id: %lu 错误码:%d, 系统错误码:%d.\n", conn_id,  err_code, err_no);
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
@@ -52,7 +52,7 @@ public:
     };
     void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {

@@ -5,13 +5,19 @@
 #include "src/network/net_imp/net_imp_define.h"
 #include "epoll_ctrl.h"
 
-namespace ToolBox{
-
-void TcpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
+namespace ToolBox
 {
-    base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
-    ImpNetwork<TcpSocket>::Init(master, network_type);
-}
+
+    bool TcpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
+    {
+        base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
+        if (!ImpNetwork<TcpSocket>::Init(master, network_type))
+        {
+            NetworkLogError("[Network] Init TcpEpollNetwork failed. network_type:%d", network_type);
+            return false;
+        }
+        return true;
+    }
 
 };  // ToolBox
 

@@ -12,18 +12,21 @@ namespace ToolBox
 
     bool IOUringCtrl::CreateIOMultiplexing()
     {
+        NetworkLogInfo("[Network] start CreateIOMultiplexing.");
         // initialize io_uring
         struct io_uring_params params;
         memset(&params, 0, sizeof(params));
-        if (io_uring_queue_init_params(max_events_, &ring_, &params) < 0)
+        int32_t ret = io_uring_queue_init_params(max_events_, &ring_, &params);
+        if (ret < 0)
         {
+            NetworkLogError("[Network] io_uring_queue_init_params failed. ret:%d", ret);
             return false;
         }
 
         // check if IORING_FEAT_FAST_POLL is supported
         if (!(params.features & IORING_FEAT_FAST_POLL))
         {
-            // printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+            NetworkLogError("[Network] IORING_FEAT_FAST_POLL not available in the kernel.");
             return false;
         }
 
@@ -32,7 +35,7 @@ namespace ToolBox
         probe = io_uring_get_probe_ring(&ring_);
         if (!probe || !io_uring_opcode_supported(probe, IORING_OP_PROVIDE_BUFFERS))
         {
-            // printf("Buffer select not supported, skipping...\n");
+            NetworkLogError("[Network] Buffer select not supported, skipping...");
             return false;
         }
         free(probe);
@@ -48,7 +51,7 @@ namespace ToolBox
         io_uring_wait_cqe(&ring_, &cqe);
         if (cqe->res < 0)
         {
-            // printf("cqe->res = %d\n", cqe->res);
+            NetworkLogError("[Network] cqe->res = %d\n", cqe->res);
             return false;
         }
         io_uring_cqe_seen(&ring_, cqe);
@@ -286,6 +289,10 @@ namespace ToolBox
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        if (!sqe)
+        {
+            return false;
+        }
         io_uring_prep_accept(sqe, socket.GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
         io_uring_sqe_set_flags(sqe, flags);
 
