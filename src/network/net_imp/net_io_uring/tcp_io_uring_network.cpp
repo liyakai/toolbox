@@ -6,13 +6,19 @@
 #include "src/network/net_imp/socket_pool.h"
 #include "src/network/net_imp/net_imp_define.h"
 
-namespace ToolBox{
-
-void TcpIOUringNetwork::Init(NetworkMaster* master, NetworkType network_type)
+namespace ToolBox
 {
-    base_ctrl_ = new IOUringCtrl(MAX_SOCKET_COUNT);
-    ImpNetwork<TcpSocket>::Init(master, network_type);
-}
+
+    bool TcpIOUringNetwork::Init(NetworkMaster* master, NetworkType network_type)
+    {
+        base_ctrl_ = new IOUringCtrl(MAX_SOCKET_COUNT);
+        if (!ImpNetwork<TcpSocket>::Init(master, network_type))
+        {
+            NetworkLogError("[Network] Init TcpIOUringNetwork failed. network_type:%d", network_type);
+            return false;
+        }
+        return true;
+    }
 
 
 };  // ToolBox

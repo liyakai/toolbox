@@ -23,7 +23,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11  -lpthread ")
 
 # 设置编译调试信息
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
-    add_definitions(-DDEBUG -g)
+    add_definitions(-DDEBUG -g -O0)
 else()
     add_definitions(-O2)
 endif()
