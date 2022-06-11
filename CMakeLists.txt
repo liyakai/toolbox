@@ -19,7 +19,7 @@ endif()
 
 
 # 设置编译选项
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11  -lpthread ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
 
 # 设置编译调试信息
 if(CMAKE_BUILD_TYPE STREQUAL Debug)

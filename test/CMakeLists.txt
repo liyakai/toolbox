@@ -11,6 +11,8 @@ link_directories(
 
 add_executable(test_tools ${TEST_SRC})
 
+# 链接库
+TARGET_LINK_LIBRARIES(test_tools -lpthread)
 if(WIN32 OR MSVC)
     target_link_libraries(test_tools ${PROJECT_SOURCE_DIR}/lib/libtoolbox.lib)
 elseif (UNIX)
