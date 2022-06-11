@@ -32,7 +32,7 @@ namespace ToolBox
     */
     struct UringIOContext
     {
-        BaseSocket*      base_socket;    // 拥有此上下文的socket.
+        BaseSocket*     base_socket;     // 拥有此上下文的socket.
         SocketState     io_type;         // 当前的I/O类型. IOCP没有像epoll那样的EPOLLIN,EPOLLOUT,只能通过自身携带的类型做标记.
         uint16_t        bid;
     };

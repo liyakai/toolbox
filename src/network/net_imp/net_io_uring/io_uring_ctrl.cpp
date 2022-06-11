@@ -1,22 +1,29 @@
 #include "io_uring_ctrl.h"
 #ifdef LINUX_IO_URING
 
-
 namespace ToolBox
 {
 
     IOUringCtrl::IOUringCtrl(uint max_events)
         : max_events_(max_events)
     {
+        ring_ = new io_uring();
+    }
+
+    IOUringCtrl::~IOUringCtrl()
+    {
+        io_uring_queue_exit(ring_);
     }
 
     bool IOUringCtrl::CreateIOMultiplexing()
     {
         NetworkLogInfo("[Network] start CreateIOMultiplexing.");
+
         // initialize io_uring
         struct io_uring_params params;
+        // struct io_uring ring;
         memset(&params, 0, sizeof(params));
-        int32_t ret = io_uring_queue_init_params(max_events_, &ring_, &params);
+        int32_t ret = io_uring_queue_init_params(max_events_, ring_, &params);
         if (ret < 0)
         {
             NetworkLogError("[Network] io_uring_queue_init_params failed. ret:%d", ret);
@@ -32,8 +39,13 @@ namespace ToolBox
 
         // check if buffer selection is supported
         struct io_uring_probe* probe;
-        probe = io_uring_get_probe_ring(&ring_);
-        if (!probe || !io_uring_opcode_supported(probe, IORING_OP_PROVIDE_BUFFERS))
+        probe = io_uring_get_probe_ring(ring_);
+        if (!probe)
+        {
+            NetworkLogError("[Network] Buffer select not supported, skipping...");
+            return false;
+        }
+        if (!io_uring_opcode_supported(probe, IORING_OP_PROVIDE_BUFFERS))
         {
             NetworkLogError("[Network] Buffer select not supported, skipping...");
             return false;
@@ -44,17 +56,17 @@ namespace ToolBox
         struct io_uring_sqe* sqe;
         struct io_uring_cqe* cqe;
 
-        sqe = io_uring_get_sqe(&ring_);
+        sqe = io_uring_get_sqe(ring_);
         io_uring_prep_provide_buffers(sqe, bufs_, MAX_MESSAGE_LEN, BUFFERS_COUNT, group_id_, 0);
 
-        io_uring_submit(&ring_);
-        io_uring_wait_cqe(&ring_, &cqe);
+        io_uring_submit(ring_);
+        io_uring_wait_cqe(ring_, &cqe);
         if (cqe->res < 0)
         {
             NetworkLogError("[Network] cqe->res = %d\n", cqe->res);
             return false;
         }
-        io_uring_cqe_seen(&ring_, cqe);
+        io_uring_cqe_seen(ring_, cqe);
 
         return true;
     }
@@ -110,17 +122,19 @@ namespace ToolBox
 
     int32_t IOUringCtrl::URingWait(int msec)
     {
-        return io_uring_submit_and_wait(&ring_, msec);
+        return io_uring_submit_and_wait(ring_, msec);
     }
 
     bool IOUringCtrl::RunOnce()
     {
+        NetworkLogInfo("[Network] RunOnce");
         time_t time_stamp = time(0);    // 时间戳
         int32_t count = URingWait(URING_WAIT_MSECONDS);
         if (count < 0)
         {
             return false;
         }
+        NetworkLogInfo("[Network] io_uring_for_each_cqecqe_count count:%u", count);
         // io_uring 设置了两个ringbuffer：
         // sq(submission queue):存放提交的IO请求,应用层为生产者操作tail,内核为消费者操作head.其中的entry称为sqe.
         // cq(completion queue):存放处理完成的IO请求,内核为生产者操作tail,应用层为消费者操作head.其中的entry称为cqe.
@@ -129,8 +143,9 @@ namespace ToolBox
         unsigned cqe_count = 0;
 
         // go through all CQEs
-        io_uring_for_each_cqe(&ring_, head, cqe)
+        io_uring_for_each_cqe(ring_, head, cqe)
         {
+            NetworkLogInfo("[Network] io_uring_for_each_cqecqe_count:%u", cqe_count);
             ++cqe_count;
             UringIOContext* uring_io = reinterpret_cast<UringIOContext*>(cqe->user_data);
             if (nullptr == uring_io)
@@ -151,9 +166,10 @@ namespace ToolBox
 
                 continue;
             }
-
+            NetworkLogInfo("[Network] io_uring_for_each_cqe socket type:", socket->GetEventType());
             if (SOCK_STATE_PROV_BUF & socket->GetEventType())
             {
+                NetworkLogInfo("[Network] SOCK_STATE_PROV_BUF recv message.");
                 if (cqe->res < 0)
                 {
                     socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
@@ -161,6 +177,7 @@ namespace ToolBox
             }
             else if (SOCK_STATE_LISTENING & socket->GetEventType())
             {
+                NetworkLogInfo("[Network] SOCK_STATE_LISTENING on recvd connect.");
                 int32_t sock_conn_fd = cqe->res;
                 // only read when there is no error, >= 0
                 if (sock_conn_fd >= 0)
@@ -170,10 +187,11 @@ namespace ToolBox
                 }
 
                 // new connected client; read data from socket and re-add accept to monitor for new connections
-                AddSocketAccept(*socket, 0);
+                AddSocketAccept(socket, 0);
             }
             else if (SOCK_STATE_RECV & socket->GetEventType())
             {
+                NetworkLogInfo("[Network] SOCK_STATE_RECV on recvd data.");
                 int32_t bytes_read = cqe->res;
                 int32_t bid = cqe->flags >> 16;
                 if (cqe->res <= 0)
@@ -191,6 +209,7 @@ namespace ToolBox
             }
             else if (SOCK_STATE_SEND & socket->GetEventType())
             {
+                NetworkLogInfo("[Network] SOCK_STATE_SEND has sended data.");
                 // write has been completed, first re-add the buffer
                 AddProvideBuf(*socket, uring_io->bid);
                 // add a new read for the existing connection
@@ -198,7 +217,7 @@ namespace ToolBox
             }
 
         }
-        io_uring_cq_advance(&ring_, count);
+        io_uring_cq_advance(ring_, count);
         // for (int32_t i = 0; i < count; i++)
         // {
         //     epoll_event& event = events_[i];
@@ -227,10 +246,11 @@ namespace ToolBox
         auto* uring_socket = socket.GetUringSocket();
         if (SocketState::SOCK_STATE_LISTENING == socket.GetSocketState())
         {
-            AddSocketAccept(socket, flags);
+            AddSocketAccept(&socket, flags);
         }
         else if (SocketState::SOCK_STATE_ESTABLISHED == socket.GetSocketState())
         {
+            NetworkLogInfo("[Network] on recvd data.");
             // // 投递一个长度为0的请求
             // DWORD bytes = 0;
             // DWORD flags = 0;
@@ -262,7 +282,7 @@ namespace ToolBox
         {
             io_send.io_type = SocketState::SOCK_STATE_SEND;
         }
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         // io_uring_prep_send(sqe, socket.GetSocketID(), &bufs_[bid], message_size, 0);
         // io_uring_sqe_set_flags(sqe, flags);
         // // TODO 处理 bid
@@ -284,33 +304,45 @@ namespace ToolBox
         return false;
     }
 
-    bool IOUringCtrl::AddSocketAccept(BaseSocket& socket, uint32_t flags)
+    bool IOUringCtrl::AddSocketAccept(BaseSocket* socket, uint32_t flags)
     {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         if (!sqe)
         {
+            NetworkLogError("[Network] get sqe from io_uring failed.");
             return false;
         }
-        io_uring_prep_accept(sqe, socket.GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
+        io_uring_prep_accept(sqe, socket->GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
         io_uring_sqe_set_flags(sqe, flags);
 
-        auto* uring_socket = socket.GetUringSocket();
-        uring_socket->io_recv.base_socket = &socket;
+        auto* uring_socket = socket->GetUringSocket();
+        if (!uring_socket)
+        {
+            NetworkLogError("[Network] the socket get uring socket failed.");
+            return false;
+        }
+        uring_socket->io_recv.base_socket = socket;
         uring_socket->io_recv.io_type = SocketState::SOCK_STATE_LISTENING;
         sqe->user_data = reinterpret_cast<uint64_t>(uring_socket);
+        NetworkLogInfo("[Network] AddSocketAccept add accept.");
         return true;
     }
 
     void IOUringCtrl::AddSocketRead(BaseSocket& socket, std::size_t message_size, uint32_t flags)
     {
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         io_uring_prep_recv(sqe, socket.GetSocketID(), NULL, message_size, 0);
         io_uring_sqe_set_flags(sqe, flags);
         sqe->buf_group = group_id_;
 
         auto* uring_socket = socket.GetUringSocket();
+        if (!uring_socket)
+        {
+            NetworkLogError("[Network] the socket get uring socket failed.");
+            return;
+        }
         uring_socket->io_recv.base_socket = &socket;
         uring_socket->io_recv.io_type = SocketState::SOCK_STATE_RECV;
         sqe->user_data = reinterpret_cast<uint64_t>(uring_socket);
@@ -318,7 +350,7 @@ namespace ToolBox
 
     void IOUringCtrl::AddSocketWrite(BaseSocket& socket, uint16_t bid, std::size_t message_size, uint32_t flags)
     {
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         io_uring_prep_send(sqe, socket.GetSocketID(), &bufs_[bid], message_size, 0);
         io_uring_sqe_set_flags(sqe, flags);
 
@@ -331,7 +363,7 @@ namespace ToolBox
 
     void IOUringCtrl::AddProvideBuf(BaseSocket& socket, uint16_t bid)
     {
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         io_uring_prep_provide_buffers(sqe, bufs_[bid], MAX_MESSAGE_LEN, 1, group_id_, bid);
 
         UringIOContext* io_context = GET_NET_OBJECT(UringIOContext);

@@ -30,6 +30,10 @@ namespace ToolBox
         */
         IOUringCtrl(uint32_t max_events);
         /*
+        * 析构
+        */
+        ~IOUringCtrl();
+        /*
         * 创建 epoll
         * @return 是否成功
         */
@@ -78,7 +82,7 @@ namespace ToolBox
         * @param message_size 消息大小
         * @param flags 标记
         */
-        bool AddSocketAccept(BaseSocket& socket, uint32_t flags);
+        bool AddSocketAccept(BaseSocket* socket, uint32_t flags);
         /*
         * @brief 读
         * @param socket 客户端连接
@@ -104,9 +108,7 @@ namespace ToolBox
         void AddProvideBuf(BaseSocket& socket, uint16_t bid);
     private:
         uint32_t max_events_ = 0; // 最大事件数
-        // int epoll_fd_;            // epoll 文件描述符
-        // epoll_event *events_;     // epoll 事件数组
-        struct io_uring ring_;       // io_uring 全局句柄
+        struct io_uring* ring_;       // io_uring 全局句柄
         char bufs_[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
         int group_id_ = 1337;
     };

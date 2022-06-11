@@ -131,7 +131,7 @@ CASE(test_tcp_echo)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 120 * 1000;
+    uint32_t run_mill_seconds = 12000 * 1000;
     while (true)
     {
         if (used_time > run_mill_seconds)
