@@ -136,6 +136,7 @@ namespace ToolBox
     template<typename SocketType>
     void ImpNetwork<SocketType>::Update()
     {
+        NetworkLogError("[Network] Update. network_type:%d", GetNetworkType());
         INetwork::Update();
         base_ctrl_->RunOnce();
     }
@@ -149,7 +150,7 @@ namespace ToolBox
     template<typename SocketType>
     uint64_t ImpNetwork<SocketType>::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto* new_socket = sock_mgr_.Alloc();
+        SocketType* new_socket = sock_mgr_.Alloc();
         if (nullptr == new_socket)
         {
             OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
