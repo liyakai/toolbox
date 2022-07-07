@@ -110,7 +110,7 @@ namespace ToolBox
         uint32_t max_events_ = 0; // 最大事件数
         struct io_uring* ring_;       // io_uring 全局句柄
         char bufs_[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
-        int group_id_ = 1337;
+        int32_t group_id_ = 1337;
     };
 
 #define EpollCtrlMgr Singleton<ToolBox::EpollCtrl>::Instance(10240)

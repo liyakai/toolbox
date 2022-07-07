@@ -136,7 +136,7 @@ namespace ToolBox
     template<typename SocketType>
     void ImpNetwork<SocketType>::Update()
     {
-        NetworkLogError("[Network] Update. network_type:%d", GetNetworkType());
+        // NetworkLogInfo("[Network] Update. network_type:%d", GetNetworkType());
         INetwork::Update();
         base_ctrl_->RunOnce();
     }
@@ -160,6 +160,7 @@ namespace ToolBox
         new_socket->SetNetwork(this);
         if (false == new_socket->InitNewAccepter(ip, port, send_buff_size, recv_buff_size))
         {
+            OnErrored(0, ENetErrCode::NET_ACCEPT_FAILED, 0);
             return INVALID_CONN_ID;
         }
         base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
