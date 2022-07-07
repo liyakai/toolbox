@@ -97,11 +97,11 @@ namespace ToolBox
         {
             if (SOCKET_EVENT_RECV & event_type)
             {
-                return OnRecv(socket, 0);
+                return OnRecv(socket, IOSQE_FIXED_FILE | IOSQE_ASYNC);
             }
             else if (SOCKET_EVENT_SEND & event_type)
             {
-                return OnSend(socket, 0);
+                return OnSend(socket, IOSQE_FIXED_FILE | IOSQE_ASYNC);
             }
         }
         else if (EventOperType::EVENT_OPER_RDC == op_type)
@@ -122,7 +122,7 @@ namespace ToolBox
 
     int32_t IOUringCtrl::URingWait(int msec)
     {
-        return io_uring_submit_and_wait(ring_, msec);
+        return io_uring_submit_and_wait(ring_, 1);
     }
 
     bool IOUringCtrl::RunOnce()
@@ -132,15 +132,17 @@ namespace ToolBox
         int32_t count = URingWait(URING_WAIT_MSECONDS);
         if (count < 0)
         {
+            NetworkLogError("[Network] the number of SQEs submitted:%u", count);
             return false;
         }
-        NetworkLogInfo("[Network] io_uring_for_each_cqecqe_count count:%u", count);
+        NetworkLogInfo("[Network] the number of SQEs submitted:%u", count);
+        sleep(2);
         // io_uring 设置了两个ringbuffer：
         // sq(submission queue):存放提交的IO请求,应用层为生产者操作tail,内核为消费者操作head.其中的entry称为sqe.
         // cq(completion queue):存放处理完成的IO请求,内核为生产者操作tail,应用层为消费者操作head.其中的entry称为cqe.
         struct io_uring_cqe* cqe;
-        unsigned head;
-        unsigned cqe_count = 0;
+        uint16_t head = 0;
+        uint16_t cqe_count = 0;
 
         // go through all CQEs
         io_uring_for_each_cqe(ring_, head, cqe)
@@ -166,8 +168,8 @@ namespace ToolBox
 
                 continue;
             }
-            NetworkLogInfo("[Network] io_uring_for_each_cqe socket type:", socket->GetEventType());
-            if (SOCK_STATE_PROV_BUF & socket->GetEventType())
+            NetworkLogInfo("[Network] io_uring_for_each_cqe socket type:%d", socket->GetSocketState());
+            if (SOCK_STATE_PROV_BUF & socket->GetSocketState())
             {
                 NetworkLogInfo("[Network] SOCK_STATE_PROV_BUF recv message.");
                 if (cqe->res < 0)
@@ -175,7 +177,7 @@ namespace ToolBox
                     socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
                 }
             }
-            else if (SOCK_STATE_LISTENING & socket->GetEventType())
+            else if (SOCK_STATE_LISTENING & socket->GetSocketState())
             {
                 NetworkLogInfo("[Network] SOCK_STATE_LISTENING on recvd connect.");
                 int32_t sock_conn_fd = cqe->res;
@@ -189,7 +191,7 @@ namespace ToolBox
                 // new connected client; read data from socket and re-add accept to monitor for new connections
                 AddSocketAccept(socket, 0);
             }
-            else if (SOCK_STATE_RECV & socket->GetEventType())
+            else if (SOCK_STATE_RECV & socket->GetSocketState())
             {
                 NetworkLogInfo("[Network] SOCK_STATE_RECV on recvd data.");
                 int32_t bytes_read = cqe->res;
@@ -207,7 +209,7 @@ namespace ToolBox
                     AddSocketWrite(*socket, bid, bytes_read, 0);
                 }
             }
-            else if (SOCK_STATE_SEND & socket->GetEventType())
+            else if (SOCK_STATE_SEND & socket->GetSocketState())
             {
                 NetworkLogInfo("[Network] SOCK_STATE_SEND has sended data.");
                 // write has been completed, first re-add the buffer
@@ -217,7 +219,9 @@ namespace ToolBox
             }
 
         }
-        io_uring_cq_advance(ring_, count);
+        NetworkLogDebug("[Network] io_uring_cq_advance begin.");
+        io_uring_cq_advance(ring_, cqe_count);
+        NetworkLogDebug("[Network] io_uring_cq_advance end.");
         // for (int32_t i = 0; i < count; i++)
         // {
         //     epoll_event& event = events_[i];
@@ -316,6 +320,8 @@ namespace ToolBox
         }
         io_uring_prep_accept(sqe, socket->GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
         io_uring_sqe_set_flags(sqe, flags);
+        // io_uring_prep_poll_add(sqe, socket.GetSocketID(), POLLIN);
+
 
         auto* uring_socket = socket->GetUringSocket();
         if (!uring_socket)
@@ -370,8 +376,6 @@ namespace ToolBox
         io_context->io_type = SocketState::SOCK_STATE_PROV_BUF;
         sqe->user_data = reinterpret_cast<uint64_t>(io_context);
     }
-
-
 };  // ToolBox
 
 #endif  // LINUX_IO_URING

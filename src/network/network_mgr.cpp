@@ -32,13 +32,13 @@ namespace ToolBox
         {
             while (!stop_.load())
             {
-                NetworkLogError("[Network] networks_ size :%zu", networks_.size());
+                // NetworkLogError("[Network] networks_ size :%zu", networks_.size());
                 // 驱动网络更新
                 for (auto& network : networks_)
                 {
                     if (network)
                     {
-                        NetworkLogError("[Network] Update. network_type:%d", network->GetNetworkType());
+                        // NetworkLogError("[Network] Update. network_type:%d", network->GetNetworkType());
                         network->Update();
                     }
                 }

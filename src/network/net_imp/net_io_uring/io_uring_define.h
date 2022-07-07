@@ -9,9 +9,9 @@ namespace ToolBox
     // constexpr std::size_t MAX_CONNECTIONS = MAX_SOCKET_COUNT;
     // constexpr std::size_t BUFFERS_COUNT = MAX_CONNECTIONS;
 
-    constexpr std::size_t MAX_MESSAGE_LEN = 16;
-    constexpr std::size_t MAX_CONNECTIONS = 16;
-    constexpr std::size_t BUFFERS_COUNT = 16;
+    constexpr std::size_t MAX_MESSAGE_LEN = 1024;
+    constexpr std::size_t MAX_CONNECTIONS = 1024;
+    constexpr std::size_t BUFFERS_COUNT = 1024;
     constexpr std::size_t URING_WAIT_MSECONDS = 2;
 
     /*
