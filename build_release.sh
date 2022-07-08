@@ -5,6 +5,7 @@ scriptDir=$(cd $(dirname $0); pwd)
 echo ${scriptDir};
 
 # 可选编译第三方库libiouring
+git submodule update --init --recursive
 cd $scriptDir/src/thirdparty/liburing/
 ./configure --prefix=../../../../ --libdir=../../../../lib/ --includedir=../../../../include/
 make CFLAGS=-std=gnu99 && make install
