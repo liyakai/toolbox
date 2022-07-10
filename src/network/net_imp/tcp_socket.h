@@ -82,11 +82,11 @@ namespace ToolBox
         /*
         * 重置接收 PerSocket
         */
-        void ResetRecvPerSocket() override;
+        void ResetRecvAsyncSocket() override;
         /*
         * 重置发送 PerSocket
         */
-        void ResetSendPerSocket() override;
+        void ResetSendAsyncSocket() override;
         /*
         * 将 socket 建立与 iocp 的关联,只调用一次.
         */
@@ -103,6 +103,18 @@ namespace ToolBox
         {
             return &uring_socket_;
         }
+        /*
+        * 重置 UringSocket
+        */
+        inline void ResetUringSocket();
+        /*
+        * 重置接收 AsyncSocket
+        */
+        void ResetRecvAsyncSocket() override;
+        /*
+        * 重置发送 AsyncSocket
+        */
+        void ResetSendAsyncSocket() override;
 #endif
         /*
         * 设置socket状态
