@@ -97,11 +97,11 @@ namespace ToolBox
         {
             if (SOCKET_EVENT_RECV & event_type)
             {
-                return OnRecv(socket, IOSQE_FIXED_FILE | IOSQE_ASYNC);
+                return OnRecv(socket, 0);
             }
             else if (SOCKET_EVENT_SEND & event_type)
             {
-                return OnSend(socket, IOSQE_FIXED_FILE | IOSQE_ASYNC);
+                return OnSend(socket, 0);
             }
         }
         else if (EventOperType::EVENT_OPER_RDC == op_type)
@@ -149,12 +149,12 @@ namespace ToolBox
         {
             NetworkLogInfo("[Network] io_uring_for_each_cqecqe_count:%u", cqe_count);
             ++cqe_count;
-            UringIOContext* uring_io = reinterpret_cast<UringIOContext*>(cqe->user_data);
-            if (nullptr == uring_io)
-            {
-                continue;
-            }
-            BaseSocket* socket = uring_io->base_socket;
+            BaseSocket* socket = reinterpret_cast<BaseSocket*>(cqe->user_data);
+            // if (nullptr == uring_io)
+            // {
+            //     continue;
+            // }
+            // BaseSocket* socket = uring_io->base_socket;
             if (nullptr == socket)
             {
                 continue;
@@ -184,7 +184,7 @@ namespace ToolBox
                 // only read when there is no error, >= 0
                 if (sock_conn_fd >= 0)
                 {
-                    AddSocketRead(*socket, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+                    // AddSocketRead(*socket, IOSQE_BUFFER_SELECT);
                     socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
                 }
 
@@ -213,9 +213,9 @@ namespace ToolBox
             {
                 NetworkLogInfo("[Network] SOCK_STATE_SEND has sended data.");
                 // write has been completed, first re-add the buffer
-                AddProvideBuf(*socket, uring_io->bid);
+                // AddProvideBuf(*socket, uring_io->bid);
                 // add a new read for the existing connection
-                AddSocketWrite(*socket, uring_io->bid, MAX_MESSAGE_LEN, 0);
+                // AddSocketWrite(*socket, uring_io->bid, MAX_MESSAGE_LEN, 0);
             }
 
         }
@@ -246,15 +246,21 @@ namespace ToolBox
 
     bool IOUringCtrl::OnRecv(BaseSocket& socket, uint32_t flags)
     {
-        // socket.ResetRecvPerSocket();
+        socket.ResetRecvAsyncSocket();
         auto* uring_socket = socket.GetUringSocket();
         if (SocketState::SOCK_STATE_LISTENING == socket.GetSocketState())
         {
+            auto& accept_ex = uring_socket->accept_ex;
+            if (nullptr == accept_ex)
+            {
+                accept_ex = new AcceptEx_t;
+            }
             AddSocketAccept(&socket, flags);
         }
         else if (SocketState::SOCK_STATE_ESTABLISHED == socket.GetSocketState())
         {
             NetworkLogInfo("[Network] on recvd data.");
+            AddSocketRead(socket, 0);
             // // 投递一个长度为0的请求
             // DWORD bytes = 0;
             // DWORD flags = 0;
@@ -276,7 +282,7 @@ namespace ToolBox
 
     bool IOUringCtrl::OnSend(BaseSocket& socket, uint32_t flags)
     {
-        // socket.ResetSendPerSocket();
+        socket.ResetSendAsyncSocket();
         auto& io_send = socket.GetUringSocket()->io_send;
         if (SocketState::SOCK_STATE_CONNECTING == socket.GetSocketState())
         {
@@ -286,7 +292,7 @@ namespace ToolBox
         {
             io_send.io_type = SocketState::SOCK_STATE_SEND;
         }
-        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
+        // struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         // io_uring_prep_send(sqe, socket.GetSocketID(), &bufs_[bid], message_size, 0);
         // io_uring_sqe_set_flags(sqe, flags);
         // // TODO 处理 bid
@@ -318,10 +324,6 @@ namespace ToolBox
             NetworkLogError("[Network] get sqe from io_uring failed.");
             return false;
         }
-        io_uring_prep_accept(sqe, socket->GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
-        io_uring_sqe_set_flags(sqe, flags);
-        // io_uring_prep_poll_add(sqe, socket.GetSocketID(), POLLIN);
-
 
         auto* uring_socket = socket->GetUringSocket();
         if (!uring_socket)
@@ -329,28 +331,31 @@ namespace ToolBox
             NetworkLogError("[Network] the socket get uring socket failed.");
             return false;
         }
-        uring_socket->io_recv.base_socket = socket;
+        // uring_socket->io_recv.base_socket = socket;
         uring_socket->io_recv.io_type = SocketState::SOCK_STATE_LISTENING;
-        sqe->user_data = reinterpret_cast<uint64_t>(uring_socket);
+        sqe->user_data = reinterpret_cast<uint64_t>(socket);
+
+
+        io_uring_prep_accept(sqe, socket->GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
+        io_uring_sqe_set_flags(sqe, flags);
+        // io_uring_prep_poll_add(sqe, socket.GetSocketID(), POLLIN);
+
         NetworkLogInfo("[Network] AddSocketAccept add accept.");
         return true;
     }
 
-    void IOUringCtrl::AddSocketRead(BaseSocket& socket, std::size_t message_size, uint32_t flags)
+    void IOUringCtrl::AddSocketRead(BaseSocket& socket, uint32_t flags)
     {
-        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
-        io_uring_prep_recv(sqe, socket.GetSocketID(), NULL, message_size, 0);
-        io_uring_sqe_set_flags(sqe, flags);
-        sqe->buf_group = group_id_;
-
         auto* uring_socket = socket.GetUringSocket();
         if (!uring_socket)
         {
             NetworkLogError("[Network] the socket get uring socket failed.");
             return;
         }
-        uring_socket->io_recv.base_socket = &socket;
-        uring_socket->io_recv.io_type = SocketState::SOCK_STATE_RECV;
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
+        io_uring_prep_recv(sqe, socket.GetSocketID(), uring_socket->io_recv.buf, uring_socket->io_recv.len, 0);
+        io_uring_sqe_set_flags(sqe, flags);
+        sqe->buf_group = group_id_;
         sqe->user_data = reinterpret_cast<uint64_t>(uring_socket);
     }
 
@@ -361,10 +366,10 @@ namespace ToolBox
         io_uring_sqe_set_flags(sqe, flags);
 
         auto* uring_socket = socket.GetUringSocket();
-        uring_socket->io_send.base_socket = &socket;
+        // uring_socket->io_send.base_socket = &socket;
         uring_socket->io_send.io_type = SocketState::SOCK_STATE_SEND;
         uring_socket->io_send.bid = bid;
-        sqe->user_data = reinterpret_cast<uint64_t>(uring_socket);
+        sqe->user_data = reinterpret_cast<uint64_t>(&socket);
     }
 
     void IOUringCtrl::AddProvideBuf(BaseSocket& socket, uint16_t bid)

@@ -20,6 +20,9 @@ else
 fi
 
 cd $scriptDir/build
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_GPERF_TOOLS_CPU=OFF -DCMAKE_GPERF_TOOLS_HEAP=OFF -DCMAKE_USE_LIBIOURING=ON .. 
 
-cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_GPERF_TOOLS_CPU=OFF -DCMAKE_GPERF_TOOLS_HEAP=OFF -DCMAKE_USE_LIBIOURING=ON .. 
+# clangd tool
+cp compile_commands.json ../compile_commands.json
+
 make -j8

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
 #ifdef LINUX_IO_URING
 
 namespace ToolBox
@@ -32,9 +33,19 @@ namespace ToolBox
     */
     struct UringIOContext
     {
-        BaseSocket*     base_socket;     // 拥有此上下文的socket.
-        SocketState     io_type;         // 当前的I/O类型. IOCP没有像epoll那样的EPOLLIN,EPOLLOUT,只能通过自身携带的类型做标记.
+        // BaseSocket*     base_socket;        // 拥有此上下文的socket.
+        SocketState     io_type;            // 当前的I/O类型. IOCP没有像epoll那样的EPOLLIN,EPOLLOUT,只能通过自身携带的类型做标记.
         uint16_t        bid;
+        char*           buf;                // 异步缓冲区内存
+        uint32_t        len;                // 异步缓冲区长度
+    };
+
+    /*
+    * 定义 AcceptEx 函数相关
+    */
+    struct AcceptEx_t
+    {
+        uint32_t   socket_fd;               //  当前未决的客户端套接字  -AcceptEx
     };
 
     /*
@@ -42,8 +53,9 @@ namespace ToolBox
     */
     struct UringSockContext
     {
-        UringIOContext   io_recv;     // 接收请求
-        UringIOContext   io_send;     // 发送请求
+        AcceptEx_t*      accept_ex = nullptr;       // AcceptEx_t指针
+        UringIOContext   io_recv;                   // 接收请求
+        UringIOContext   io_send;                   // 发送请求
     };
 
 }

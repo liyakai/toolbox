@@ -86,10 +86,9 @@ namespace ToolBox
         /*
         * @brief 读
         * @param socket 客户端连接
-        * @param message_size 消息大小
         * @param flags 标记
         */
-        void AddSocketRead(BaseSocket& socket, std::size_t message_size, uint32_t flags);
+        void AddSocketRead(BaseSocket& socket, uint32_t flags);
         /*
         * @brief 写
         * @param socket 客户端连接

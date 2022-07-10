@@ -83,6 +83,14 @@ namespace ToolBox
         * 发送错误,向主线程报告
         */
         void OnErrored(ENetErrCode err_code, int32_t err_no);
+        /*
+        * 重置接收 AsyncSocket
+        */
+        virtual void ResetRecvAsyncSocket() {};
+        /*
+        * 重置发送 AsyncSocket
+        */
+        virtual void ResetSendAsyncSocket() {};
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         /*
         * 获取 socket id
@@ -105,14 +113,6 @@ namespace ToolBox
         {
             return nullptr;
         }
-        /*
-        * 重置接收 PerSocket
-        */
-        virtual void ResetRecvPerSocket() {};
-        /*
-        * 重置发送 PerSocket
-        */
-        virtual void ResetSendPerSocket() {};
         /*
         * 将 socket 建立与 iocp 的关联,只调用一次.
         */
