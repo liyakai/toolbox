@@ -185,6 +185,8 @@ namespace ToolBox
                 if (sock_conn_fd >= 0)
                 {
                     // AddSocketRead(*socket, IOSQE_BUFFER_SELECT);
+                    auto* uring_socket = socket->GetUringSocket();
+                    uring_socket->accept_ex->socket_fd = sock_conn_fd;
                     socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
                 }
 
@@ -353,10 +355,11 @@ namespace ToolBox
             return;
         }
         struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
-        io_uring_prep_recv(sqe, socket.GetSocketID(), uring_socket->io_recv.buf, uring_socket->io_recv.len, 0);
-        io_uring_sqe_set_flags(sqe, flags);
         sqe->buf_group = group_id_;
-        sqe->user_data = reinterpret_cast<uint64_t>(uring_socket);
+        sqe->user_data = reinterpret_cast<uint64_t>(&socket);
+
+        io_uring_prep_recv(sqe, socket.GetSocketID(), uring_socket->io_recv.buf, uring_socket->io_recv.len, flags);
+        io_uring_sqe_set_flags(sqe, flags);
     }
 
     void IOUringCtrl::AddSocketWrite(BaseSocket& socket, uint16_t bid, std::size_t message_size, uint32_t flags)

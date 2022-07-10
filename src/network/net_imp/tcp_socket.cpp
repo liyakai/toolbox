@@ -143,6 +143,9 @@ namespace ToolBox
 #elif defined(__linux__)
             auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
             p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+#if defined (LINUX_IO_URING)
+            break;
+#endif
 #elif defined(__APPLE__)
             auto p_kqueue_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
             p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
