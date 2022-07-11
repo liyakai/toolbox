@@ -24,8 +24,8 @@ public:
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
-        //  Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
-        //  PrintData(data, 16);
+        Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
+        PrintData(data, 16);
         Send(ToolBox::NT_TCP, conn_id, data, size);
     };
     void OnClose(uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
