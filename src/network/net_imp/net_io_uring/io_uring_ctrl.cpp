@@ -136,7 +136,7 @@ namespace ToolBox
             return false;
         }
         NetworkLogInfo("[Network] the number of SQEs submitted:%u", count);
-        sleep(2);
+        //sleep(2);
         // io_uring 设置了两个ringbuffer：
         // sq(submission queue):存放提交的IO请求,应用层为生产者操作tail,内核为消费者操作head.其中的entry称为sqe.
         // cq(completion queue):存放处理完成的IO请求,内核为生产者操作tail,应用层为消费者操作head.其中的entry称为cqe.
