@@ -193,7 +193,7 @@ namespace ToolBox
                 }
 
                 // new connected client; read data from socket and re-add accept to monitor for new connections
-                AddSocketAccept(socket, 0);
+                // AddSocketAccept(socket, 0);
             }
             else if (SOCK_STATE_RECV & uring_io->io_type)
             {
@@ -211,6 +211,8 @@ namespace ToolBox
                 {
                     // bytes have been read into bufs, now add write to socket sqe
                     // AddSocketWrite(*socket, bid, bytes_read, 0);
+                    auto* uring_socket = socket->GetUringSocket();
+                    uring_socket->io_recv.len = cqe->res;
                     socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
                 }
             }
