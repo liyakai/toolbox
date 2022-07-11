@@ -115,6 +115,10 @@ namespace ToolBox
         * 重置发送 AsyncSocket
         */
         void ResetSendAsyncSocket() override;
+        /*
+        * 将 socket 重新监听读写事件
+        */
+        bool ReAddSocketToUring(SockEventType event_type);
 #endif
         /*
         * 设置socket状态
