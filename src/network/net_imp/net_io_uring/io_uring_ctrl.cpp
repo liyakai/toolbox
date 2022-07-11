@@ -149,27 +149,29 @@ namespace ToolBox
         {
             NetworkLogInfo("[Network] io_uring_for_each_cqecqe_count:%u", cqe_count);
             ++cqe_count;
-            BaseSocket* socket = reinterpret_cast<BaseSocket*>(cqe->user_data);
-            // if (nullptr == uring_io)
-            // {
-            //     continue;
-            // }
-            // BaseSocket* socket = uring_io->base_socket;
+            UringIOContext* uring_io = reinterpret_cast<UringIOContext*>(cqe->user_data);
+            if (nullptr == uring_io)
+            {
+                NetworkLogError("[Network] convert user_data to UringIOContext failed. user_data:%p", cqe->user_data);
+                continue;
+            }
+            BaseSocket* socket = uring_io->base_socket;
             if (nullptr == socket)
             {
+                NetworkLogError("[Network] base_socket is nullpter.");
                 continue;
             }
             if (cqe->res == -ENOBUFS)
             {
                 // fprintf(stdout, "bufs in automatic buffer selection empty, this should not happen...\n");
                 // fflush(stdout);
+                NetworkLogError("[Network] bufs in automatic buffer selection empty, this should not happen....");
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-                // epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
-
                 continue;
             }
-            NetworkLogInfo("[Network] io_uring_for_each_cqe socket type:%d", socket->GetSocketState());
-            if (SOCK_STATE_PROV_BUF & socket->GetSocketState())
+            NetworkLogInfo("[Network] io_uring_for_each_cqe socket type:%d, uring_io type:%d ", socket->GetSocketState(), uring_io->io_type);
+            NetworkLogInfo("[Network] io_uring_for_each_cqe socket type:, uring_io type:%d ", uring_io->io_type);
+            if (SOCK_STATE_PROV_BUF & uring_io->io_type)
             {
                 NetworkLogInfo("[Network] SOCK_STATE_PROV_BUF recv message.");
                 if (cqe->res < 0)
@@ -177,7 +179,7 @@ namespace ToolBox
                     socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
                 }
             }
-            else if (SOCK_STATE_LISTENING & socket->GetSocketState())
+            else if (SOCK_STATE_LISTENING & uring_io->io_type)
             {
                 NetworkLogInfo("[Network] SOCK_STATE_LISTENING on recvd connect.");
                 int32_t sock_conn_fd = cqe->res;
@@ -193,7 +195,7 @@ namespace ToolBox
                 // new connected client; read data from socket and re-add accept to monitor for new connections
                 AddSocketAccept(socket, 0);
             }
-            else if (SOCK_STATE_RECV & socket->GetSocketState())
+            else if (SOCK_STATE_RECV & uring_io->io_type)
             {
                 NetworkLogInfo("[Network] SOCK_STATE_RECV on recvd data.");
                 int32_t bytes_read = cqe->res;
@@ -201,17 +203,18 @@ namespace ToolBox
                 if (cqe->res <= 0)
                 {
                     // read failed, re-add the buffer
-                    AddProvideBuf(*socket, bid);
+                    // AddProvideBuf(*socket, bid);
                     // connection closed or error
                     socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
                 }
                 else
                 {
                     // bytes have been read into bufs, now add write to socket sqe
-                    AddSocketWrite(*socket, bid, bytes_read, 0);
+                    // AddSocketWrite(*socket, bid, bytes_read, 0);
+                    socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
                 }
             }
-            else if (SOCK_STATE_SEND & socket->GetSocketState())
+            else if (SOCK_STATE_SEND & uring_io->io_type)
             {
                 NetworkLogInfo("[Network] SOCK_STATE_SEND has sended data.");
                 // write has been completed, first re-add the buffer
@@ -333,9 +336,9 @@ namespace ToolBox
             NetworkLogError("[Network] the socket get uring socket failed.");
             return false;
         }
-        // uring_socket->io_recv.base_socket = socket;
+        uring_socket->io_recv.base_socket = socket;
         uring_socket->io_recv.io_type = SocketState::SOCK_STATE_LISTENING;
-        sqe->user_data = reinterpret_cast<uint64_t>(socket);
+        sqe->user_data = reinterpret_cast<uint64_t>(&uring_socket->io_recv);
 
 
         io_uring_prep_accept(sqe, socket->GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
@@ -356,7 +359,9 @@ namespace ToolBox
         }
         struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         sqe->buf_group = group_id_;
-        sqe->user_data = reinterpret_cast<uint64_t>(&socket);
+        uring_socket->io_recv.base_socket = &socket;
+        uring_socket->io_recv.io_type = SocketState::SOCK_STATE_RECV;
+        sqe->user_data = reinterpret_cast<uint64_t>(&uring_socket->io_recv);
 
         io_uring_prep_recv(sqe, socket.GetSocketID(), uring_socket->io_recv.buf, uring_socket->io_recv.len, flags);
         io_uring_sqe_set_flags(sqe, flags);

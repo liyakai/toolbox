@@ -144,6 +144,7 @@ namespace ToolBox
             auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
             p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #if defined (LINUX_IO_URING)
+            ReAddSocketToUring(SOCKET_EVENT_RECV);
             break;
 #endif
 #elif defined(__APPLE__)
@@ -199,6 +200,21 @@ namespace ToolBox
         }
         ReAddSocketToIocp(SOCKET_EVENT_RECV);
 #elif defined(__linux__) || defined(__APPLE__)
+#if defined (LINUX_IO_URING)
+        recv_ring_buffer_.AdjustWritePos(uring_socket_.io_recv.len);
+        // 处理数据
+        if (ErrCode::ERR_SUCCESS != ProcessRecvData())
+        {
+            return;
+        }
+
+        // 检查接收 buffer 是否超限
+        if (!CheckRecvRingBufferSize())
+        {
+            return;
+        }
+        ReAddSocketToUring(SOCKET_EVENT_RECV);
+#else
         while (size_t size = recv_ring_buffer_.ContinuouslyWriteableSize())
         {
             int32_t bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
@@ -228,6 +244,8 @@ namespace ToolBox
                 return;
             }
         }
+#endif
+
 #endif
         return;
     }
@@ -302,15 +320,23 @@ namespace ToolBox
         event_type_ |= SOCKET_EVENT_RECV;
         socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        ReAddSocketToIocp(SOCKET_EVENT_RECV);
-#elif defined(__linux__)
-        auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
-        p_epoll_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
-#elif defined(__APPLE__)
-        auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
-        p_kqueue_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
-#endif
+        // TODO delete. 三者形式是统一的,不过先注释掉,没有问题的话就都删掉.
+        // #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        //         ReAddSocketToIocp(SOCKET_EVENT_RECV);
+        // #elif defined(__linux__)
+        //         auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
+        //         p_epoll_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        // #elif defined(__APPLE__)
+        //         auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
+        //         p_kqueue_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
+        // #endif
+
+        auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        if (nullptr == p_iocp_network)
+        {
+            return ;
+        }
+        p_iocp_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 
         p_network_->OnConnected(GetConnID());
     }
@@ -320,12 +346,18 @@ namespace ToolBox
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         send_ring_buffer_.AdjustReadPos(per_socket_.io_send.wsa_buf.len);
 #elif defined(__linux__) || defined(__APPLE__)
+#if defined (LINUX_IO_URING)
+        send_ring_buffer_.AdjustReadPos(uring_socket_.io_send.len);
+#endif
 #endif
         while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
         {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
             ReAddSocketToIocp(SOCKET_EVENT_SEND);
 #elif defined(__linux__) || defined(__APPLE__)
+#if defined (LINUX_IO_URING)
+            ReAddSocketToUring(SOCKET_EVENT_SEND);
+#else
             int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
             if (bytes < 0)
             {
@@ -337,6 +369,8 @@ namespace ToolBox
             {
                 break;
             }
+#endif
+
 #endif
         }
     }
@@ -532,6 +566,16 @@ namespace ToolBox
         memset(&uring_socket_.io_send, 0, sizeof(uring_socket_.io_send));;
         uring_socket_.io_send.buf = send_ring_buffer_.GetReadPtr();
         uring_socket_.io_send.len = send_ring_buffer_.ContinuouslyReadableSize();
+    }
+    bool TcpSocket::ReAddSocketToUring(SockEventType event_type)
+    {
+        auto p_uring_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        if (nullptr == p_uring_network)
+        {
+            return false;
+        }
+        // 将监听socket重新加入iocp
+        return p_uring_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type);
     }
 #endif
 
