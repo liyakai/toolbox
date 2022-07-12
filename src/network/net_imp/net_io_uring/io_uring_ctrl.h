@@ -96,6 +96,12 @@ namespace ToolBox
         * @param flags 标记
         */
         bool AddSocketWrite(BaseSocket& socket, uint16_t bid, uint32_t flags);
+
+        /*
+        * @brief 关闭
+        * @param socket 客户端连接
+        */
+        bool AddSocketClose(BaseSocket& socket);
         // /*
         // * @brief 提供buf
         // * @param socket 客户端连接

@@ -131,6 +131,7 @@ namespace ToolBox
                 p_sock_pool_->Free(new_socket);
                 return;
             }
+            NetworkLogDebug("[Network] accept a new socket. socket id:%d, socket state:%d", new_socket->GetSocketID(), new_socket->GetSocketState());
             // 通知主线程有新的客户端连接进来
             p_network_->OnAccepted(new_socket->GetConnID());
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -454,6 +455,7 @@ namespace ToolBox
     {
         if (IsSocketValid())
         {
+            NetworkLogDebug("[Network] socket id:%d Ready to be free.", GetSocketID());
             BaseSocket::Close(net_err, sys_err);
             p_network_->CloseListenInMultiplexing(GetSocketID());
             // 通知主线程 socket 关闭
