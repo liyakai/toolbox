@@ -353,9 +353,11 @@ namespace ToolBox
         {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
             ReAddSocketToIocp(SOCKET_EVENT_SEND);
+            break;  // 做 io_uring 时觉得这里应该添加一个.
 #elif defined(__linux__) || defined(__APPLE__)
 #if defined (LINUX_IO_URING)
             ReAddSocketToUring(SOCKET_EVENT_SEND);
+            break;
 #else
             int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
             if (bytes < 0)
@@ -368,7 +370,7 @@ namespace ToolBox
             {
                 break;
             }
-#endif
+#endif  // LINUX_IO_URING
 
 #endif
         }
@@ -380,7 +382,13 @@ namespace ToolBox
         int32_t send_bytes = 0; //send(socket_fd, data, (int32_t)size, 0);
         return send_bytes;
 #elif defined(__linux__) || defined(__APPLE__)
+#if defined (LINUX_IO_URING)
+        int32_t send_bytes = 0;
+        return send_bytes;
+#else
         int32_t send_bytes = send(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
+#endif
+
 #endif
         if (send_bytes < 0)
         {
@@ -792,6 +800,9 @@ namespace ToolBox
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
             ReAddSocketToIocp(SOCKET_EVENT_SEND);
 #elif defined(__linux__) || defined(__APPLE__)
+#if defined (LINUX_IO_URING)
+            ReAddSocketToUring(SOCKET_EVENT_SEND);
+#endif
 #endif
         }
     }
