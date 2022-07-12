@@ -349,7 +349,8 @@ namespace ToolBox
         send_ring_buffer_.AdjustReadPos(uring_socket_.io_send.len);
 #endif
 #endif
-        while (size_t size = send_ring_buffer_.ContinuouslyReadableSize())
+        size_t size = 0;
+        while ((size = send_ring_buffer_.ContinuouslyReadableSize()) != 0)
         {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
             ReAddSocketToIocp(SOCKET_EVENT_SEND);
