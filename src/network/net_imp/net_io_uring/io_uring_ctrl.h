@@ -88,22 +88,22 @@ namespace ToolBox
         * @param socket 客户端连接
         * @param flags 标记
         */
-        void AddSocketRead(BaseSocket& socket, uint32_t flags);
+        bool AddSocketRead(BaseSocket& socket, uint32_t flags);
         /*
         * @brief 写
         * @param socket 客户端连接
         * @param bid
         * @param flags 标记
         */
-        void AddSocketWrite(BaseSocket& socket, uint16_t bid, uint32_t flags);
-        /*
-        * @brief 提供buf
-        * @param socket 客户端连接
-        * @param bid
-        * @param message_size 消息大小
-        * @param flags 标记
-        */
-        void AddProvideBuf(BaseSocket& socket, uint16_t bid);
+        bool AddSocketWrite(BaseSocket& socket, uint16_t bid, uint32_t flags);
+        // /*
+        // * @brief 提供buf
+        // * @param socket 客户端连接
+        // * @param bid
+        // * @param message_size 消息大小
+        // * @param flags 标记
+        // */
+        // void AddProvideBuf(BaseSocket& socket, uint16_t bid);
     private:
         uint32_t max_events_ = 0; // 最大事件数
         struct io_uring* ring_;       // io_uring 全局句柄

@@ -147,5 +147,5 @@ namespace ToolBox
         char log_buffer_[log_buffer_size_];
     };
 
-#define LogMgr Singleton<ToolBox::LogManager>::Instance()
+#define LogMgr ToolBox::Singleton<ToolBox::LogManager>::Instance()
 };
