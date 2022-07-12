@@ -144,6 +144,8 @@ namespace ToolBox
             auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
             p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #if defined (LINUX_IO_URING)
+            // 将监听socket重新加入iocp
+            ReAddSocketToUring(SOCKET_EVENT_RECV);
             break;
 #endif
 #elif defined(__APPLE__)

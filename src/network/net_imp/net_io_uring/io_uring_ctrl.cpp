@@ -1,4 +1,5 @@
 #include "io_uring_ctrl.h"
+#include "network_def.h"
 #ifdef LINUX_IO_URING
 
 namespace ToolBox
@@ -146,12 +147,13 @@ namespace ToolBox
         // go through all CQEs
         io_uring_for_each_cqe(ring_, head, cqe)
         {
-            NetworkLogTrace("[Network] io_uring_for_each_cqecqe_count:%u", ++cqe_count);
             ++cqe_count;
+            NetworkLogTrace("[Network] io_uring_for_each_cqecqe_count:%u", cqe_count);
+
             UringIOContext* uring_io = reinterpret_cast<UringIOContext*>(cqe->user_data);
             if (nullptr == uring_io)
             {
-                NetworkLogError("[Network] convert user_data to UringIOContext failed. user_data:%p", cqe->user_data);
+                NetworkLogError("[Network] convert user_data to UringIOContext failed. cqe:%p, user_data:%p", cqe, cqe->user_data);
                 continue;
             }
             BaseSocket* socket = uring_io->base_socket;
@@ -172,7 +174,7 @@ namespace ToolBox
                 NetworkLogError("[Network] io_uring_for_each_cqe error: cqe->res:%d ", cqe->res);
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
             }
-            NetworkLogInfo("[Network] io_uring_for_each_cqe socket type:%d, uring_io type:%d ", socket->GetSocketState(), uring_io->io_type);
+            NetworkLogTrace("[Network] io_uring_for_each_cqe socket type:%d, uring_io type:%d ", socket->GetSocketState(), uring_io->io_type);
 
             if (SOCK_STATE_PROV_BUF & uring_io->io_type)
             {
@@ -180,7 +182,7 @@ namespace ToolBox
             }
             else if (SOCK_STATE_LISTENING & uring_io->io_type)
             {
-                NetworkLogInfo("[Network] SOCK_STATE_LISTENING on recvd connect.");
+                NetworkLogDebug("[Network] SOCK_STATE_LISTENING on recvd connect. socket id:%d, socket state:%d", socket->GetSocketID(), socket->GetSocketState());
                 int32_t sock_conn_fd = cqe->res;
                 if (sock_conn_fd >= 0)
                 {
@@ -299,7 +301,7 @@ namespace ToolBox
         io_uring_sqe_set_flags(sqe, flags);
         // io_uring_prep_poll_add(sqe, socket.GetSocketID(), POLLIN);
 
-        NetworkLogTrace("[Network] AddSocketAccept add accept.");
+        NetworkLogDebug("[Network] AddSocketAccept add accept. socket id:%d, socket state:%d", socket->GetSocketID(), socket->GetSocketState());
         return true;
     }
 
