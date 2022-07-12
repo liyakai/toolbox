@@ -173,6 +173,7 @@ namespace ToolBox
             {
                 NetworkLogError("[Network] io_uring_for_each_cqe error: cqe->res:%d ", cqe->res);
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
+                continue;
             }
             NetworkLogTrace("[Network] io_uring_for_each_cqe socket type:%d, uring_io type:%d ", socket->GetSocketState(), uring_io->io_type);
 

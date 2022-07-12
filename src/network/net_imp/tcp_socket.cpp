@@ -668,9 +668,11 @@ namespace ToolBox
         }
 #endif
         SetReuseAddrOn(socket_id_); // 复用端口
-        // SetLingerOff(socket_id_);   // 立即关闭该连接
-        // SetDeferAccept(socket_id_); // 1s 之内没有数据发送，则直接关闭连接
-        // SetNonBlocking(socket_id_); // 设置为非阻塞
+        SetLingerOff(socket_id_);   // 立即关闭该连接
+        SetDeferAccept(socket_id_); // 1s 之内没有数据发送，则直接关闭连接
+#if !defined(LINUX_IO_URING)
+        SetNonBlocking(socket_id_); // 设置为非阻塞
+#endif
         // 绑定端口
         int32_t error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
         if (error < 0)
