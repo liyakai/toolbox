@@ -118,7 +118,7 @@ CASE(test_tcp_echo)
     ProfilerStart("test_tcp_echo.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_tcp_echo \n");
-    LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_DEBUG);
+    LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->Start();

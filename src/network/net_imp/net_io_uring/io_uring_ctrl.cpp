@@ -1,5 +1,6 @@
 #include "io_uring_ctrl.h"
 #include "network_def.h"
+#include <unistd.h>
 #ifdef LINUX_IO_URING
 
 namespace ToolBox
@@ -147,36 +148,36 @@ namespace ToolBox
         // go through all CQEs
         io_uring_for_each_cqe(ring_, head, cqe)
         {
-            ++cqe_count;
-            NetworkLogTrace("[Network] io_uring_for_each_cqecqe_count:%u", cqe_count);
-
+            // usleep(10);
             UringIOContext* uring_io = reinterpret_cast<UringIOContext*>(cqe->user_data);
             if (nullptr == uring_io)
             {
                 NetworkLogError("[Network] convert user_data to UringIOContext failed. cqe:%p, user_data:%p", cqe, cqe->user_data);
-                continue;
+                break;
             }
             BaseSocket* socket = uring_io->base_socket;
             if (nullptr == socket)
             {
-                NetworkLogError("[Network] base_socket is nullpter.");
-                continue;
+                NetworkLogError("[Network] base_socket is nullpter. cqe:%p, user_data:%p", cqe, cqe->user_data);
+                sleep(1);
+                break;
             }
             if (cqe->res == -ENOBUFS)
             {
                 NetworkLogError("[Network] bufs in automatic buffer selection empty, this should not happen....");
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-                continue;
+                break;
             }
             // only read when there is no error, >= 0
-            if (cqe->res < 0)
+            if (cqe->res <= 0)
             {
-                NetworkLogError("[Network] io_uring_for_each_cqe error: cqe->res:%d ", cqe->res);
+                NetworkLogError("[Network] io_uring_for_each_cqe error: cqe->res:%d, socket id:%d ", cqe->res, socket->GetSocketID());
+                AddSocketClose(*socket);
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-                continue;
+                break;
             }
-            NetworkLogTrace("[Network] io_uring_for_each_cqe socket type:%d, uring_io type:%d ", socket->GetSocketState(), uring_io->io_type);
-
+            ++cqe_count;
+            NetworkLogTrace("[Network] io_uring_for_each_cqe socket type:%d, uring_io type:%d, io_uring_for_each_cqecqe_count:%u ", socket->GetSocketState(), uring_io->io_type, cqe_count);
             if (SOCK_STATE_PROV_BUF & uring_io->io_type)
             {
                 NetworkLogInfo("[Network] SOCK_STATE_PROV_BUF recv message.");
@@ -195,7 +196,7 @@ namespace ToolBox
             }
             else if (SOCK_STATE_RECV & uring_io->io_type)
             {
-                NetworkLogTrace("[Network] SOCK_STATE_RECV on recvd data.");
+                NetworkLogTrace("[Network] SOCK_STATE_RECV on recvd data. len:%d", cqe->res);
                 // int32_t bytes_read = cqe->res;
                 // int32_t bid = cqe->flags >> 16;
                 // bytes have been read into bufs, now add write to socket sqe
@@ -308,13 +309,20 @@ namespace ToolBox
 
     bool IOUringCtrl::AddSocketRead(BaseSocket& socket, uint32_t flags)
     {
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
+        if (!sqe)
+        {
+            NetworkLogError("[Network] get sqe from io_uring failed.");
+            return false;
+        }
+
         auto* uring_socket = socket.GetUringSocket();
         if (!uring_socket)
         {
             NetworkLogError("[Network] the socket get uring socket failed.");
             return false;
         }
-        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
+
         sqe->buf_group = group_id_;
         uring_socket->io_recv.base_socket = &socket;
         uring_socket->io_recv.io_type = SocketState::SOCK_STATE_RECV;
@@ -342,6 +350,15 @@ namespace ToolBox
         sqe->user_data = reinterpret_cast<uint64_t>( &uring_socket->io_send);
 
         io_uring_prep_send(sqe, socket.GetSocketID(), uring_socket->io_send.buf, uring_socket->io_send.len, flags);
+        return true;
+    }
+
+
+    bool IOUringCtrl::AddSocketClose(BaseSocket& socket)
+    {
+        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
+
+        io_uring_prep_close(sqe, socket.GetSocketID());
         return true;
     }
 
