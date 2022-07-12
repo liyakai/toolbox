@@ -93,10 +93,9 @@ namespace ToolBox
         * @brief 写
         * @param socket 客户端连接
         * @param bid
-        * @param message_size 消息大小
         * @param flags 标记
         */
-        void AddSocketWrite(BaseSocket& socket, uint16_t bid, std::size_t message_size, uint32_t flags);
+        void AddSocketWrite(BaseSocket& socket, uint16_t bid, uint32_t flags);
         /*
         * @brief 提供buf
         * @param socket 客户端连接
