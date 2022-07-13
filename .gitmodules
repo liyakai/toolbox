@@ -1,0 +1,3 @@
+[submodule "src/thirdparty/liburing"]
+	path = src/thirdparty/liburing
+	url = git@github.com:liyakai/liburing.git

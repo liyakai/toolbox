@@ -2,3 +2,9 @@
 /out
 /bin
 /build
+/.cache
+*.a
+*.so
+*.so.*
+compile_commands.json
+

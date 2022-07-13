@@ -1,29 +1,25 @@
 #pragma once
-
-#ifdef __linux__
+#ifdef LINUX_IO_URING
 
 #include "src/network/net_imp/imp_network.h"
-
 
 namespace ToolBox
 {
 
-    class TcpSocket;
-
     /*
-    * 定义基于 TCP 和 Epoll 的网络
+    * 定义基于 TCP 和 io_uring 的网络
     */
-    class TcpEpollNetwork : public ImpNetwork<TcpSocket>
+    class TcpIOUringNetwork : public ImpNetwork<TcpSocket>
     {
     public:
         /*
         * 构造
         */
-        TcpEpollNetwork() = default;
+        TcpIOUringNetwork() = default;
         /*
         * 析构
         */
-        virtual ~TcpEpollNetwork() = default;
+        virtual ~TcpIOUringNetwork() = default;
         /*
         * 初始化
         */
@@ -32,4 +28,17 @@ namespace ToolBox
 
 };  // ToolBox
 
-#endif // __linux__
+#endif // LINUX_IO_URING
+
+
+
+
+
+
+
+
+
+
+
+
+
