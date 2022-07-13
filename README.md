@@ -17,10 +17,15 @@ windows 系统:
     基于TCP+epoll的Linux网络库[reactor模式]
     基于UDP+epoll的Linux网络库[reactor模式]
     基于KCP+epoll的Linux网络库[reactor模式]
+    基于TCP+io_uring的Linux网络库[proactor模式]
     基于TCP+iocp的windows网络库[proactor模式]
     基于TCP+kqueue的MacOS网络库[reactor模式]
 
-
+|        | epoll | io_uring | iocp | kqueue |
+|  ----  | ----  | ----     | ---- | ----   |
+| TCP    |   √   |  √       |   √  |   √    |
+| UDP    |   √   |          |      |        |
+| KCP    |   √   |          |      |        |
     
 #### 2.2 工具
 1. [基于五层时间轮算法的定时器](https://github.com/liyakai/toolbox/blob/main/src/tools/timer.h)
@@ -38,7 +43,7 @@ windows 系统:
 13. [字符串处理工具](https://github.com/liyakai/toolbox/blob/main/src/tools/string_util.h)
 14. [智能指针](https://github.com/liyakai/toolbox/blob/main/src/tools/smart_pointer.h)
 ### 3. 下一步开发计划
-1. linux下的异步io机制:io_uring.
+1. ~~linux下的异步io机制:io_uring~~.
 2. 网络库中补充重连机制.
 
    // TODO 扩充工具库
