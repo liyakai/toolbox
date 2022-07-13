@@ -21,11 +21,11 @@ windows 系统:
     基于TCP+iocp的windows网络库[proactor模式]
     基于TCP+kqueue的MacOS网络库[reactor模式]
 
-|        | epoll | io_uring | iocp | kqueue |
-|  ----  | ----  | ----     | ---- | ----   |
-| TCP    |   √   |  √       |   √  |   √    |
-| UDP    |   √   |          |      |        |
-| KCP    |   √   |          |      |        |
+|        | epoll | io_uring  |  iocp |  kqueue |
+|  ----  | ----  |  ----     |  ---- |  ----   |
+| TCP    |   √   |     √     |   √   |    √    |
+| UDP    |   √   |           |       |         |
+| KCP    |   √   |           |       |         |
     
 #### 2.2 工具
 1. [基于五层时间轮算法的定时器](https://github.com/liyakai/toolbox/blob/main/src/tools/timer.h)
