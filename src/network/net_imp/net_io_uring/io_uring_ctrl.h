@@ -96,24 +96,10 @@ namespace ToolBox
         * @param flags 标记
         */
         bool AddSocketWrite(BaseSocket& socket, uint16_t bid, uint32_t flags);
-
-        /*
-        * @brief 关闭
-        * @param socket 客户端连接
-        */
-        bool AddSocketClose(BaseSocket& socket);
-        // /*
-        // * @brief 提供buf
-        // * @param socket 客户端连接
-        // * @param bid
-        // * @param message_size 消息大小
-        // * @param flags 标记
-        // */
-        // void AddProvideBuf(BaseSocket& socket, uint16_t bid);
     private:
         uint32_t max_events_ = 0; // 最大事件数
         struct io_uring* ring_;       // io_uring 全局句柄
-        char bufs_[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
+        char bufs_[BUFFERS_COUNT][MAX_MESSAGE_LEN];
         int32_t group_id_ = 1337;
     };
 
