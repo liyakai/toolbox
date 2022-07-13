@@ -55,13 +55,13 @@ namespace ToolBox
     */
     enum SocketState
     {
-        SOCK_STATE_INVALIED     = 1 << 0,   // 初始状态
-        SOCK_STATE_LISTENING    = 1 << 1,   // 监听
-        SOCK_STATE_CONNECTING   = 1 << 2,   // 主动连接
-        SOCK_STATE_ESTABLISHED  = 1 << 3,   // 连接建立
-        SOCK_STATE_RECV         = 1 << 4,   // 接收[异步IO所用的细分状态]
-        SOCK_STATE_SEND         = 1 << 5,   // 发送[异步IO所用的细分状态]
-        SOCK_STATE_PROV_BUF     = 1 << 6,   //     [异步IO所用的细分状态]
+        SOCK_STATE_INVALIED     = 1 << 0,   // 1  初始状态
+        SOCK_STATE_LISTENING    = 1 << 1,   // 2  监听
+        SOCK_STATE_CONNECTING   = 1 << 2,   // 4  主动连接
+        SOCK_STATE_ESTABLISHED  = 1 << 3,   // 8  连接建立
+        SOCK_STATE_RECV         = 1 << 4,   // 16 接收[异步IO所用的细分状态]
+        SOCK_STATE_SEND         = 1 << 5,   // 32 发送[异步IO所用的细分状态]
+        SOCK_STATE_PROV_BUF     = 1 << 6,   // 64 [异步IO所用的细分状态]
     };
 
     /*

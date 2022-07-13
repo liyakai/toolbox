@@ -137,7 +137,6 @@ namespace ToolBox
             return false;
         }
         NetworkLogTrace("[Network] the number of SQEs submitted:%u", count);
-        //sleep(2);
         // io_uring 设置了两个ringbuffer：
         // sq(submission queue):存放提交的IO请求,应用层为生产者操作tail,内核为消费者操作head.其中的entry称为sqe.
         // cq(completion queue):存放处理完成的IO请求,内核为生产者操作tail,应用层为消费者操作head.其中的entry称为cqe.
@@ -148,6 +147,7 @@ namespace ToolBox
         // go through all CQEs
         io_uring_for_each_cqe(ring_, head, cqe)
         {
+            ++cqe_count;
             // usleep(10);
             UringIOContext* uring_io = reinterpret_cast<UringIOContext*>(cqe->user_data);
             if (nullptr == uring_io)
@@ -159,7 +159,6 @@ namespace ToolBox
             if (nullptr == socket)
             {
                 NetworkLogError("[Network] base_socket is nullpter. cqe:%p, user_data:%p", cqe, cqe->user_data);
-                sleep(1);
                 break;
             }
             if (cqe->res == -ENOBUFS)
@@ -169,14 +168,30 @@ namespace ToolBox
                 break;
             }
             // only read when there is no error, >= 0
-            if (cqe->res <= 0)
+            if (cqe->res < 0)
             {
-                NetworkLogError("[Network] io_uring_for_each_cqe error: cqe->res:%d, socket id:%d ", cqe->res, socket->GetSocketID());
-                AddSocketClose(*socket);
+                NetworkLogWarn("[Network] io_uring_for_each_cqe error: cqe->res:%d, socket id:%d,uring_io io_type:%d ", cqe->res, socket->GetSocketID(), uring_io->io_type);
+                errno = -cqe->res;
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
                 break;
             }
-            ++cqe_count;
+            else if (cqe->res == 0)
+            {
+                NetworkLogDebug("[Network] io_uring_for_each_cqe error: cqe->res:%d, socket id:%d,uring_io io_type:%d ", cqe->res, socket->GetSocketID(), uring_io->io_type);
+                if (SOCK_STATE_SEND == uring_io->io_type)
+                {
+                    NetworkLogDebug("[Network] io_uring_for_each_cqe connect success.");
+                    socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
+                }
+                else if (SOCK_STATE_RECV == uring_io->io_type)
+                {
+                    NetworkLogDebug("[Network] io_uring_for_each_cqe socket disconnected.");
+                    socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
+                }
+
+                break;
+            }
+
             NetworkLogTrace("[Network] io_uring_for_each_cqe socket type:%d, uring_io type:%d, io_uring_for_each_cqecqe_count:%u ", socket->GetSocketState(), uring_io->io_type, cqe_count);
             if (SOCK_STATE_PROV_BUF & uring_io->io_type)
             {
@@ -220,25 +235,6 @@ namespace ToolBox
 
         }
         io_uring_cq_advance(ring_, cqe_count);
-        // for (int32_t i = 0; i < count; i++)
-        // {
-        //     epoll_event& event = events_[i];
-        //     BaseSocket* socket = static_cast<BaseSocket*>(event.data.ptr);
-        //     if (nullptr == socket) continue;
-        //     if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
-        //     {
-        //         socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-        //         epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
-        //     }
-        //     if (event.events & EPOLLIN)
-        //     {
-        //         socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
-        //     }
-        //     if (event.events & EPOLLOUT)
-        //     {
-        //         socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
-        //     }
-        // }
         return true;
     }
 
@@ -352,25 +348,6 @@ namespace ToolBox
         io_uring_prep_send(sqe, socket.GetSocketID(), uring_socket->io_send.buf, uring_socket->io_send.len, flags);
         return true;
     }
-
-
-    bool IOUringCtrl::AddSocketClose(BaseSocket& socket)
-    {
-        struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
-
-        io_uring_prep_close(sqe, socket.GetSocketID());
-        return true;
-    }
-
-    // void IOUringCtrl::AddProvideBuf(BaseSocket& socket, uint16_t bid)
-    // {
-    //     struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
-    //     io_uring_prep_provide_buffers(sqe, bufs_[bid], MAX_MESSAGE_LEN, 1, group_id_, bid);
-
-    //     UringIOContext* io_context = GET_NET_OBJECT(UringIOContext);
-    //     io_context->io_type = SocketState::SOCK_STATE_PROV_BUF;
-    //     sqe->user_data = reinterpret_cast<uint64_t>(io_context);
-    // }
 };  // ToolBox
 
 #endif  // LINUX_IO_URING
