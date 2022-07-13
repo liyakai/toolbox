@@ -25,74 +25,75 @@
 
 #endif  // #if (defined(WIN32) || defined(_WIN64))
 
-namespace ToolBox{
-
-constexpr std::size_t MAX_SOCKET_COUNT = 40000;
-constexpr std::size_t INVALID_CONN_ID = UINT32_MAX;
-constexpr std::size_t DEFAULT_CONN_BUFFER_SIZE = 256 * 1024;        /* 256 k */
-constexpr std::size_t DEFAULT_RING_BUFF_SIZE = 256 * 1024;        /* 256 k */
-constexpr std::size_t DEFAULT_BACKLOG_SIZE = 256;
-// 
-constexpr int32_t KCP_TRANSPORT_MTU = 1000;
-constexpr uint32_t KCP_CONV = 0x01020304;          // kcp»á»°ID, must equal in two endpoint from the same connection
-
-typedef struct sockaddr_in SocketAddress;
-/*
-* ´íÎóÂë
-*/
-enum class ErrCode
+namespace ToolBox
 {
-    ERR_SUCCESS = 0,
-    ERR_MALLOC_FAILED, // ·ÖÅäÄÚ´æÊ§°Ü
-    ERR_PARAM_NULLPTR, // ²ÎÊıÎª¿ÕÖ¸Õë
-    ERR_INSUFFICIENT_LENGTH,    // ³¤¶È²»×ã
-    ERR_INVALID_PACKET_SIZE,    // °ü³¤¶È·Ç·¨
+    constexpr std::size_t MAX_SOCKET_COUNT = 10000;
+    constexpr std::size_t INVALID_CONN_ID = UINT32_MAX;
+    constexpr std::size_t DEFAULT_CONN_BUFFER_SIZE = 256 * 1024;        /* 256 k */
+    constexpr std::size_t DEFAULT_RING_BUFF_SIZE = 256 * 1024;        /* 256 k */
+    constexpr std::size_t DEFAULT_BACKLOG_SIZE = 256;
+    //
+    constexpr int32_t KCP_TRANSPORT_MTU = 1000;
+    constexpr uint32_t KCP_CONV = 0x01020304;          //  kcpä¼šè¯ID, must equal in two endpoint from the same connection
 
-};
+    typedef struct sockaddr_in SocketAddress;
+    /*
+    * é”™è¯¯ç 
+    */
+    enum class ErrCode
+    {
+        ERR_SUCCESS = 0,
+        ERR_MALLOC_FAILED, // åˆ†é…å†…å­˜å¤±è´¥
+        ERR_PARAM_NULLPTR, // å‚æ•°ä¸ºç©ºæŒ‡é’ˆ
+        ERR_INSUFFICIENT_LENGTH,    // é•¿åº¦ä¸è¶³
+        ERR_INVALID_PACKET_SIZE,    // åŒ…é•¿åº¦éæ³•
 
-/*
-* socketµÄ×´Ì¬
-*/
-enum SocketState
-{
-    SOCK_STATE_INVALIED     = 1 << 0,   // ³õÊ¼×´Ì¬
-    SOCK_STATE_LISTENING    = 1 << 1,   // ¼àÌı
-    SOCK_STATE_CONNECTING   = 1 << 2,   // Ö÷¶¯Á¬½Ó
-    SOCK_STATE_ESTABLISHED  = 1 << 3,   // Á¬½Ó½¨Á¢
-    SOCK_STATE_RECV         = 1 << 4,   // ½ÓÊÕ[iocpÖĞpersocketµÄÏ¸·Ö×´Ì¬]
-    SOCK_STATE_SEND         = 1 << 5,   // ·¢ËÍ[iocpÖĞpersocketµÄÏ¸·Ö×´Ì¬]
-};
+    };
 
-/*
-* Event ²Ù×÷
-*/
-enum class EventOperType
-{
-    EVENT_OPER_ADD = 1,
-    EVENT_OPER_RDC = 2,
-};
+    /*
+    * socket çš„çŠ¶æ€
+    */
+    enum SocketState
+    {
+        SOCK_STATE_INVALIED     = 1 << 0,   // 1  åˆå§‹çŠ¶æ€
+        SOCK_STATE_LISTENING    = 1 << 1,   // 2  ç›‘å¬
+        SOCK_STATE_CONNECTING   = 1 << 2,   // 4  ä¸»åŠ¨è¿æ¥
+        SOCK_STATE_ESTABLISHED  = 1 << 3,   // 8  è¿æ¥å»ºç«‹
+        SOCK_STATE_RECV         = 1 << 4,   // 16 æ¥æ”¶[å¼‚æ­¥IOæ‰€ç”¨çš„ç»†åˆ†çŠ¶æ€]
+        SOCK_STATE_SEND         = 1 << 5,   // 32 å‘é€[å¼‚æ­¥IOæ‰€ç”¨çš„ç»†åˆ†çŠ¶æ€]
+        SOCK_STATE_PROV_BUF     = 1 << 6,   // 64 [å¼‚æ­¥IOæ‰€ç”¨çš„ç»†åˆ†çŠ¶æ€]
+    };
 
-/*
-* socket ¿ÉÍ¶µİÊÂ¼ş
-*/
-enum SockEventType
-{
-    SOCKET_EVENT_INVALID = 0,
-    SOCKET_EVENT_RECV = 1,
-    SOCKET_EVENT_SEND = 2,
-    SOCKET_EVENT_ERR = 4,
-};
+    /*
+    * Event æ“ä½œ
+    */
+    enum class EventOperType
+    {
+        EVENT_OPER_ADD = 1,
+        EVENT_OPER_RDC = 2,
+    };
 
-/*
-* UDP socket ÀàĞÍ
-*/
-enum class UdpType
-{
-    UNKNOWN = 0,
-    ACCEPTOR = 1,
-    CONNECTOR = 2,
-    REMOTE = 3,
-};
+    /*
+    * socket å¯æŠ•é€’äº‹ä»¶
+    */
+    enum SockEventType
+    {
+        SOCKET_EVENT_INVALID = 0,
+        SOCKET_EVENT_RECV = 1,
+        SOCKET_EVENT_SEND = 2,
+        SOCKET_EVENT_ERR = 4,
+    };
+
+    /*
+    * UDP socket ç±»å‹
+    */
+    enum class UdpType
+    {
+        UNKNOWN = 0,
+        ACCEPTOR = 1,
+        CONNECTOR = 2,
+        REMOTE = 3,
+    };
 
 };  // ToolBox
 
@@ -100,6 +101,7 @@ enum class UdpType
 #include "src/network/net_imp/net_iocp/iocp_define.h"
 #elif defined(__linux__)
 #include "src/network/net_imp/net_epoll/epoll_define.h"
+#include "src/network/net_imp/net_io_uring/io_uring_define.h"
 #elif defined(__APPLE__)
 #include "src/network/net_imp/net_kqueue/kqueue_define.h"
 #endif

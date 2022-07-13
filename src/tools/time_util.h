@@ -4,7 +4,7 @@
 
 namespace ToolBox{
 
-/// 获取毫秒级时间戳(ms)
+/// 鑾峰彇姣绾ф椂闂存埑(ms)
 static inline std::time_t GetMillSecondTimeStamp()
 {
     auto point = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
