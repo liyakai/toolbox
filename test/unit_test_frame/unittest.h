@@ -1,7 +1,7 @@
 #pragma once
 
 #include <list>
-#include "src/tools/singleton.h"
+#include "tools/singleton.h"
 #include "test/unit_test_frame/fixture.h"
 
 /*

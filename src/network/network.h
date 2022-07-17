@@ -1,8 +1,8 @@
 #pragma once
 
 #include "event.h"
-#include "src/tools/ringbuffer.h"
-#include "src/tools/memory_pool_lock_free.h"
+#include "tools/ringbuffer.h"
+#include "tools/memory_pool_lock_free.h"
 #include "network_mgr.h"
 #include "network_def.h"
 

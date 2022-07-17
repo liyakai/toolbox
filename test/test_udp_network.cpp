@@ -1,4 +1,4 @@
-#include "src/network/network_mgr.h"
+#include "network/network_mgr.h"
 #include "unit_test_frame/unittest.h"
 #ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
@@ -7,7 +7,7 @@
 class TestNetworkEcho : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(uint64_t conn_id) override 
+    void OnAccepted(uint64_t conn_id) override
     {
         Print("接到客户端连接,连接ID:%llu\n", conn_id);
     };
@@ -39,7 +39,7 @@ public:
 class TestNetworkForward : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(uint64_t conn_id) override 
+    void OnAccepted(uint64_t conn_id) override
     {
         Print("接到客户端连接,连接ID:%llu\n", conn_id);
     };
@@ -60,7 +60,7 @@ public:
     {
         //Print("收到客户端数据长度为%d\n", size);
         //PrintData(data, 32);
-        if(conn_id == echo_conn_id_)
+        if (conn_id == echo_conn_id_)
         {
             // echo 发来的信息
             // 换头后发送给 client
@@ -70,7 +70,7 @@ public:
             memmove(&connect_id, data + sizeof(uint32_t), sizeof(connect_id));
 
             char* send_data = ToolBox::MemPoolLockFreeMgr->GetMemory(size - sizeof(uint64_t));
-            uint32_t send_data_size = size - sizeof(uint64_t);  
+            uint32_t send_data_size = size - sizeof(uint64_t);
             uint64_t client_conn_id = 0;
             memmove(send_data, &send_data_size, sizeof(uint32_t));  // buff len
             memmove(&client_conn_id, data + sizeof(uint32_t), sizeof(uint64_t));
@@ -80,9 +80,10 @@ public:
             // PrintData(send_data, 32);
             // Print("\n\n");
             Send(ToolBox::NT_UDP, client_conn_id, send_data, send_data_size);
-            
+
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data1");
-        } else 
+        }
+        else
         {
             // 客户端发来的消息
             // 换头后发送给 echo
@@ -90,7 +91,7 @@ public:
             //  PrintData(data, 32);
 
             char* send_data = ToolBox::MemPoolLockFreeMgr->GetMemory(size + sizeof(uint64_t));
-            uint32_t send_data_size = size + sizeof(uint64_t);  
+            uint32_t send_data_size = size + sizeof(uint64_t);
             memmove(send_data, &send_data_size, sizeof(uint32_t));  // buff len
             memmove(send_data + sizeof(uint32_t), &conn_id, sizeof(uint64_t));  // conn_id
             memmove(send_data + sizeof(uint32_t) + sizeof(uint64_t), data + sizeof(uint32_t), size - sizeof(uint32_t)); // data
@@ -119,13 +120,14 @@ CASE(test_udp_echo)
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_udp_echo.prof");
 #endif // USE_GPERF_TOOLS
-    fprintf(stderr,"网络库测试用例: test_udp_echo \n");
+    fprintf(stderr, "网络库测试用例: test_udp_echo \n");
     ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_UDP, 10*1024*1024, 10*1024*1024);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->Start();
     bool run = true;
-    std::thread t([&](){
-        while(run)
+    std::thread t([&]()
+    {
+        while (run)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             ToolBox::Singleton<TestNetworkEcho>::Instance()->Update();
@@ -133,16 +135,19 @@ CASE(test_udp_echo)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 24*3600*1000;
-    while(true)
+    uint32_t run_mill_seconds = 24 * 3600 * 1000;
+    while (true)
     {
-        if(used_time > run_mill_seconds) break;
-        uint32_t time_left = (run_mill_seconds - used_time)/1000;
-        if(time_left != old_time)
+        if (used_time > run_mill_seconds)
         {
-            if(time_left + 10 <= old_time || old_time == 0)
+            break;
+        }
+        uint32_t time_left = (run_mill_seconds - used_time) / 1000;
+        if (time_left != old_time)
+        {
+            if (time_left + 10 <= old_time || old_time == 0)
             {
-                fprintf(stderr,"距离网络库停止还有%d秒\n",time_left);
+                fprintf(stderr, "距离网络库停止还有%d秒\n", time_left);
                 old_time = time_left;
             }
         }
@@ -166,14 +171,15 @@ CASE(test_udp_forward)
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_udp_forward.prof");
 #endif // USE_GPERF_TOOLS
-    fprintf(stderr,"网络库测试用例: test_udp_forward \n");
+    fprintf(stderr, "网络库测试用例: test_udp_forward \n");
     ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, ToolBox::NT_UDP);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_UDP, 10*1024*1024, 10*1024*1024);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Start();
     bool run = true;
-    std::thread t([&](){
-        while(run)
+    std::thread t([&]()
+    {
+        while (run)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             ToolBox::Singleton<TestNetworkForward>::Instance()->Update();
@@ -181,16 +187,19 @@ CASE(test_udp_forward)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 24*3600*1000;
-    while(true)
+    uint32_t run_mill_seconds = 24 * 3600 * 1000;
+    while (true)
     {
-        if(used_time > run_mill_seconds) break;
-        uint32_t time_left = (run_mill_seconds - used_time)/1000;
-        if(time_left != old_time)
+        if (used_time > run_mill_seconds)
         {
-            if(time_left + 10 <= old_time || old_time == 0)
+            break;
+        }
+        uint32_t time_left = (run_mill_seconds - used_time) / 1000;
+        if (time_left != old_time)
+        {
+            if (time_left + 10 <= old_time || old_time == 0)
             {
-                fprintf(stderr,"距离网络库停止还有 %d 秒. \n",time_left);
+                fprintf(stderr, "距离网络库停止还有 %d 秒. \n", time_left);
                 old_time = time_left;
             }
         }

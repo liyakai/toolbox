@@ -2,9 +2,9 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 
-#include "src/network/net_imp/imp_network.h"
-#include "src/network/net_imp/socket_pool.h"
-#include "src/network/net_imp/tcp_socket.h"
+#include "network/net_imp/imp_network.h"
+#include "network/net_imp/socket_pool.h"
+#include "network/net_imp/tcp_socket.h"
 #include "iocp_ctrl.h"
 
 namespace ToolBox

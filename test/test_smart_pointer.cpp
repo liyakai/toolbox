@@ -1,4 +1,4 @@
-#include "src/tools/smart_pointer.h"
+#include "tools/smart_pointer.h"
 #include "unit_test_frame/unittest.h"
 
 
@@ -7,7 +7,7 @@ FIXTURE_BEGIN(TestSmartPointer)
 CASE(test_normal)
 {
     // 定义一个基础类对象指针
-    int32_t *obj = new int32_t(3);
+    int32_t* obj = new int32_t(3);
 
     //定义三个智能指针类对象，对象都指向基础类对象 obj
     //使用花括号控制三个指针指针的ß生命期，观察计数的变化

@@ -1,9 +1,9 @@
 #pragma once
-#include "src/tools/object_pool.h"
-#include "src/tools/object_pool_lock_free.h"
-#include "src/tools/memory_pool.h"
-#include "src/tools/memory_pool_lock_free.h"
-#include "src/tools/log.h"
+#include "tools/object_pool.h"
+#include "tools/object_pool_lock_free.h"
+#include "tools/memory_pool.h"
+#include "tools/memory_pool_lock_free.h"
+#include "tools/log.h"
 
 namespace ToolBox
 {

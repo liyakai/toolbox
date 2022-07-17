@@ -3,8 +3,8 @@
 #ifdef LINUX_IO_URING
 
 #include "io_uring_ctrl.h"
-#include "src/network/net_imp/socket_pool.h"
-#include "src/network/net_imp/net_imp_define.h"
+#include "network/net_imp/socket_pool.h"
+#include "network/net_imp/net_imp_define.h"
 
 namespace ToolBox
 {

@@ -1,4 +1,4 @@
-#include "src/tools/debug_new.h"
+#include "tools/debug_new.h"
 #include "unit_test_frame/unittest.h"
 
 FIXTURE_BEGIN(TestDebugNew)
@@ -12,17 +12,24 @@ public:
     /*
     * 构造
     */
-    TestClass(){ fprintf(stderr,"[TestDebugNew] TestClass 构造\n"); };
+    TestClass()
+    {
+        fprintf(stderr, "[TestDebugNew] TestClass 构造\n");
+    };
     /*
     * 析构
     */
-    ~TestClass(){ fprintf(stderr,"[TestDebugNew] TestClass 析构\n"); };
+    ~TestClass()
+    {
+        fprintf(stderr, "[TestDebugNew] TestClass 析构\n");
+    };
 private:
     int32_t m_a = 0;
     int32_t m_b = 1;
 };
 
-CASE(TestNewNormal){
+CASE(TestNewNormal)
+{
     int* single = new int;
     CHECK_LEAKS
     delete single;

@@ -1,13 +1,15 @@
-#include "src/tools/thread_pool.h"
+#include "tools/thread_pool.h"
 #include "unit_test_frame/unittest.h"
 #include <map>
 
 FIXTURE_BEGIN(TestThreadPool)
 
 // 测试数字有返回
-CASE(TestThreadPoolCase1_num){
+CASE(TestThreadPoolCase1_num)
+{
     std::mutex mtx;
-    try{
+    try
+    {
         ToolBox::ThreadPool thread_pool;
         std::vector<std::future<int32_t>> v_future;
         for (int32_t i = 0; i < 10; i++)
@@ -20,21 +22,25 @@ CASE(TestThreadPoolCase1_num){
             std::lock_guard<std::mutex> lg(mtx);
             fprintf(stderr, "threadpool result: %d\n", v_future[i].get());
         }
-    } catch(std::exception& e)
+    }
+    catch (std::exception& e)
     {
         fprintf(stderr, "[TestThreadPoolCase] %s \n", e.what());
     }
 }
 
 // 测试字符串无返回
-CASE(TestThreadPoolCase1_num_str){
+CASE(TestThreadPoolCase1_num_str)
+{
     std::mutex mtx;
-    try{
+    try
+    {
         ToolBox::ThreadPool thread_pool;
         std::vector<std::future<void>> v_future;
         for (int32_t i = 0; i <= 5; i++)
         {
-            auto res = thread_pool.Add([&mtx](const std::string& str1, const std::string& str2){
+            auto res = thread_pool.Add([&mtx](const std::string & str1, const std::string & str2)
+            {
                 std::lock_guard<std::mutex> lg(mtx);
                 fprintf(stderr, "%s%s\n", str1.c_str(), str2.c_str());
             }, "hello ", "world");
@@ -44,9 +50,10 @@ CASE(TestThreadPoolCase1_num_str){
         {
             v_future[i].get();
         }
-        
-        
-    } catch(std::exception& e)
+
+
+    }
+    catch (std::exception& e)
     {
         fprintf(stderr, "[TestThreadPoolCase] %s \n", e.what());
     }

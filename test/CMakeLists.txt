@@ -2,8 +2,18 @@
 # output 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
-aux_source_directory(. TEST_SRC)
-aux_source_directory(./unit_test_frame TEST_SRC)
+
+# 头文件
+INCLUDE_DIRECTORIES(
+    .
+    ..
+    ../include/
+    ../src/
+    ../src/thirdparty/
+)
+# 源文件
+AUX_SOURCE_DIRECTORY(. TEST_SRC)
+AUX_SOURCE_DIRECTORY(./unit_test_frame TEST_SRC)
 
 link_directories(
     ${PROJECT_SOURCE_DIR}/lib
