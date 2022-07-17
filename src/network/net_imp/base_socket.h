@@ -1,6 +1,6 @@
 #pragma once
 #include "net_imp_define.h"
-#include "network.h"
+#include "network/network.h"
 
 namespace ToolBox
 {
