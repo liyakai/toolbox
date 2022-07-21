@@ -1,14 +1,14 @@
 # https://cmake.org/cmake/help/latest/prop_tgt/UNITY_BUILD.html
 
-if(!{CMAKE_MAJOR_VERSION} LESS 3 OR ${CMAKE_MINOR_VERSION} LESS 16)
+if({CMAKE_MAJOR_VERSION} LESS 3 OR ${CMAKE_MINOR_VERSION} LESS 16)
     SET(CMAKE_UNITY_BUILD OFF)
-#else()
+else()
     if(DEFINED CMAKE_UNITY_BUILD AND CMAKE_UNITY_BUILD STREQUAL "OFF")
         SET(CMAKE_UNITY_BUILD OFF)
-    #else
+    else()
         SET(CMAKE_UNITY_BUILD ON)
-    #endif()
-#endif()
+    endif()
+endif()
 
 if(CMAKE_UNITY_BUILD STREQUAL "ON")
     if(NOT DEFINED CMAKE_UNITY_BUILD_BATCH_SIZE)

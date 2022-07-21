@@ -4,7 +4,7 @@
 #include <gperftools/profiler.h>
 #endif // USE_GPERF_TOOLS
 
-class TestNetworkEcho : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
+class TestUdpNetworkEcho : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override
@@ -21,7 +21,7 @@ public:
     };
     void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
@@ -36,7 +36,7 @@ public:
 };
 
 
-class TestNetworkForward : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
+class TestUdpNetworkForward : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override
@@ -54,7 +54,7 @@ public:
     };
     void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
     void OnReceived(uint64_t conn_id, const char* data, size_t size) override
     {
@@ -121,16 +121,16 @@ CASE(test_udp_echo)
     ProfilerStart("test_udp_echo.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_echo \n");
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start();
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->SetDebugPrint(true);
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Start();
     bool run = true;
     std::thread t([&]()
     {
         while (run)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            ToolBox::Singleton<TestNetworkEcho>::Instance()->Update();
+            ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Update();
         }
     });
     uint32_t used_time = 0;
@@ -156,7 +156,7 @@ CASE(test_udp_echo)
     }
 
     run = false;
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->StopWait();
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->StopWait();
     t.join();
 #ifdef USE_GPERF_TOOLS
     ProfilerStop();
@@ -172,17 +172,17 @@ CASE(test_udp_forward)
     ProfilerStart("test_udp_forward.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_forward \n");
-    ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, ToolBox::NT_UDP);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Start();
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->SetDebugPrint(true);
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Accept("127.0.0.1", 9500, ToolBox::NT_UDP);
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&]()
     {
         while (run)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            ToolBox::Singleton<TestNetworkForward>::Instance()->Update();
+            ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Update();
         }
     });
     uint32_t used_time = 0;
@@ -209,7 +209,7 @@ CASE(test_udp_forward)
 
     run = false;
     t.join();
-    ToolBox::Singleton<TestNetworkForward>::Instance()->StopWait();
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->StopWait();
 #ifdef USE_GPERF_TOOLS
     ProfilerStop();
 #endif // USE_GPERF_TOOLS

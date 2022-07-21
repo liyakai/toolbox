@@ -1,6 +1,4 @@
 
-
-
 # 根据宏确定不同的操作系统
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Configuring on/for Linux")
