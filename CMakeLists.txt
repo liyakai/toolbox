@@ -7,6 +7,7 @@ PROJECT(toolbox)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 include(unity_build)
+include(ccache)
 
 # 编译库
 add_subdirectory(src)
