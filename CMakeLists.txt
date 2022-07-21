@@ -4,8 +4,13 @@ cmake_minimum_required(VERSION 3.12.0)
 # project name
 PROJECT(toolbox)
 
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
+include(unity_build)
+
+# 编译库
 add_subdirectory(src)
-# 单元测试
+# 编译单元测试
 add_subdirectory(test)
 
 
