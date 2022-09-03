@@ -8,7 +8,7 @@
 namespace ToolBox
 {
 
-    bool TcpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
+    bool TcpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type)
     {
         base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
         if (!ImpNetwork<TcpSocket>::Init(master, network_type))

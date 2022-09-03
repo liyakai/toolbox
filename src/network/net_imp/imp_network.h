@@ -33,10 +33,10 @@ namespace ToolBox
         virtual ~ImpNetwork();
         /*
         * @brief 初始化函数
-        * @param NetworkMaster* 主线程
+        * @param NetworkChannel* 主线程
         * @param NetworkType 网络类型
         */
-        virtual bool Init(NetworkMaster* master, NetworkType network_type) override;
+        virtual bool Init(NetworkChannel* master, NetworkType network_type) override;
         /*
         * @brief 逆初始化网络
         */
@@ -92,7 +92,7 @@ namespace ToolBox
     }
 
     template<typename SocketType>
-    bool ImpNetwork<SocketType>::Init(NetworkMaster* master, NetworkType network_type)
+    bool ImpNetwork<SocketType>::Init(NetworkChannel* master, NetworkType network_type)
     {
         if (!INetwork::Init(master, network_type))
         {

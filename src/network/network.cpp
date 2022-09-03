@@ -28,7 +28,7 @@ namespace ToolBox
         event2worker_.Clear();
     }
 
-    bool INetwork::Init(NetworkMaster* master, NetworkType network_type)
+    bool INetwork::Init(NetworkChannel* master, NetworkType network_type)
     {
         master_ = master;
         network_type_ = network_type;

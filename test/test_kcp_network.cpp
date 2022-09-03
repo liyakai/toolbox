@@ -6,7 +6,7 @@
 
 #ifdef __linux__
 
-class TestNetworkEcho : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
+class TestNetworkEcho : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override
@@ -38,7 +38,7 @@ public:
 };
 
 
-class TestNetworkForward : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
+class TestNetworkForward : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override

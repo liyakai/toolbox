@@ -9,7 +9,7 @@
 namespace ToolBox
 {
 
-    class NetworkMaster;
+    class NetworkChannel;
 
     /// 事件队列
     using Event2Worker = RingBufferSPSC<NetEventWorker*, NETWORK_EVENT_QUEUE_MAX_COUNT>;
@@ -32,7 +32,7 @@ namespace ToolBox
         /*
         * 初始化网络
         */
-        virtual bool Init(NetworkMaster* master, NetworkType network_type);
+        virtual bool Init(NetworkChannel* master, NetworkType network_type);
         /*
         * 逆初始化网络
         */
@@ -125,7 +125,7 @@ namespace ToolBox
     private:
         NetworkType network_type_;          // 网络类型: TCP,UDP,KCP
         Event2Worker event2worker_;         // 主线程到工作线程的事件队列
-        NetworkMaster* master_;             // 主线程中的网络管理器
+        NetworkChannel* master_;             // 主线程中的网络管理器
     };
 
 };  // ToolBox
