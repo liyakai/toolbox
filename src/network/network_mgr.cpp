@@ -15,17 +15,17 @@
 namespace ToolBox
 {
 
-    NetworkMaster::NetworkMaster()
+    NetworkChannel::NetworkChannel()
     {
         stop_.store(false);
     }
 
-    NetworkMaster::~NetworkMaster()
+    NetworkChannel::~NetworkChannel()
     {
         event2main_.Clear();
     }
 
-    bool NetworkMaster::Start()
+    bool NetworkChannel::Start()
     {
         stop_.store(false);
         worker_.reset(new std::thread([this]()
@@ -47,12 +47,12 @@ namespace ToolBox
         }));
         return true;
     }
-    void NetworkMaster::Update()
+    void NetworkChannel::Update()
     {
         DispatchMainEvent_();
     }
 
-    void NetworkMaster::StopWait()
+    void NetworkChannel::StopWait()
     {
         stop_.store(true);
         if (worker_)
@@ -74,13 +74,13 @@ namespace ToolBox
         }
 
     }
-    void NetworkMaster::Close(NetworkType type, uint64_t conn_id)
+    void NetworkChannel::Close(NetworkType type, uint64_t conn_id)
     {
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerClose);
         event->SetConnectID(conn_id);
         NotifyWorker(event, type);
     }
-    void NetworkMaster::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size)
+    void NetworkChannel::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size)
     {
         auto* data_to_worker = GET_NET_MEMORY(size);
         memmove(data_to_worker, data, size);
@@ -90,7 +90,7 @@ namespace ToolBox
         NotifyWorker(event, type);
     }
 
-    void NetworkMaster::Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
+    void NetworkChannel::Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
     {
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewAccepter);
         event->SetIP(ip);
@@ -98,7 +98,7 @@ namespace ToolBox
         event->SetBuffSize(send_buff_size, recv_buff_size);
         NotifyWorker(event, type);
     }
-    void NetworkMaster::Connect(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
+    void NetworkChannel::Connect(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
     {
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewConnecter);
         event->SetIP(ip);
@@ -106,7 +106,7 @@ namespace ToolBox
         event->SetBuffSize(send_buff_size, recv_buff_size);
         NotifyWorker(event, type);
     }
-    void NetworkMaster::NotifyWorker(NetEventWorker* event, NetworkType type)
+    void NetworkChannel::NotifyWorker(NetEventWorker* event, NetworkType type)
     {
         if (type >= NT_MAX || type <= NT_UNKNOWN )
         {
@@ -121,7 +121,7 @@ namespace ToolBox
         }
         networks_[index]->PushEvent(std::move(event));
     }
-    bool NetworkMaster::NotifyMain(NetEventMain* event)
+    bool NetworkChannel::NotifyMain(NetEventMain* event)
     {
         if (!event2main_.Full())
         {
@@ -133,7 +133,7 @@ namespace ToolBox
 
 
 
-    void NetworkMaster::DispatchMainEvent_()
+    void NetworkChannel::DispatchMainEvent_()
     {
         while (!event2main_.Empty())
         {
@@ -179,7 +179,7 @@ namespace ToolBox
         }
     }
 
-    INetwork* NetworkMaster::GetNetwork_(NetworkType type)
+    INetwork* NetworkChannel::GetNetwork_(NetworkType type)
     {
         switch (type)
         {

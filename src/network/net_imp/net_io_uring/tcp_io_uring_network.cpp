@@ -9,7 +9,7 @@
 namespace ToolBox
 {
 
-    bool TcpIOUringNetwork::Init(NetworkMaster* master, NetworkType network_type)
+    bool TcpIOUringNetwork::Init(NetworkChannel* master, NetworkType network_type)
     {
         base_ctrl_ = new IOUringCtrl(MAX_SOCKET_COUNT);
         if (!ImpNetwork<TcpSocket>::Init(master, network_type))

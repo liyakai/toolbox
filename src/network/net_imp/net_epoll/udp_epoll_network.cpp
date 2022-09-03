@@ -11,7 +11,7 @@
 namespace ToolBox
 {
 
-    bool UdpEpollNetwork::Init(NetworkMaster* master, NetworkType network_type)
+    bool UdpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type)
     {
         base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
         if (!ImpNetwork<UdpSocket>::Init(master, network_type))

@@ -14,17 +14,17 @@ namespace ToolBox
     /*
     * 定义网络主线程
     */
-    class NetworkMaster
+    class NetworkChannel
     {
     public:
         /*
         * 构造
         */
-        NetworkMaster();
+        NetworkChannel();
         /*
         * 析构
         */
-        virtual ~NetworkMaster();
+        virtual ~NetworkChannel();
         /*
         * 启动工作线程
         */

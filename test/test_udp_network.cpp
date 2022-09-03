@@ -4,7 +4,7 @@
 #include <gperftools/profiler.h>
 #endif // USE_GPERF_TOOLS
 
-class TestUdpNetworkEcho : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
+class TestUdpNetworkEcho : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override
@@ -36,7 +36,7 @@ public:
 };
 
 
-class TestUdpNetworkForward : public ToolBox::NetworkMaster, public ToolBox::DebugPrint
+class TestUdpNetworkForward : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
     void OnAccepted(uint64_t conn_id) override

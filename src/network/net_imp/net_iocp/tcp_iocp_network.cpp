@@ -7,7 +7,7 @@
 namespace ToolBox
 {
 
-    bool TcpIocpNetwork::Init(NetworkMaster* master, NetworkType network_type)
+    bool TcpIocpNetwork::Init(NetworkChannel* master, NetworkType network_type)
     {
         base_ctrl_ = new IocpCtrl();
         if (!ImpNetwork<TcpSocket>::Init(master, network_type))
