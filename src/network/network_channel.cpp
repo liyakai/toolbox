@@ -1,4 +1,4 @@
-#include "network_mgr.h"
+#include "network_channel.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #include "network/net_imp/net_iocp/tcp_iocp_network.h"
 #elif defined(__linux__)

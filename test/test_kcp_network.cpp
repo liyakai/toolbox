@@ -1,4 +1,4 @@
-#include "src/network/network_mgr.h"
+#include "src/network/network_channel.h"
 #include "unit_test_frame/unittest.h"
 #ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
