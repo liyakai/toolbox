@@ -1,4 +1,4 @@
-#include "network/network_mgr.h"
+#include "network/network_channel.h"
 #include "unit_test_frame/unittest.h"
 #include "tools/log.h"
 #ifdef USE_GPERF_TOOLS
