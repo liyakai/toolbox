@@ -4,6 +4,12 @@
 
 #include <linux/time_types.h>
 
-#include <linux/openat2.h>
+#include <inttypes.h>
+
+struct open_how {
+	uint64_t	flags;
+	uint64_t	mode;
+	uint64_t	resolve;
+};
 
 #endif

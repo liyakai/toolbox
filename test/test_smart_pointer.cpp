@@ -21,7 +21,7 @@ CASE(test_normal)
         }
     }
     fprintf(stderr, "[智能指针测试] obj_ptr%p obj_value:%d\n", obj, *obj);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 }
 
 FIXTURE_END(TestSmartPointer)

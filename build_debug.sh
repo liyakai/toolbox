@@ -25,4 +25,5 @@ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_GPERF_T
 # clangd tool
 cp compile_commands.json ../compile_commands.json
 
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_GPERF_TOOLS_CPU=ON -DCMAKE_GPERF_TOOLS_HEAP=ON .. 
 make -j8
