@@ -13,8 +13,8 @@ else()
 endif()
 
 
-# 设置编译选项
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+# 设置编译选项                                             遇到编译错误就停止编译
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -Wfatal-errors")
 
 # 设置编译调试信息
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
@@ -35,6 +35,8 @@ INCLUDE_DIRECTORIES(
 	./net_work/network/net_imp/net_iocp
     ./net_work/network/net_imp/net_kqueue
     ./net_work/network/net_imp/net_io_uring
+    ./ospf
+    ./ospf/libxorp
     ./thirdparty
 )
 
@@ -47,6 +49,8 @@ AUX_SOURCE_DIRECTORY(./network/net_imp/net_epoll DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./network/net_imp/net_iocp DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./network/net_imp/net_kqueue DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./network/net_imp/net_io_uring DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./ospf DIR_SRCS)
+AUX_SOURCE_DIRECTORY(./ospf/libxorp DIR_SRCS)
 
 # 设置输出路径
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)

@@ -4,12 +4,12 @@
 namespace ToolBox
 {
     // 定义日志宏
-#define LogTrace(LogFormat, ...) !LogMgr->IsEnabled(LogLevel::LOG_TRACE) ? false : LogMgr->Trace("[TRACE] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
-#define LogDebug(LogFormat, ...) !LogMgr->IsEnabled(LogLevel::LOG_DEBUG) ? false : LogMgr->Debug("[DEBUG] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
-#define LogInfo(LogFormat, ...)  !LogMgr->IsEnabled(LogLevel::LOG_INFO)  ? false : LogMgr->Info("[INFO] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
-#define LogWarn(LogFormat, ...)  !LogMgr->IsEnabled(LogLevel::LOG_WARN)  ? false : LogMgr->Warn("[WARN] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
-#define LogError(LogFormat, ...) !LogMgr->IsEnabled(LogLevel::LOG_ERROR) ? false : LogMgr->Error("[ERROR] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
-#define LogFatal(LogFormat, ...) !LogMgr->IsEnabled(LogLevel::LOG_FATAL) ? false : LogMgr->Fatal("[FATAL] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
+#define LogTrace(LogFormat, ...) !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_TRACE) ? false : LogMgr->Trace("[TRACE] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
+#define LogDebug(LogFormat, ...) !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_DEBUG) ? false : LogMgr->Debug("[DEBUG] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
+#define LogInfo(LogFormat, ...)  !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_INFO)  ? false : LogMgr->Info("[INFO] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
+#define LogWarn(LogFormat, ...)  !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_WARN)  ? false : LogMgr->Warn("[WARN] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
+#define LogError(LogFormat, ...) !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_ERROR) ? false : LogMgr->Error("[ERROR] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
+#define LogFatal(LogFormat, ...) !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_FATAL) ? false : LogMgr->Fatal("[FATAL] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
     /*
     * 定义日志等级枚举
     */
