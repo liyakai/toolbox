@@ -2,10 +2,13 @@
 # 根据宏确定不同的操作系统
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Configuring on/for Linux")
+    add_definitions(-DOS_LINUX)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     message(STATUS "Configuring on/for macOS")
+    add_definitions(-DOS_MAC)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     message(STATUS "Configuring on/for Windows")
+    add_definitions(-DOS_WINDOWS)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "AIX")
     message(STATUS "Configuring on/for IBM AIX")
 else()
@@ -96,3 +99,8 @@ if(CMAKE_GPERF_TOOLS_HEAP)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltcmalloc ")
     target_link_libraries(${PROJECT_NAME} libtcmalloc.a )
 endif()
+
+
+# 编译 xorp 版本的router
+add_subdirectory(./router/xorp)
+

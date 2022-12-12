@@ -1,0 +1,150 @@
+# Copyright (c) 2009-2011 XORP, Inc and Others
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, Version 2, June
+# 1991 as published by the Free Software Foundation. Redistribution
+# and/or modification of this program under the terms of any other
+# version of the GNU General Public License is not permitted.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. For more details,
+# see the GNU General Public License, Version 2, a copy of which can be
+# found in the XORP LICENSE.gpl file.
+#
+# XORP Inc, 2953 Bunker Hill Lane, Suite 204, Santa Clara, CA 95054, USA;
+# http://xorp.net
+
+# $XORP$
+
+import os
+Import('env')
+
+env = env.Clone()
+
+is_shared = env.has_key('SHAREDLIBS')
+
+env.AppendUnique(CPPPATH = [
+    '#',
+    '$BUILDDIR',
+     ])
+
+env.AppendUnique(LIBPATH = [
+    '$BUILDDIR/libxorp',
+    '$BUILDDIR/libcomm',
+    '$BUILDDIR/libxipc',
+    '$BUILDDIR/libfeaclient',
+    '$BUILDDIR/policy/backend',
+    '$BUILDDIR/policy/common',
+    '$BUILDDIR/xrl/interfaces',
+    '$BUILDDIR/xrl/targets',
+    '$BUILDDIR/bgp',
+    '.',
+    ])
+
+env.AppendUnique(LIBS = [
+    'xorp_bgp',			# for ASPath
+    'xif_bgp',
+    'xorp_policy_backend',
+    'xorp_policy_common',
+    'xorp_ipc',
+    'xorp_core',
+    'xorp_comm',
+    'xif_rib',
+    'xorp_fea_client',
+    'xif_fea_ifmgr_mirror',
+    'xst_fea_ifmgr_mirror',
+    'xif_fea_ifmgr_replicator',
+    'xst_bgp',
+    'xif_finder_event_notifier',
+    ])
+
+if not is_shared:
+    env.AppendUnique(LIBS = [
+        "crypto",
+        ])
+
+    if not (env.has_key('mingw') and env['mingw']):
+        env.AppendUnique(LIBS = [
+            "rt",
+            ])
+
+if (env.has_key('mingw') and env['mingw']):
+    env.AppendUnique(LIBS = [
+        'ws2_32',
+        'iphlpapi',
+#        'mprapi',
+        'regex',
+        'winmm',
+        ])
+
+    env.Append(LIBS = ['xorp_core'])
+
+if not (env.has_key('disable_profile') and env['disable_profile']):
+    env.AppendUnique(LIBS = [
+        'xif_profile_client',
+        ])
+
+
+env.Replace(RPATH = [
+    env.Literal(env['xorp_tool_rpath'])
+])
+
+### print_peers
+
+ppeers_srcs = [
+	'print_peer.cc',
+	'print_peers.cc',
+	]
+
+ppeers = env.Program(target = 'print_peers', source = ppeers_srcs)
+
+# don't install -for debug only
+#env.Alias('install',
+#    env.InstallProgram(env['xorp_tooldir'], ppeers))
+
+### print_routes
+
+proutes_srcs = [
+	'print_routes.cc',
+	'print_routes_main.cc',
+	]
+
+proutes = env.Program(target = 'print_routes', source = proutes_srcs)
+
+# don't install -for debug only
+#env.Alias('install',
+#    env.InstallProgram(env['xorp_tooldir'], proutes))
+
+### xorpsh_print_peers
+
+xppeers_srcs = [
+	'print_peer.cc',
+	'xorpsh_print_peers.cc',
+	]
+
+xppeers = env.Program(target = 'bgp_print_peers', source = xppeers_srcs)
+if env['enable_builddirrun']:
+    for obj in xppeers:
+        env.AddPostAction(xppeers,
+            env.Copy(obj.abspath,
+                        os.path.join(env['xorp_alias_tooldir'], str(obj))))
+env.Alias('install',
+    env.InstallProgram(env['xorp_tooldir'], xppeers))
+
+### xorpsh_print_routes
+
+xproutes_srcs = [
+	'print_routes.cc',
+	'xorpsh_print_routes.cc',
+	]
+
+xproutes = env.Program(target = 'bgp_print_routes', source = xproutes_srcs)
+if env['enable_builddirrun']:
+    for obj in xproutes:
+        env.AddPostAction(xproutes,
+            env.Copy(obj.abspath,
+                        os.path.join(env['xorp_alias_tooldir'], str(obj))))
+env.Alias('install', env.InstallProgram(env['xorp_tooldir'], xproutes))
+
+Default(xppeers, xproutes)

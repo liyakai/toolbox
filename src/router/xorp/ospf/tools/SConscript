@@ -1,0 +1,115 @@
+# Copyright (c) 2009-2011 XORP, Inc and Others
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, Version 2, June
+# 1991 as published by the Free Software Foundation. Redistribution
+# and/or modification of this program under the terms of any other
+# version of the GNU General Public License is not permitted.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. For more details,
+# see the GNU General Public License, Version 2, a copy of which can be
+# found in the XORP LICENSE.gpl file.
+#
+# XORP Inc, 2953 Bunker Hill Lane, Suite 204, Santa Clara, CA 95054, USA;
+# http://xorp.net
+
+# $XORP$
+
+import os
+Import('env')
+
+env = env.Clone()
+
+is_shared = env.has_key('SHAREDLIBS')
+
+env.AppendUnique(CPPPATH = [
+    '#',
+    '$BUILDDIR',
+     ])
+
+env.AppendUnique(LIBPATH = [
+    '$BUILDDIR/libxorp',
+    '$BUILDDIR/libcomm',
+    '$BUILDDIR/libxipc',
+    '$BUILDDIR/libproto',
+    '$BUILDDIR/xrl/interfaces',
+    '$BUILDDIR/xrl/targets',
+    '.',
+    ])
+
+env.AppendUnique(LIBS = [
+    'xif_ospfv2',
+    'xorp_ipc',
+    'xorp_core',
+    'xorp_proto',
+    'xorp_comm',
+    ])
+
+if (env.has_key('mingw') and env['mingw']):
+    env.Append(LIBS = [
+        'iphlpapi',
+#        'mprapi',
+        'regex',
+        'winmm',
+        ])
+
+    env.Append(LIBS = ['xorp_core', 'crypto', 'ws2_32'])
+
+
+if not (env.has_key('disable_ipv6') and env['disable_ipv6']):
+    env.AppendUnique(LIBS = [
+        'xif_ospfv3',
+        ])
+
+
+env.Replace(RPATH = [
+    env.Literal(env['xorp_tool_rpath'])
+])
+
+cleardbsrcs = [
+	'clear_database.cc'
+    ]
+
+printlsassrcs = [
+	'print_lsas.cc',
+    ]
+
+# deal with shared code
+if is_shared:
+    printlsassrcs += [ '../lsa.cc', '../fletcher_checksum.cc' ]
+else:
+    obj_fletcher = env.StaticObject(target='tools_fletcher',
+                                    source='../fletcher_checksum.cc')
+    obj_lsa = env.StaticObject(target='tools_lsa', source='../lsa.cc')
+    printlsassrcs += [ obj_fletcher, obj_lsa ]
+
+printneighborssrcs = [
+        'print_neighbours.cc'
+    ]
+
+cleardb = env.Program(target = 'ospf_clear_database',
+		      source = cleardbsrcs)
+printlsas = env.Program(target = 'ospf_print_lsas',
+			source = printlsassrcs)
+printneighbors = env.Program(target = 'ospf_print_neighbours',
+			     source = printneighborssrcs)
+if env['enable_builddirrun']:
+    for obj in cleardb:
+        env.AddPostAction(cleardb,
+            env.Copy(obj.abspath,
+                        os.path.join(env['xorp_alias_tooldir'], str(obj))))
+    for obj in printlsas:
+        env.AddPostAction(printlsas,
+            env.Copy(obj.abspath,
+                        os.path.join(env['xorp_alias_tooldir'], str(obj))))
+    for obj in printneighbors:
+        env.AddPostAction(printneighbors,
+            env.Copy(obj.abspath,
+                        os.path.join(env['xorp_alias_tooldir'], str(obj))))
+env.Alias('install', env.InstallProgram(env['xorp_tooldir'], cleardb))
+env.Alias('install', env.InstallProgram(env['xorp_tooldir'], printlsas))
+env.Alias('install', env.InstallProgram(env['xorp_tooldir'], printneighbors))
+
+Default(cleardb, printlsas, printneighbors)

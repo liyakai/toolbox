@@ -1,0 +1,179 @@
+# Copyright (c) 2009-2011 XORP, Inc and Others
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, Version 2, June
+# 1991 as published by the Free Software Foundation. Redistribution
+# and/or modification of this program under the terms of any other
+# version of the GNU General Public License is not permitted.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. For more details,
+# see the GNU General Public License, Version 2, a copy of which can be
+# found in the XORP LICENSE.gpl file.
+#
+# XORP Inc, 2953 Bunker Hill Lane, Suite 204, Santa Clara, CA 95054, USA;
+# http://xorp.net
+
+# $XORP$
+
+import os
+Import('env')
+
+# XXX Not sure how to proceed here.
+#subdirs = [ 'tests' ]
+
+SConscript([ 'backend/SConscript', 'common/SConscript' ], exports='env')
+
+env = env.Clone()
+
+is_shared = env.has_key('SHAREDLIBS')
+
+# Fedora 19 has broken-ish lex...work around it for now.
+env.AppendUnique(CCFLAGS = [
+    '-Wno-sign-compare',
+    ])
+
+env.AppendUnique(CPPPATH = [
+    '#',
+    '$BUILDDIR',
+    env['xorp_sourcedir'],	#this is needed for lex and yacc generated files
+    ])
+
+env.PrependUnique(LIBPATH = [
+    '$BUILDDIR/libfeaclient',
+    '$BUILDDIR/policy/backend',
+    '$BUILDDIR/policy/common',
+    '$BUILDDIR/xrl/interfaces',
+    '$BUILDDIR/xrl/targets',
+    '$BUILDDIR/libproto',
+    '$BUILDDIR/libxipc',
+    '$BUILDDIR/libxorp',
+    '$BUILDDIR/libcomm',
+    '.',
+    ])
+
+env.AppendUnique(LIBS = [
+    'xorp_policy',
+    'xorp_policy_backend',
+    'xorp_policy_common',
+    'xst_policy',
+    'xif_policy_backend',
+    'xif_finder_event_notifier',
+    'xif_rib',
+    'xorp_ipc',
+    'xorp_core',
+    'xorp_proto',
+    'xorp_comm'
+])
+
+if not is_shared:
+    env.AppendUnique(LIBS = [
+        "crypto",
+        ])
+
+    if not (env.has_key('mingw') and env['mingw']):
+        env.AppendUnique(LIBS = [
+            "rt",
+            ])
+
+if (env.has_key('mingw') and env['mingw']):
+    env.AppendUnique(LIBS = [
+        'ws2_32',
+        'iphlpapi',
+        'regex',
+        'winmm',
+        ])
+
+    env.Append(LIBS = ['xorp_core'])
+
+env.Replace(RPATH = [
+    env.Literal(env['xorp_module_rpath'])
+])
+
+# Automatically generate flex and yacc files
+
+#Create yacc files
+yacc_env = env.Clone()
+
+# bison on BSD generates headers files with .h suffix,
+# while on other OSs it generates header files with .hh suffix
+#
+# But, on FreeBSD at least, if you don't do the .hh suffix, it doesn't even
+# build a .h file of any type --Ben
+yacc_env.Replace(YACCHXXFILESUFFIX='.hh')
+
+yacc_env.AppendUnique(YACCFLAGS='-d')
+
+yacc_env.AppendUnique(YACCFLAGS='-ppolicy_parser')
+
+policy_yacc = yacc_env.CXXFile(target='y.policy_parser_tab.cc',
+				source='policy.yy')
+
+#create lex files
+lex_env = env.Clone()
+
+lex_env.AppendUnique(LEXFLAGS='-Ppolicy_parser')
+
+policy_lex = lex_env.CXXFile(target='lex.policy_parser.cc',
+					source='policy.ll')
+
+libxorp_policy_srcs = [
+     policy_lex[0],
+     policy_yacc[0],
+     'code.cc',
+     'code_generator.cc',
+     'code_list.cc',
+     'configuration.cc',
+     'dependency.cc',
+     'export_code_generator.cc',
+     'filter_manager.cc',
+     'parser.cc',
+     'policy_list.cc',
+     'policy_map.cc',
+     'policy_statement.cc',
+     'policy_target.cc',
+     'process_watch.cc',
+     'protocol_map.cc',
+     'semantic_varrw.cc',
+     'set_map.cc',
+     'source_match_code_generator.cc',
+     'term.cc',
+     'test_varrw.cc',
+     'var_map.cc',
+     'visitor_dep.cc',
+     'visitor_printer.cc',
+     'visitor_semantic.cc',
+     'visitor_test.cc',
+     'xrl_target.cc',
+     ]
+
+######
+
+if is_shared:
+    libxorp_policy = env.SharedLibrary(target = 'libxorp_policy',
+				       source = libxorp_policy_srcs,
+				       LIBS = '')
+    if env['rtld_origin']:
+        for obj in libxorp_policy:
+            env.AddPostAction(libxorp_policy,
+                env.Symlink(obj.abspath,
+                            os.path.join(env['xorp_alias_libdir'], str(obj))))
+    env.Alias('install', env.InstallLibrary(env['xorp_libdir'], libxorp_policy))
+else:
+    libxorp_policy = env.StaticLibrary(target = 'libxorp_policy',
+				       source = libxorp_policy_srcs,
+				       LIBS = '')
+
+######
+
+policysrcs = [ 'xorp_policy.cc', ]
+policy = env.Program(target = 'xorp_policy', source = policysrcs)
+if env['enable_builddirrun']:
+    for obj in policy:
+        env.AddPostAction(policy,
+            env.Symlink(obj.abspath,
+                os.path.join(env['xorp_alias_moduledir'], str(obj))))
+env.Alias('install', env.InstallProgram(env['xorp_moduledir'], policy))
+
+Default(libxorp_policy, policy)

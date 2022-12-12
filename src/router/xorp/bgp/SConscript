@@ -1,0 +1,207 @@
+# Copyright (c) 2009-2011 XORP, Inc and Others
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, Version 2, June
+# 1991 as published by the Free Software Foundation. Redistribution
+# and/or modification of this program under the terms of any other
+# version of the GNU General Public License is not permitted.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. For more details,
+# see the GNU General Public License, Version 2, a copy of which can be
+# found in the XORP LICENSE.gpl file.
+#
+# XORP Inc, 2953 Bunker Hill Lane, Suite 204, Santa Clara, CA 95054, USA;
+# http://xorp.net
+
+# $XORP$
+
+import os
+Import('env')
+
+subdirs = [
+	'tools',
+	'tests',
+	'harness',
+    ]
+
+SConscript(dirs = subdirs, exports='env')
+
+is_shared = env.has_key('SHAREDLIBS')
+
+if not is_shared:
+    env.AppendUnique(LIBS = [
+        "crypto",
+        ])
+
+    if not (env.has_key('mingw') and env['mingw']):
+        env.AppendUnique(LIBS = [
+            "rt",
+            ])
+
+if (env.has_key('mingw') and env['mingw']):
+    env.AppendUnique(LIBS = [
+        'ws2_32',
+        'iphlpapi',
+#        'mprapi',
+        'regex',
+        'winmm',
+        ])
+
+    env.Append(LIBS = ['xorp_core'])
+
+
+bgp_env = env.Clone()
+
+bgp_env.AppendUnique(CPPPATH = [
+    '#',
+    '$BUILDDIR',
+    ])
+
+bgp_env.PrependUnique(LIBPATH = [
+    '.',
+    '$BUILDDIR/policy/backend',
+    '$BUILDDIR/policy/common',
+    '$BUILDDIR/libfeaclient',
+    '$BUILDDIR/xrl/interfaces',
+    '$BUILDDIR/xrl/targets',
+    '$BUILDDIR/libxipc',
+    '$BUILDDIR/libxorp',
+    '$BUILDDIR/libcomm',
+    ])
+
+bgp_env.AppendUnique(LIBS = [
+    'xorp_policy_backend',
+    'xorp_policy_common',
+    'xorp_fea_client',
+    'xst_bgp',
+    'xst_fea_ifmgr_mirror',
+    'xif_rib',
+    'xif_finder_event_notifier',
+    'xif_fea_ifmgr_mirror',
+    'xif_fea_ifmgr_replicator',
+    'xorp_ipc',
+    'xorp_core',
+    'xorp_comm',
+])
+
+
+if not (bgp_env.has_key('disable_profile') and bgp_env['disable_profile']):
+    bgp_env.AppendUnique(LIBS = [ 'xif_profile_client' ])
+
+bgp_env.Replace(RPATH = [
+    bgp_env.Literal(bgp_env['xorp_module_rpath'])
+])
+
+### libxorp_bgp
+
+libxorp_bgp_env = bgp_env.Clone()
+
+libxorp_bgp_srcs = [
+	'aspath.cc',
+	'attribute_manager.cc',
+        'bgp.cc',
+	'bgp_trie.cc',
+	'bgp_varrw.cc',
+	'bgp_varrw_export.cc',
+	'crash_dump.cc',
+	'damping.cc',
+	'dump_iterators.cc',
+	'internal_message.cc',
+	'iptuple.cc',
+	'local_data.cc',
+	'next_hop_resolver.cc',
+	'notification_packet.cc',
+	'open_packet.cc',
+	'packet.cc',
+	'parameter.cc',
+	'path_attribute.cc',
+	'peer.cc',
+	'peer_data.cc',
+	'peer_handler.cc',
+	'peer_list.cc',
+	'plumbing.cc',
+	'process_watch.cc',
+	'rib_ipc_handler.cc',
+	'route_queue.cc',
+	'route_table_aggregation.cc',
+	'route_table_base.cc',
+	'route_table_cache.cc',
+	'route_table_damping.cc',
+	'route_table_decision.cc',
+	'route_table_deletion.cc',
+	'route_table_dump.cc',
+	'route_table_fanout.cc',
+	'route_table_filter.cc',
+	'route_table_nhlookup.cc',
+	'route_table_policy.cc',
+	'route_table_policy_ex.cc',
+	'route_table_policy_im.cc',
+	'route_table_policy_sm.cc',
+	'route_table_reader.cc',
+	'route_table_ribin.cc',
+	'route_table_ribout.cc',
+	'socket.cc',
+	'subnet_route.cc',
+	'update_attrib.cc',
+	'update_packet.cc',
+	'xrl_target.cc',
+	]
+
+if not (bgp_env.has_key('disable_profile') and bgp_env['disable_profile']):
+    libxorp_bgp_srcs.append('profile_vars.cc')
+
+if (bgp_env.has_key('mingw') and bgp_env['mingw']):
+    bgp_env.Append(LIBS = [
+        'ws2_32',
+        'iphlpapi',
+#        'mprapi',
+        'regex',
+        'winmm',
+        ])
+
+    bgp_env.Append(LIBS = ['xorp_core', 'crypto', 'ws2_32'])
+
+if is_shared:
+    libxorp_bgp = bgp_env.SharedLibrary(target = 'libxorp_bgp',
+                                        source = libxorp_bgp_srcs,
+                                        LIBS = '')
+    if bgp_env['rtld_origin']:
+        for obj in libxorp_bgp:
+            bgp_env.AddPostAction(libxorp_bgp,
+                                  bgp_env.Symlink(obj.abspath,
+                                                  os.path.join(bgp_env['xorp_alias_libdir'], str(obj))))
+else:
+    libxorp_ospf = bgp_env.StaticLibrary(target = 'libxorp_bgp',
+                                         source = libxorp_bgp_srcs,
+                                         LIBS = '')
+
+### xorp_bgp
+
+#bgp_env2 = bgp_env.Clone()
+
+bgp_env.PrependUnique(LIBS = [
+    'xorp_bgp',
+])
+
+bgpsrcs = [
+    'main.cc',
+    ]
+
+bgp = bgp_env.Program(target = 'xorp_bgp', source = bgpsrcs)
+if env['enable_builddirrun']:
+    for obj in bgp:
+        env.AddPostAction(bgp,
+            env.Symlink(obj.abspath,
+                        os.path.join(env['xorp_alias_moduledir'], str(obj))))
+bgp_env.Alias('install', bgp_env.InstallProgram(bgp_env['xorp_moduledir'], bgp))
+
+
+if is_shared:
+    bgp_env.Alias('install', env.InstallLibrary(bgp_env['xorp_libdir'], libxorp_bgp))
+
+# Install scripts
+env.Alias('install', env.InstallScript('$exec_prefix/sbin/', env.Entry('bgp_xrl_shell_funcs.sh')))
+
+Default(bgp)
