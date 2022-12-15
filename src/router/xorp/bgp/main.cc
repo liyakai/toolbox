@@ -7,13 +7,13 @@
 // 1991 as published by the Free Software Foundation. Redistribution
 // and/or modification of this program under the terms of any other
 // version of the GNU General Public License is not permitted.
-// 
+//
 // This program is distributed in the hope that it will be useful, but
 // WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. For more details,
 // see the GNU General Public License, Version 2, a copy of which can be
 // found in the XORP LICENSE.gpl file.
-// 
+//
 // XORP Inc, 2953 Bunker Hill Lane, Suite 204, Santa Clara, CA 95054, USA;
 // http://xorp.net
 
@@ -34,63 +34,63 @@
 #include "xrl_target.hh"
 
 
-int
-main(int /*argc*/, char **argv)
-{
-    XorpUnexpectedHandler x(xorp_unexpected_handler);
-    //
-    // Initialize and start xlog
-    //
-    xlog_init(argv[0], NULL);
-    xlog_set_verbose(XLOG_VERBOSE_LOW);		// Least verbose messages
-    // XXX: verbosity of the error messages temporary increased
-    xlog_level_set_verbose(XLOG_LEVEL_ERROR, XLOG_VERBOSE_HIGH);
-    xlog_level_set_verbose(XLOG_LEVEL_WARNING, XLOG_VERBOSE_HIGH);
-    // Enable verbose tracing via configuration to increase the tracing level
-//     xlog_level_set_verbose(XLOG_LEVEL_INFO, XLOG_VERBOSE_HIGH);
-//     xlog_level_set_verbose(XLOG_LEVEL_TRACE, XLOG_VERBOSE_HIGH);
-    xlog_add_default_output();
-    xlog_start();
+// int
+// main(int /*argc*/, char **argv)
+// {
+//     XorpUnexpectedHandler x(xorp_unexpected_handler);
+//     //
+//     // Initialize and start xlog
+//     //
+//     xlog_init(argv[0], NULL);
+//     xlog_set_verbose(XLOG_VERBOSE_LOW);      // Least verbose messages
+//     // XXX: verbosity of the error messages temporary increased
+//     xlog_level_set_verbose(XLOG_LEVEL_ERROR, XLOG_VERBOSE_HIGH);
+//     xlog_level_set_verbose(XLOG_LEVEL_WARNING, XLOG_VERBOSE_HIGH);
+//     // Enable verbose tracing via configuration to increase the tracing level
+// //     xlog_level_set_verbose(XLOG_LEVEL_INFO, XLOG_VERBOSE_HIGH);
+// //     xlog_level_set_verbose(XLOG_LEVEL_TRACE, XLOG_VERBOSE_HIGH);
+//     xlog_add_default_output();
+//     xlog_start();
 
-    comm_init();
+//     comm_init();
 
-    setup_dflt_sighandlers();
+//     setup_dflt_sighandlers();
 
-    try {
-	EventLoop eventloop;
+//     try {
+//  EventLoop eventloop;
 
-// 	signal(SIGINT, terminate_main_loop);
+// //   signal(SIGINT, terminate_main_loop);
 
-	BGPMain bgp(eventloop);
+//  BGPMain bgp(eventloop);
 
-	/*
-	** By default assume there is a rib running.
-	*/
- 	bgp.register_ribname("rib");
+//  /*
+//  ** By default assume there is a rib running.
+//  */
+//      bgp.register_ribname("rib");
 
-	/*
-	** Wait for our local configuration information and for the
-	** FEA and RIB to start.
-	*/
-	while (xorp_do_run && bgp.get_xrl_target()->waiting()) {
-	    eventloop.run();
-	}
+//  /*
+//  ** Wait for our local configuration information and for the
+//  ** FEA and RIB to start.
+//  */
+//  while (xorp_do_run && bgp.get_xrl_target()->waiting()) {
+//      eventloop.run();
+//  }
 
-	/*
-	** Check we shouldn't be exiting.
-	*/
- 	if (!bgp.get_xrl_target()->done())
- 	   bgp.main_loop();
-    } catch(...) {
-	xorp_catch_standard_exceptions();
-    }
+//  /*
+//  ** Check we shouldn't be exiting.
+//  */
+//      if (!bgp.get_xrl_target()->done())
+//         bgp.main_loop();
+//     } catch(...) {
+//  xorp_catch_standard_exceptions();
+//     }
 
-    //
-    // Gracefully stop and exit xlog
-    //
-    xlog_stop();
-    xlog_exit();
-    comm_exit();
-    debug_msg("Bye!\n");
-    return 0;
-}
+//     //
+//     // Gracefully stop and exit xlog
+//     //
+//     xlog_stop();
+//     xlog_exit();
+//     comm_exit();
+//     debug_msg("Bye!\n");
+//     return 0;
+// }

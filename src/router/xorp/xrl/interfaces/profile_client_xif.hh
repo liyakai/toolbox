@@ -14,6 +14,7 @@
 #ifndef __XRL_INTERFACES_PROFILE_CLIENT_XIF_HH__
 #define __XRL_INTERFACES_PROFILE_CLIENT_XIF_HH__
 
+#include "router/xorp/libxipc/xrl_sender.hh"
 #undef XORP_LIBRARY_NAME
 #define XORP_LIBRARY_NAME "XifProfileClient"
 
@@ -24,9 +25,14 @@
 #include "libxipc/xrl_error.hh"
 #include "libxipc/xrl_sender.hh"
 
+class Xrl;
+class XrlArgs;
+class XrlError;
+
 //#include <memory>
 
-class XrlProfileClientV0p1Client {
+class XrlProfileClientV0p1Client
+{
 public:
     XrlProfileClientV0p1Client(XrlSender* s) : _sender(s) {}
     virtual ~XrlProfileClientV0p1Client() {}
@@ -48,12 +54,12 @@ public:
      *  @param comment a comment to be appended to this entry.
      */
     bool send_log(
-	const char*	dst_xrl_target_name,
-	const string&	pname,
-	const uint32_t&	sec,
-	const uint32_t&	usec,
-	const string&	comment,
-	const LogCB&	cb
+        const char* dst_xrl_target_name,
+        const string&   pname,
+        const uint32_t& sec,
+        const uint32_t& usec,
+        const string&   comment,
+        const LogCB&    cb
     );
 
     typedef XorpCallback1<void, const XrlError&>::RefPtr FinishedCB;
@@ -67,9 +73,9 @@ public:
      *  @param pname profiling variable.
      */
     bool send_finished(
-	const char*	dst_xrl_target_name,
-	const string&	pname,
-	const FinishedCB&	cb
+        const char* dst_xrl_target_name,
+        const string&   pname,
+        const FinishedCB&   cb
     );
 
 protected:
@@ -77,15 +83,15 @@ protected:
 
 private:
     static void unmarshall_log(
-	const XrlError&	e,
-	XrlArgs*	a,
-	LogCB		cb
+        const XrlError& e,
+        XrlArgs*    a,
+        LogCB       cb
     );
 
     static void unmarshall_finished(
-	const XrlError&	e,
-	XrlArgs*	a,
-	FinishedCB		cb
+        const XrlError& e,
+        XrlArgs*    a,
+        FinishedCB      cb
     );
 
 private:

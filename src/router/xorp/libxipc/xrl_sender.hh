@@ -9,13 +9,13 @@
 // Redistribution and/or modification of this program under the terms of
 // any other version of the GNU Lesser General Public License is not
 // permitted.
-// 
+//
 // This program is distributed in the hope that it will be useful, but
 // WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. For more details,
 // see the GNU Lesser General Public License, Version 2.1, a copy of
 // which can be found in the XORP LICENSE.lgpl file.
-// 
+//
 // XORP, Inc, 2953 Bunker Hill Lane, Suite 204, Santa Clara, CA 95054, USA;
 // http://xorp.net
 
@@ -24,15 +24,19 @@
 #ifndef __LIBXIPC_XRL_SENDER_HH__
 #define __LIBXIPC_XRL_SENDER_HH__
 
+#include "libxorp/callback.hh"
+
 class Xrl;
 class XrlArgs;
 class XrlError;
+
 
 /**
  * Base for classes able to transport Xrls.
  * See xrl_router.hh for implementor of this base class.
  */
-class XrlSender {
+class XrlSender
+{
 public:
     virtual ~XrlSender() {}
 

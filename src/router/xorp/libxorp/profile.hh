@@ -291,12 +291,12 @@ public:
         ProfileLogEntry ple;
         if (profile->read_log(pname, ple))
         {
-            TimeVal t = ple.time();
-            XrlProfileClientV0p1Client pc(xrl_router);
-            pc.send_log(instance_name.c_str(),
-                        pname, t.sec(), t.usec(), ple.loginfo(),
-                        callback(ProfileUtils::transmit_callback,
-                                 pname, xrl_router, instance_name, profile));
+            // TimeVal t = ple.time();
+            // XrlProfileClientV0p1Client pc(xrl_router);
+            // pc.send_log(instance_name.c_str(),
+            //             pname, t.sec(), t.usec(), ple.loginfo(),
+            //             callback(ProfileUtils::transmit_callback,
+            //                      pname, xrl_router, instance_name, profile));
         }
         else
         {
@@ -331,10 +331,10 @@ public:
         debug_msg("pname = %s instance_name = %s\n", pname.c_str(),
                   instance_name.c_str());
 
-        XrlProfileClientV0p1Client pc(xrl_router);
-        pc.send_finished(instance_name.c_str(), pname,
-                         callback(ProfileUtils::transmit_finished_callback,
-                                  pname));
+        // XrlProfileClientV0p1Client pc(xrl_router);
+        // pc.send_finished(instance_name.c_str(), pname,
+        //                  callback(ProfileUtils::transmit_finished_callback,
+        //                           pname));
     }
 
     static

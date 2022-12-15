@@ -8,13 +8,13 @@
 // 1991 as published by the Free Software Foundation. Redistribution
 // and/or modification of this program under the terms of any other
 // version of the GNU General Public License is not permitted.
-// 
+//
 // This program is distributed in the hope that it will be useful, but
 // WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. For more details,
 // see the GNU General Public License, Version 2, a copy of which can be
 // found in the XORP LICENSE.gpl file.
-// 
+//
 // XORP Inc, 2953 Bunker Hill Lane, Suite 204, Santa Clara, CA 95054, USA;
 // http://xorp.net
 
@@ -34,40 +34,40 @@ using policy_backend_parser::policy_backend_parse;
 
 PolicyFilter::PolicyFilter() : _policies(NULL),
 #ifndef XORP_DISABLE_PROFILE
-			       _profiler_exec(NULL),
+    _profiler_exec(NULL),
 #endif
-			       _subr(NULL)
+    _subr(NULL)
 {
     _exec.set_set_manager(&_sman);
 }
 
-void PolicyFilter::configure(const string& str) 
+void PolicyFilter::configure(const string& str)
 {
     vector<PolicyInstr*>* policies = new vector<PolicyInstr*>();
-    map<string,Element*>* sets = new map<string,Element*>();
+    map<string, Element*>* sets = new map<string, Element*>();
     SUBR* subr = new SUBR;
     string err;
 
-    // do the actual parsing
-    if (policy_backend_parse(*policies, *sets, *subr, str, err)) {
-	// get rid of temporary parse junk.
-	delete_vector(policies);
-	clear_map(*sets);
-	clear_map(*subr);
-	delete sets;
-	delete subr;
-	xorp_throw(ConfError, err);
-    }
+    // // do the actual parsing
+    // if (policy_backend_parse(*policies, *sets, *subr, str, err)) {
+    // get rid of temporary parse junk.
+    // delete_vector(policies);
+    // clear_map(*sets);
+    // clear_map(*subr);
+    // delete sets;
+    // delete subr;
+    // xorp_throw(ConfError, err);
+    // }
 
-    // properly erase old conf
-    reset();
+    // // properly erase old conf
+    // reset();
 
-    // replace with new conf
-    _policies = policies;
-    _subr = subr;
-    _sman.replace_sets(sets);
-    _exec.set_policies(_policies);
-    _exec.set_subr(_subr);
+    // // replace with new conf
+    // _policies = policies;
+    // _subr = subr;
+    // _sman.replace_sets(sets);
+    // _exec.set_policies(_policies);
+    // _exec.set_subr(_subr);
 }
 
 PolicyFilter::~PolicyFilter()
@@ -77,16 +77,18 @@ PolicyFilter::~PolicyFilter()
 
 void PolicyFilter::reset()
 {
-    if (_policies) {
-	delete_vector(_policies);
-	_policies = NULL;
-	_exec.set_policies(NULL);
+    if (_policies)
+    {
+        delete_vector(_policies);
+        _policies = NULL;
+        _exec.set_policies(NULL);
     }
 
-    if (_subr) {
-	clear_map(*_subr);
-	delete _subr;
-	_subr = NULL;
+    if (_subr)
+    {
+        clear_map(*_subr);
+        delete _subr;
+        _subr = NULL;
     }
 
     _sman.clear();
@@ -97,14 +99,15 @@ bool PolicyFilter::acceptRoute(VarRW& varrw)
     bool default_action = true;
 
     // no configuration done yet.
-    if (!_policies) {
-	// need to sync.  Consider case where the parent [such as version policy
-	// filter] performed a write for some reason.  If we return without
-	// syncing, it might be a problem [i.e. when using singlevarrw which
-	// will perform the write only on sync!]
-	varrw.sync();
-	return default_action;
-    }	
+    if (!_policies)
+    {
+        // need to sync.  Consider case where the parent [such as version policy
+        // filter] performed a write for some reason.  If we return without
+        // syncing, it might be a problem [i.e. when using singlevarrw which
+        // will perform the write only on sync!]
+        varrw.sync();
+        return default_action;
+    }
 
 #ifndef XORP_DISABLE_PROFILE
     // setup profiling
@@ -116,52 +119,58 @@ bool PolicyFilter::acceptRoute(VarRW& varrw)
 
     // print any trace data...
     uint32_t level = varrw.trace();
-    if (level) {
-	string trace = "";
+    if (level)
+    {
+        string trace = "";
 
-	// basic, one line [hopefully!] info...
-	if (level > 0) {
-	    trace += varrw.more_tracelog();
+        // basic, one line [hopefully!] info...
+        if (level > 0)
+        {
+            trace += varrw.more_tracelog();
 
-	    switch (fa) {
-		case IvExec::REJ:
-		    trace += ": rejected";
-		    break;
-	    
-		case IvExec::DEFAULT:
-		    trace += ": default action";
-		    break;
+            switch (fa)
+            {
+                case IvExec::REJ:
+                    trace += ": rejected";
+                    break;
 
-		case IvExec::ACCEPT:
-		    trace += ": accepted";
-		    break;
-	    }
-	}
+                case IvExec::DEFAULT:
+                    trace += ": default action";
+                    break;
 
-	if (level > 1) {
-	    trace += "\nBasic VarRW trace:\n";
-	    trace += varrw.tracelog();
-	}
+                case IvExec::ACCEPT:
+                    trace += ": accepted";
+                    break;
+            }
+        }
 
-	if (level > 2) {
-	    trace += "Execution trace:\n";
-	    trace += _exec.tracelog();
-	    trace += "End of trace\n";
-	}
+        if (level > 1)
+        {
+            trace += "\nBasic VarRW trace:\n";
+            trace += varrw.tracelog();
+        }
 
-	XLOG_TRACE(true, "Policy filter result: %s", trace.c_str());
+        if (level > 2)
+        {
+            trace += "Execution trace:\n";
+            trace += _exec.tracelog();
+            trace += "End of trace\n";
+        }
+
+        XLOG_TRACE(true, "Policy filter result: %s", trace.c_str());
     }
 
     // decide what to do
-    switch (fa) {
+    switch (fa)
+    {
         case IvExec::REJ:
-	    return false;
+            return false;
 
         case IvExec::DEFAULT:
-	    return default_action;
+            return default_action;
 
         case IvExec::ACCEPT:
-	    return true;
+            return true;
     }
 
     // unreach [hopefully]
