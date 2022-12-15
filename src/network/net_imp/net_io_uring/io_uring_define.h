@@ -1,7 +1,8 @@
 #pragma once
 
-#include <bits/stdint-uintn.h>
 #ifdef LINUX_IO_URING
+
+#include <bits/stdint-uintn.h>
 
 namespace ToolBox
 {
