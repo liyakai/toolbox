@@ -1,5 +1,4 @@
 #include "tcp_socket.h"
-#include "liburing.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 //#include <winsock2.h>
 #pragma comment(lib,"ws2_32.lib")
@@ -9,6 +8,11 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <linux/tcp.h> // TCP_NODELAY
+
+#ifdef LINUX_IO_URING
+#include "liburing.h"
+#endif  //LINUX_IO_URING
+
 #elif defined(__APPLE__)
 #include <sys/socket.h>
 #include <netinet/in.h>
