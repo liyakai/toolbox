@@ -742,7 +742,7 @@ namespace ToolBox
             sa.sin_addr.s_addr = inet_addr(ip.c_str());
         }
 #endif
-        // SetNonBlocking(socket_id_); // 设置为非阻塞
+        SetNonBlocking(socket_id_); // 设置为非阻塞
         SetNagleOff(socket_id_);    // 关闭 Nagle
         SetTcpBuffSize(socket_id_);
         int32_t error = connect(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
