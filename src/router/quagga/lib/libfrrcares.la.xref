@@ -1,0 +1,146 @@
+{
+  "cli": {
+    "debug_resolver_cmd": {
+      "lib/libfrrcares.la": {
+        "defun": {
+          "file": "lib/resolver.c",
+          "func": "debug_resolver",
+          "line": 299
+        },
+        "doc": "Negate a command or set its defaults\nDebugging functions\nDebug DNS resolver actions\n",
+        "nodes": [
+          {
+            "install": {
+              "file": "lib/resolver.c",
+              "func": "resolver_init",
+              "line": 340
+            },
+            "node": 3
+          },
+          {
+            "install": {
+              "file": "lib/resolver.c",
+              "func": "resolver_init",
+              "line": 339
+            },
+            "node": 4
+          }
+        ],
+        "string": "[no] debug resolver"
+      }
+    }
+  },
+  "refs": {
+    "J8KNJ-7XVWM": [
+      {
+        "args": "fd",
+        "binary": "lib/libfrrcares.la",
+        "file": "lib/resolver.c",
+        "fmtstring": "c-ares registered FD %d",
+        "func": "resolver_fd_get",
+        "line": 86,
+        "priority": 7,
+        "type": "logmsg"
+      }
+    ],
+    "NP3XH-482FY": [
+      {
+        "args": "query, ares_strerror(status)",
+        "binary": "lib/libfrrcares.la",
+        "file": "lib/resolver.c",
+        "fmtstring": "[%p] Resolving failed (%s)",
+        "func": "ares_address_cb",
+        "line": 202,
+        "priority": 7,
+        "type": "logmsg"
+      }
+    ],
+    "PDCNZ-G2KMQ": [
+      {
+        "args": "hostname",
+        "binary": "lib/libfrrcares.la",
+        "ec": 100663356,
+        "file": "lib/resolver.c",
+        "fmtstring": "Trying to resolve '%s', but previous query was not finished yet",
+        "func": "resolver_resolve",
+        "line": 255,
+        "priority": 3,
+        "type": "logmsg"
+      }
+    ],
+    "QDNFR-6T7SJ": [
+      {
+        "args": "query, hostname",
+        "binary": "lib/libfrrcares.la",
+        "file": "lib/resolver.c",
+        "fmtstring": "[%p] Resolving '%s'",
+        "func": "resolver_resolve",
+        "line": 277,
+        "priority": 7,
+        "type": "logmsg"
+      }
+    ],
+    "QMJZ6-3T29E": [
+      {
+        "args": "__func__, vrf_id, safe_strerror(errno)",
+        "binary": "lib/libfrrcares.la",
+        "ec": 100663299,
+        "file": "lib/resolver.c",
+        "fmtstring": "%s: Can't switchback from VRF %u (%s)",
+        "func": "resolver_resolve",
+        "line": 290,
+        "priority": 3,
+        "type": "logmsg"
+      }
+    ],
+    "SYC4C-W5KPW": [
+      {
+        "args": "query, (int)i",
+        "binary": "lib/libfrrcares.la",
+        "file": "lib/resolver.c",
+        "fmtstring": "[%p] Resolved with %d results",
+        "func": "ares_address_cb",
+        "line": 224,
+        "priority": 7,
+        "type": "logmsg"
+      }
+    ],
+    "TFGAV-5K2TZ": [
+      {
+        "args": "resfd->fd",
+        "binary": "lib/libfrrcares.la",
+        "file": "lib/resolver.c",
+        "fmtstring": "c-ares unregistered FD %d",
+        "func": "resolver_fd_drop_maybe",
+        "line": 97,
+        "priority": 7,
+        "type": "logmsg"
+      }
+    ],
+    "YRBSP-10YK7": [
+      {
+        "args": "__func__, vrf_id, safe_strerror(errno)",
+        "binary": "lib/libfrrcares.la",
+        "ec": 100663299,
+        "file": "lib/resolver.c",
+        "fmtstring": "%s: Can't switch to VRF %u (%s)",
+        "func": "resolver_resolve",
+        "line": 282,
+        "priority": 3,
+        "type": "logmsg"
+      }
+    ],
+    "Z9T9X-AFCW1": [
+      {
+        "args": "query, hostname",
+        "binary": "lib/libfrrcares.la",
+        "file": "lib/resolver.c",
+        "fmtstring": "[%p] Resolving '%s' (IP literal)",
+        "func": "resolver_resolve",
+        "line": 266,
+        "priority": 7,
+        "type": "logmsg"
+      }
+    ]
+  }
+}
