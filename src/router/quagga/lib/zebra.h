@@ -144,7 +144,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/filter.h>
 #else
-#define RT_TABLE_MAIN		0
+#define RT_TABLE_MAIN       0
 #endif /* HAVE_NETLINK */
 
 #include <netdb.h>
@@ -185,16 +185,16 @@
  * e.g. this makes life easier for FBSD 4.11 users.
  */
 #ifndef INT16_MAX
-#define INT16_MAX	(32767)
+#define INT16_MAX   (32767)
 #endif
 #ifndef INT32_MAX
-#define INT32_MAX	(2147483647)
+#define INT32_MAX   (2147483647)
 #endif
 #ifndef UINT16_MAX
-#define UINT16_MAX	(65535U)
+#define UINT16_MAX  (65535U)
 #endif
 #ifndef UINT32_MAX
-#define UINT32_MAX	(4294967295U)
+#define UINT32_MAX  (4294967295U)
 #endif
 
 #ifdef HAVE_GLIBC_BACKTRACE
@@ -222,16 +222,16 @@ extern "C" {
 #endif
 
 #ifndef HAVE_STRLCAT
-size_t strlcat(char *__restrict dest,
-	       const char *__restrict src, size_t destsize);
+size_t strlcat(char* __restrict dest,
+               const char* __restrict src, size_t destsize);
 #endif
 #ifndef HAVE_STRLCPY
-size_t strlcpy(char *__restrict dest,
-	       const char *__restrict src, size_t destsize);
+size_t strlcpy(char* __restrict dest,
+               const char* __restrict src, size_t destsize);
 #endif
 
 #ifndef HAVE_EXPLICIT_BZERO
-void explicit_bzero(void *buf, size_t len);
+void explicit_bzero(void* buf, size_t len);
 #endif
 
 #if !defined(HAVE_STRUCT_MMSGHDR_MSG_HDR) || !defined(HAVE_SENDMMSG)
@@ -239,18 +239,19 @@ void explicit_bzero(void *buf, size_t len);
 #define mmsghdr frr_mmsghdr
 #define sendmmsg frr_sendmmsg
 
-struct mmsghdr {
-	struct msghdr msg_hdr;
-	unsigned int msg_len;
+struct mmsghdr
+{
+    struct msghdr msg_hdr;
+    unsigned int msg_len;
 };
 
 /* just go 1 at a time here, the loop this is used in will handle the rest */
-static inline int sendmmsg(int fd, struct mmsghdr *mmh, unsigned int len,
-			   int flags)
+static inline int sendmmsg(int fd, struct mmsghdr* mmh, unsigned int len,
+                           int flags)
 {
-	int rv = sendmsg(fd, &mmh->msg_hdr, 0);
+    int rv = sendmsg(fd, &mmh->msg_hdr, 0);
 
-	return rv > 0 ? 1 : rv;
+    return rv > 0 ? 1 : rv;
 }
 #endif
 
@@ -277,7 +278,7 @@ static inline int sendmmsg(int fd, struct mmsghdr *mmh, unsigned int len,
  */
 #ifndef CMSG_SPACE
 #define CMSG_SPACE(l)                                                          \
-	(_CMSG_DATA_ALIGN(sizeof(struct cmsghdr)) + _CMSG_HDR_ALIGN(l))
+    (_CMSG_DATA_ALIGN(sizeof(struct cmsghdr)) + _CMSG_HDR_ALIGN(l))
 #warning "assuming 4-byte alignment for CMSG_SPACE"
 #endif /* CMSG_SPACE */
 
@@ -291,10 +292,11 @@ static inline int sendmmsg(int fd, struct mmsghdr *mmh, unsigned int len,
 /*  The definition of struct in_pktinfo is missing in old version of
     GLIBC 2.1 (Redhat 6.1).  */
 #if defined(GNU_LINUX) && !defined(HAVE_STRUCT_IN_PKTINFO)
-struct in_pktinfo {
-	int ipi_ifindex;
-	struct in_addr ipi_spec_dst;
-	struct in_addr ipi_addr;
+struct in_pktinfo
+{
+    int ipi_ifindex;
+    struct in_addr ipi_spec_dst;
+    struct in_addr ipi_addr;
 };
 #endif
 
@@ -308,9 +310,9 @@ struct in_pktinfo {
  *          *BSD
  */
 #if defined(__NetBSD__)                                                        \
-	|| (defined(__FreeBSD__) && (__FreeBSD_version < 1100030))             \
-	|| (defined(__OpenBSD__) && (OpenBSD < 200311))                        \
-	|| (defined(__APPLE__))
+    || (defined(__FreeBSD__) && (__FreeBSD_version < 1100030))             \
+    || (defined(__OpenBSD__) && (OpenBSD < 200311))                        \
+    || (defined(__APPLE__))
 #define HAVE_IP_HDRINCL_BSD_ORDER
 #endif
 
@@ -325,7 +327,7 @@ struct in_pktinfo {
 #endif /* IN6_ARE_ADDR_EQUAL */
 
 /* default zebra TCP port for zclient */
-#define ZEBRA_PORT			2600
+#define ZEBRA_PORT          2600
 
 /*
  * The compiler.h header is used for anyone using the CPP_NOTICE
@@ -339,40 +341,42 @@ struct in_pktinfo {
 #define strmatch(a,b) (!strcmp((a), (b)))
 
 #ifndef INADDR_LOOPBACK
-#define	INADDR_LOOPBACK	0x7f000001	/* Internet address 127.0.0.1.  */
+#define INADDR_LOOPBACK 0x7f000001  /* Internet address 127.0.0.1.  */
 #endif
 
 /* Address family numbers from RFC1700. */
-typedef enum {
-	AFI_UNSPEC = 0,
-	AFI_IP = 1,
-	AFI_IP6 = 2,
-	AFI_L2VPN = 3,
-	AFI_MAX = 4
+typedef enum
+{
+    AFI_UNSPEC = 0,
+    AFI_IP = 1,
+    AFI_IP6 = 2,
+    AFI_L2VPN = 3,
+    AFI_MAX = 4
 } afi_t;
 
 #define IS_VALID_AFI(a) ((a) > AFI_UNSPEC && (a) < AFI_MAX)
 
 /* Subsequent Address Family Identifier. */
-typedef enum {
-	SAFI_UNSPEC = 0,
-	SAFI_UNICAST = 1,
-	SAFI_MULTICAST = 2,
-	SAFI_MPLS_VPN = 3,
-	SAFI_ENCAP = 4,
-	SAFI_EVPN = 5,
-	SAFI_LABELED_UNICAST = 6,
-	SAFI_FLOWSPEC = 7,
-	SAFI_MAX = 8
+typedef enum
+{
+    SAFI_UNSPEC = 0,
+    SAFI_UNICAST = 1,
+    SAFI_MULTICAST = 2,
+    SAFI_MPLS_VPN = 3,
+    SAFI_ENCAP = 4,
+    SAFI_EVPN = 5,
+    SAFI_LABELED_UNICAST = 6,
+    SAFI_FLOWSPEC = 7,
+    SAFI_MAX = 8
 } safi_t;
 
 #define FOREACH_AFI_SAFI(afi, safi)                                            \
-	for (afi = AFI_IP; afi < AFI_MAX; afi++)                               \
-		for (safi = SAFI_UNICAST; safi < SAFI_MAX; safi++)
+    for (afi = AFI_IP; afi < AFI_MAX; afi++)                               \
+        for (safi = SAFI_UNICAST; safi < SAFI_MAX; safi++)
 
 #define FOREACH_AFI_SAFI_NSF(afi, safi)                                        \
-	for (afi = AFI_IP; afi < AFI_MAX; afi++)                               \
-		for (safi = SAFI_UNICAST; safi <= SAFI_MPLS_VPN; safi++)
+    for (afi = AFI_IP; afi < AFI_MAX; afi++)                               \
+        for (safi = SAFI_UNICAST; safi <= SAFI_MPLS_VPN; safi++)
 
 /* Default Administrative Distance of each protocol. */
 #define ZEBRA_KERNEL_DISTANCE_DEFAULT      0
@@ -396,13 +400,13 @@ typedef enum {
 
 /* Atomic flag manipulation macros. */
 #define CHECK_FLAG_ATOMIC(PV, F)                                               \
-	((atomic_load_explicit(PV, memory_order_seq_cst)) & (F))
+    ((atomic_load_explicit(PV, memory_order_seq_cst)) & (F))
 #define SET_FLAG_ATOMIC(PV, F)                                                 \
-	((atomic_fetch_or_explicit(PV, (F), memory_order_seq_cst)))
+    ((atomic_fetch_or_explicit(PV, (F), memory_order_seq_cst)))
 #define UNSET_FLAG_ATOMIC(PV, F)                                               \
-	((atomic_fetch_and_explicit(PV, ~(F), memory_order_seq_cst)))
+    ((atomic_fetch_and_explicit(PV, ~(F), memory_order_seq_cst)))
 #define RESET_FLAG_ATOMIC(PV)                                                  \
-	((atomic_store_explicit(PV, 0, memory_order_seq_cst)))
+    ((atomic_store_explicit(PV, 0, memory_order_seq_cst)))
 
 /* VRF ID type. */
 typedef uint32_t vrf_id_t;

@@ -1,6 +1,8 @@
+#ifndef OSPF_LDP_SYNC_CLIPPY_C
+#define OSPF_LDP_SYNC_CLIPPY_C
 /* ospf_mpls_ldp_sync => "mpls ldp-sync" */
 DEFUN_CMD_FUNC_DECL(ospf_mpls_ldp_sync)
-#define funcdecl_ospf_mpls_ldp_sync static int ospf_mpls_ldp_sync_magic(\
+#define funcdecl_ospf_mpls_ldp_sync int ospf_mpls_ldp_sync_magic(\
 	const struct cmd_element *self __attribute__ ((unused)),\
 	struct vty *vty __attribute__ ((unused)),\
 	int argc __attribute__ ((unused)),\
@@ -402,3 +404,4 @@ DEFUN_CMD_FUNC_TEXT(show_ip_ospf_mpls_ldp_interface)
 	return show_ip_ospf_mpls_ldp_interface_magic(self, vty, argc, argv, interface);
 }
 
+#endif //OSPF_LDP_SYNC_CLIPPY_C

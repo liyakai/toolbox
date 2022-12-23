@@ -751,13 +751,12 @@ void ospf_ldp_sync_if_write_config(struct vty *vty,
 /*
  * LDP-SYNC commands.
  */
-#include "ospfd/ospf_ldp_sync_clippy.c"
+#include "ospfd/ospf_ldp_sync_clippy.h"
 
 DEFPY (ospf_mpls_ldp_sync,
        ospf_mpls_ldp_sync_cmd,
        "mpls ldp-sync",
-       "MPLS specific commands\n"
-       "Enable MPLS LDP-IGP Sync\n")
+       "MPLS specific commands\n Enable MPLS LDP-IGP Sync\n")
 {
 	VTY_DECLVAR_INSTANCE_CONTEXT(ospf, ospf);
 	struct vrf *vrf = vrf_lookup_by_id(ospf->vrf_id);

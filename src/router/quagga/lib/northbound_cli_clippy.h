@@ -1,3 +1,5 @@
+#ifndef NORTHBOUND_CLI_CLIPPY_C
+#define NORTHBOUND_CLI_CLIPPY_C
 /* config_commit => "commit [{force$force|confirmed (1-60)}]" */
 DEFUN_CMD_FUNC_DECL(config_commit)
 #define funcdecl_config_commit static int config_commit_magic(\
@@ -1194,3 +1196,4 @@ DEFUN_CMD_FUNC_TEXT(debug_nb)
 	return debug_nb_magic(self, vty, argc, argv, no, cbs, cbs_cfg, cbs_state, cbs_rpc, notifications, events, libyang);
 }
 
+#endif // NORTHBOUND_CLI_CLIPPY_C

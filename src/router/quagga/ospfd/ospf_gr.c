@@ -44,7 +44,8 @@
 #include "ospfd/ospf_gr.h"
 #include "ospfd/ospf_errors.h"
 #include "ospfd/ospf_dump.h"
-#include "ospfd/ospf_gr_clippy.c"
+#include "ospfd/ospf_gr_clippy.h"
+#include "config.h"
 
 static void ospf_gr_nvm_delete(struct ospf *ospf);
 

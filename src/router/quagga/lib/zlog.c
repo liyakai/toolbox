@@ -27,6 +27,8 @@
 #include <stdarg.h>
 #include <pthread.h>
 
+#include "assert/assert.h"
+
 /* gettid() & co. */
 #ifdef HAVE_PTHREAD_NP_H
 #include <pthread_np.h>

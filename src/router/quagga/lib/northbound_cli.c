@@ -32,7 +32,7 @@
 #include "northbound.h"
 #include "northbound_cli.h"
 #include "northbound_db.h"
-#include "lib/northbound_cli_clippy.c"
+#include "lib/northbound_cli_clippy.h"
 
 struct debug nb_dbg_cbs_config = {0, "Northbound callbacks: configuration"};
 struct debug nb_dbg_cbs_state = {0, "Northbound callbacks: state"};

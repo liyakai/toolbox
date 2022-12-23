@@ -308,14 +308,14 @@ extern "C" {
  * of the macro doesn't do the const check. */
 #define container_of(ptr, type, member)                                        \
         ({                                                             \
-            const decltype(((type *)0)->member) *__mptr = (ptr);     \
+            const typeof(((type *)0)->member) *__mptr = (ptr);     \
             (type *)((char *)__mptr - offsetof(type, member));     \
         })
 #endif
 
 #define container_of_null(ptr, type, member)                                   \
     ({                                                                     \
-        decltype(ptr) _tmp = (ptr);                                      \
+        typeof(ptr) _tmp = (ptr);                                      \
         _tmp ? container_of(_tmp, type, member) : NULL;                \
     })
 

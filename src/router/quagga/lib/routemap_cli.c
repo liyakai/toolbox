@@ -26,7 +26,7 @@
 #include "lib/northbound_cli.h"
 #include "lib/routemap.h"
 
-#include "lib/routemap_cli_clippy.c"
+#include "lib/routemap_cli_clippy.h"
 
 #define ROUTE_MAP_CMD_STR \
 	"Create route-map or enter route-map command mode\n" \

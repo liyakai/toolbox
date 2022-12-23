@@ -158,7 +158,7 @@ static int reconf_clear_dst(struct zlog_cfg_5424_user *cfg, struct vty *vty)
 	return reconf_dst(cfg, vty);
 }
 
-#include "lib/zlog_5424_cli_clippy.c"
+#include "lib/zlog_5424_cli_clippy.h"
 
 DEFPY_NOSH(log_5424_target,
 	   log_5424_target_cmd,
