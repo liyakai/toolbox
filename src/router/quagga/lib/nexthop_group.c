@@ -28,7 +28,7 @@
 #include <command.h>
 #include <jhash.h>
 
-#include "lib/nexthop_group_clippy.c"
+#include "lib/nexthop_group_clippy.h"
 
 DEFINE_MTYPE_STATIC(LIB, NEXTHOP_GROUP, "Nexthop Group");
 

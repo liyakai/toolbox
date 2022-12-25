@@ -1193,7 +1193,7 @@ static int vty_clear_prefix_list(struct vty *vty, afi_t afi, const char *name,
 	return CMD_SUCCESS;
 }
 
-#include "lib/plist_clippy.c"
+#include "lib/plist_clippy.h"
 
 DEFPY (show_ip_prefix_list,
        show_ip_prefix_list_cmd,

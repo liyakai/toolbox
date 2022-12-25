@@ -31,7 +31,7 @@
 #include "lib/plist_int.h"
 #include "lib/printfrr.h"
 
-#include "lib/filter_cli_clippy.c"
+#include "lib/filter_cli_clippy.h"
 
 #define ACCESS_LIST_STR "Access list entry\n"
 #define ACCESS_LIST_ZEBRA_STR "Access list name\n"

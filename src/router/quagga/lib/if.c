@@ -35,7 +35,7 @@
 #include "buffer.h"
 #include "log.h"
 #include "northbound_cli.h"
-#include "lib/if_clippy.c"
+#include "lib/if_clippy.h"
 
 DEFINE_MTYPE_STATIC(LIB, IF, "Interface");
 DEFINE_MTYPE_STATIC(LIB, IFDESC, "Intf Desc");

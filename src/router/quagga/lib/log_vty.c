@@ -29,7 +29,7 @@
 #include "lib/printfrr.h"
 #include "lib/systemd.h"
 
-#include "lib/log_vty_clippy.c"
+#include "lib/log_vty_clippy.h"
 
 #define ZLOG_MAXLVL(a, b) MAX(a, b)
 

@@ -1102,14 +1102,14 @@ void zlog_5424_state(struct zlog_cfg_5424 *zcf, size_t *lost_msgs,
 		*err_ts = zcf->active->last_err_ts;
 }
 
-struct rcu_close_rotate {
+struct rcu_close_rotate_5424 {
 	struct rcu_head_close head_close;
 	struct rcu_head head_self;
 };
 
 bool zlog_5424_rotate(struct zlog_cfg_5424 *zcf)
 {
-	struct rcu_close_rotate *rcr;
+	struct rcu_close_rotate_5424 *rcr;
 	int fd;
 
 	frr_with_mutex (&zcf->cfg_mtx) {

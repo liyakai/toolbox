@@ -22,6 +22,7 @@
 
 #include <string.h>
 #include "typesafe.h"
+#include "compiler.h"
 
 #ifdef __cplusplus
 extern "C" {
