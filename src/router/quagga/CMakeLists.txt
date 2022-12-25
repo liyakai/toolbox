@@ -22,10 +22,11 @@ set_source_files_properties(${QUAGGA_SRC} PROPERTIES LANGUAGE C)
 
 
 # 宏定义
-add_definitions(-DFRR_AUTOCONF_ATOMIC=On)
+#add_definitions(-DFRR_AUTOCONF_ATOMIC=On)
 add_definitions(-DHAVE___ATOMIC=On)
 add_definitions(-DHAVE_CONFIG_H=On)
-add_definitions(-DMULTIPATH_NUM=1024) # Maximum number of paths for a route
+add_definitions(-DFRR_DEFINE_DESC_TABLE=On)
+#add_definitions(-DMULTIPATH_NUM=1024) # Maximum number of paths for a route
 add_definitions(-DIOV_MAX=16) # 	/* IOV_MAX are normally defined in <sys/uio.h> , Posix.1g. example: Solaris2.6 are defined IOV_MAX size at 16.     */
 add_definitions(-DSYSCONFDIR="/etc/frr")
 

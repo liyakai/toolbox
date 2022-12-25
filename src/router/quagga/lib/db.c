@@ -36,7 +36,7 @@
 
 #include "db.h"
 #include "log.h"
-
+#ifdef HAVE_SQLITE3
 static struct sqlite3 *dbp;
 
 /*
@@ -323,3 +323,4 @@ int db_execute(const char *stmt_fmt, ...)
 
 	return 0;
 }
+#endif /* HAVE_SQLITE3 */
