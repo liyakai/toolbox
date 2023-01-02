@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  *
  * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Chris Torek.
@@ -33,6 +33,8 @@
  *
  * $FreeBSD$
  */
+#ifndef PRINTF_LOCAL_H
+#define PRINTF_LOCAL_H
 
 #include "compiler.h"
 #include "printfrr.h"
@@ -40,68 +42,71 @@
 /*
  * Flags used during conversion.
  */
-#define	ALT		0x001		/* alternate form */
-#define	LADJUST		0x004		/* left adjustment */
-#define	LONGDBL		0x008		/* long double */
-#define	LONGINT		0x010		/* long integer */
-#define	LLONGINT	0x020		/* long long integer */
-#define	SHORTINT	0x040		/* short integer */
-#define	ZEROPAD		0x080		/* zero (as opposed to blank) pad */
-#define	FPT		0x100		/* Floating point number */
-#define	GROUPING	0x200		/* use grouping ("'" flag) */
-					/* C99 additional size modifiers: */
-#define	SIZET		0x400		/* size_t */
-#define	PTRDIFFT	0x800		/* ptrdiff_t */
-#define	INTMAXT		0x1000		/* intmax_t */
-#define	CHARINT		0x2000		/* print char using int format */
+#define ALT     0x001       /* alternate form */
+#define LADJUST     0x004       /* left adjustment */
+#define LONGDBL     0x008       /* long double */
+#define LONGINT     0x010       /* long integer */
+#define LLONGINT    0x020       /* long long integer */
+#define SHORTINT    0x040       /* short integer */
+#define ZEROPAD     0x080       /* zero (as opposed to blank) pad */
+#define FPT     0x100       /* Floating point number */
+#define GROUPING    0x200       /* use grouping ("'" flag) */
+/* C99 additional size modifiers: */
+#define SIZET       0x400       /* size_t */
+#define PTRDIFFT    0x800       /* ptrdiff_t */
+#define INTMAXT     0x1000      /* intmax_t */
+#define CHARINT     0x2000      /* print char using int format */
 
 /*
  * Macros for converting digits to letters and vice versa
  */
-#define	to_digit(c)	((c) - '0')
-#define is_digit(c)	((unsigned)to_digit(c) <= 9)
-#define	to_char(n)	((n) + '0')
+#define to_digit(c) ((c) - '0')
+#define is_digit(c) ((unsigned)to_digit(c) <= 9)
+#define to_char(n)  ((n) + '0')
 
 /* Size of the static argument table. */
 #define STATIC_ARG_TBL_SIZE 8
 
-union arg {
-	int	intarg;
-	u_int	uintarg;
-	long	longarg;
-	u_long	ulongarg;
-	long long longlongarg;
-	unsigned long long ulonglongarg;
-	ptrdiff_t ptrdiffarg;
-	size_t	sizearg;
-	intmax_t intmaxarg;
-	uintmax_t uintmaxarg;
-	void	*pvoidarg;
-	char	*pchararg;
-	signed char *pschararg;
-	short	*pshortarg;
-	int	*pintarg;
-	long	*plongarg;
-	long long *plonglongarg;
-	ptrdiff_t *pptrdiffarg;
-	ssize_t	*pssizearg;
-	intmax_t *pintmaxarg;
+union arg
+{
+    int intarg;
+    u_int   uintarg;
+    long    longarg;
+    u_long  ulongarg;
+    long long longlongarg;
+    unsigned long long ulonglongarg;
+    ptrdiff_t ptrdiffarg;
+    size_t  sizearg;
+    intmax_t intmaxarg;
+    uintmax_t uintmaxarg;
+    void*    pvoidarg;
+    char*    pchararg;
+    signed char* pschararg;
+    short*   pshortarg;
+    int* pintarg;
+    long*    plongarg;
+    long long* plonglongarg;
+    ptrdiff_t* pptrdiffarg;
+    ssize_t* pssizearg;
+    intmax_t* pintmaxarg;
 #ifndef NO_FLOATING_POINT
-	double	doublearg;
-	long double longdoublearg;
+    double  doublearg;
+    long double longdoublearg;
 #endif
-	wint_t	wintarg;
-	wchar_t	*pwchararg;
+    wint_t  wintarg;
+    wchar_t* pwchararg;
 };
 
 /* Handle positional parameters. */
-int	_frr_find_arguments(const char *, va_list, union arg **) DSO_LOCAL;
+int _frr_find_arguments(const char*, va_list, union arg**) DSO_LOCAL;
 #ifdef WCHAR_SUPPORT
-int	_frr_find_warguments(const wchar_t *, va_list, union arg **) DSO_LOCAL;
+int _frr_find_warguments(const wchar_t*, va_list, union arg**) DSO_LOCAL;
 #endif
 
 /* returns number of bytes needed for full output, or -1 */
-ssize_t printfrr_extp(struct fbuf *, struct printfrr_eargs *ea, const void *)
-	DSO_LOCAL;
-ssize_t printfrr_exti(struct fbuf *, struct printfrr_eargs *ea, uintmax_t)
-	DSO_LOCAL;
+ssize_t printfrr_extp(struct fbuf*, struct printfrr_eargs* ea, const void*)
+DSO_LOCAL;
+ssize_t printfrr_exti(struct fbuf*, struct printfrr_eargs* ea, uintmax_t)
+DSO_LOCAL;
+
+#endif // PRINTF_LOCAL_H

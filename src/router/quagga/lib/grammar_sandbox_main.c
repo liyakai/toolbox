@@ -39,29 +39,29 @@ static void vty_do_exit(int isexit)
 
 struct thread_master *master;
 
-int main(int argc, char **argv)
-{
-	struct thread thread;
+// int main(int argc, char **argv)
+// {
+// 	struct thread thread;
 
-	master = thread_master_create(NULL);
+// 	master = thread_master_create(NULL);
 
-	zlog_aux_init("NONE: ", LOG_DEBUG);
+// 	zlog_aux_init("NONE: ", LOG_DEBUG);
 
-	/* Library inits. */
-	cmd_init(1);
-	host.name = strdup("test");
-	host.domainname = strdup("testdomainname");
+// 	/* Library inits. */
+// 	cmd_init(1);
+// 	host.name = strdup("test");
+// 	host.domainname = strdup("testdomainname");
 
-	vty_init(master, true);
-	lib_cmd_init();
-	nb_init(master, NULL, 0, false);
+// 	vty_init(master, true);
+// 	lib_cmd_init();
+// 	nb_init(master, NULL, 0, false);
 
-	vty_stdio(vty_do_exit);
+// 	vty_stdio(vty_do_exit);
 
-	/* Fetch next active thread. */
-	while (thread_fetch(master, &thread))
-		thread_call(&thread);
+// 	/* Fetch next active thread. */
+// 	while (thread_fetch(master, &thread))
+// 		thread_call(&thread);
 
-	/* Not reached. */
-	exit(0);
-}
+// 	/* Not reached. */
+// 	exit(0);
+// }

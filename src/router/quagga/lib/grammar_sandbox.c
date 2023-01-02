@@ -79,7 +79,7 @@ DEFUN (grammar_test,
 	struct cmd_token *token = cmd_token_new(START_TKN, 0, NULL, NULL);
 	graph_new_node(graph, token, (void (*)(void *)) & cmd_token_del);
 
-	cmd_graph_parse(graph, cmd);
+	// cmd_graph_parse(graph, cmd);
 	cmd_graph_merge(nodegraph, graph, +1);
 
 	return CMD_SUCCESS;
@@ -242,7 +242,7 @@ DEFUN (grammar_test_doc,
 	cmd->func = NULL;
 
 	// parse element
-	cmd_graph_parse(nodegraph, cmd);
+	// cmd_graph_parse(nodegraph, cmd);
 
 	return CMD_SUCCESS;
 }

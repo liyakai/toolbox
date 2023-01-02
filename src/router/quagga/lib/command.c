@@ -329,7 +329,7 @@ void _install_element(enum node_type ntype, const struct cmd_element *cmd)
 		graph_new_node(graph, token,
 			       (void (*)(void *)) & cmd_token_del);
 
-		cmd_graph_parse(graph, cmd);
+		// cmd_graph_parse(graph, cmd);
 		cmd_graph_names(graph);
 		cmd_graph_merge(cnode->cmdgraph, graph, +1);
 		graph_delete_graph(graph);
@@ -352,7 +352,7 @@ static void cmd_finalize_iter(struct hash_bucket *hb, void *arg)
 
 	graph_new_node(graph, token, (void (*)(void *)) & cmd_token_del);
 
-	cmd_graph_parse(graph, cmd);
+	// cmd_graph_parse(graph, cmd);
 	cmd_graph_names(graph);
 	cmd_graph_merge(cnode->cmdgraph, graph, +1);
 	graph_delete_graph(graph);
@@ -407,7 +407,7 @@ void uninstall_element(enum node_type ntype, const struct cmd_element *cmd)
 		graph_new_node(graph, token,
 			       (void (*)(void *)) & cmd_token_del);
 
-		cmd_graph_parse(graph, cmd);
+		// cmd_graph_parse(graph, cmd);
 		cmd_graph_names(graph);
 		cmd_graph_merge(cnode->cmdgraph, graph, -1);
 		graph_delete_graph(graph);

@@ -2442,10 +2442,10 @@ static void ospfTrapNbrStateChange(struct ospf_neighbor *on)
 	oid_copy_in_addr(index, &(on->address.u.prefix4));
 	index[IN_ADDR_SIZE] = 0;
 
-	smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
-		  array_size(ospf_trap_oid), ospf_oid,
-		  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
-		  ospfNbrTrapList, array_size(ospfNbrTrapList), NBRSTATECHANGE);
+	// smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
+	// 	  array_size(ospf_trap_oid), ospf_oid,
+	// 	  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
+	// 	  ospfNbrTrapList, array_size(ospfNbrTrapList), NBRSTATECHANGE);
 }
 
 static void ospfTrapVirtNbrStateChange(struct ospf_neighbor *on)
@@ -2457,11 +2457,11 @@ static void ospfTrapVirtNbrStateChange(struct ospf_neighbor *on)
 	oid_copy_in_addr(index, &(on->address.u.prefix4));
 	index[IN_ADDR_SIZE] = 0;
 
-	smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
-		  array_size(ospf_trap_oid), ospf_oid,
-		  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
-		  ospfVirtNbrTrapList, array_size(ospfVirtNbrTrapList),
-		  VIRTNBRSTATECHANGE);
+	// smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
+	// 	  array_size(ospf_trap_oid), ospf_oid,
+	// 	  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
+	// 	  ospfVirtNbrTrapList, array_size(ospfVirtNbrTrapList),
+	// 	  VIRTNBRSTATECHANGE);
 }
 
 static int ospf_snmp_nsm_change(struct ospf_neighbor *nbr, int next_state,
@@ -2501,10 +2501,10 @@ static void ospfTrapIfStateChange(struct ospf_interface *oi)
 	oid_copy_in_addr(index, &(oi->address->u.prefix4));
 	index[IN_ADDR_SIZE] = 0;
 
-	smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
-		  array_size(ospf_trap_oid), ospf_oid,
-		  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
-		  ospfIfTrapList, array_size(ospfIfTrapList), IFSTATECHANGE);
+	// smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
+	// 	  array_size(ospf_trap_oid), ospf_oid,
+	// 	  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
+	// 	  ospfIfTrapList, array_size(ospfIfTrapList), IFSTATECHANGE);
 }
 
 static void ospfTrapVirtIfStateChange(struct ospf_interface *oi)
@@ -2516,11 +2516,11 @@ static void ospfTrapVirtIfStateChange(struct ospf_interface *oi)
 	oid_copy_in_addr(index, &(oi->address->u.prefix4));
 	index[IN_ADDR_SIZE] = 0;
 
-	smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
-		  array_size(ospf_trap_oid), ospf_oid,
-		  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
-		  ospfVirtIfTrapList, array_size(ospfVirtIfTrapList),
-		  VIRTIFSTATECHANGE);
+	// smux_trap(ospf_variables, array_size(ospf_variables), ospf_trap_oid,
+	// 	  array_size(ospf_trap_oid), ospf_oid,
+	// 	  sizeof(ospf_oid) / sizeof(oid), index, IN_ADDR_SIZE + 1,
+	// 	  ospfVirtIfTrapList, array_size(ospfVirtIfTrapList),
+	// 	  VIRTIFSTATECHANGE);
 }
 
 static int ospf_snmp_ism_change(struct ospf_interface *oi, int state,
@@ -2544,8 +2544,8 @@ static int ospf_snmp_init(struct thread_master *tm)
 {
 	ospf_snmp_iflist = list_new();
 	ospf_snmp_vl_table = route_table_init();
-	smux_init(tm);
-	REGISTER_MIB("mibII/ospf", ospf_variables, variable, ospf_oid);
+	// smux_init(tm);
+	// REGISTER_MIB("mibII/ospf", ospf_variables, variable, ospf_oid);
 	return 0;
 }
 
@@ -2562,7 +2562,7 @@ static int ospf_snmp_module_init(void)
 	return 0;
 }
 
-FRR_MODULE_SETUP(.name = "ospfd_snmp", .version = FRR_VERSION,
-		 .description = "ospfd AgentX SNMP module",
-		 .init = ospf_snmp_module_init,
-);
+// FRR_MODULE_SETUP(.name = "ospfd_snmp", .version = FRR_VERSION,
+// 		 .description = "ospfd AgentX SNMP module",
+// 		 .init = ospf_snmp_module_init,
+// );
