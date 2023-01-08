@@ -309,4 +309,12 @@ BGPPlumbing::push<IPv4>(PeerHandler* peer_handler)
     plumbing_ipv4().push(peer_handler);
 }
 
+template<> inline
+void
+BGPPlumbing::push<IPv6>(PeerHandler* peer_handler)
+{
+    debug_msg("BGPPlumbing::push\n");
+    plumbing_ipv6().push(peer_handler);
+}
+
 #endif // __BGP_PLUMBING_HH__

@@ -1458,13 +1458,7 @@ BGPPlumbing::lookup_route(const IPNet<IPv6>& net) const
            plumbing_ipv6().lookup_route(net);
 }
 
-template<>
-void
-BGPPlumbing::push<IPv6>(PeerHandler* peer_handler)
-{
-    debug_msg("BGPPlumbing::push\n");
-    plumbing_ipv6().push(peer_handler);
-}
+
 
 
 template<>
