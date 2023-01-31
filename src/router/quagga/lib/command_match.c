@@ -100,7 +100,9 @@ enum matcher_rv command_match(struct graph *cmdgraph, vector vline,
 	       sizeof(void *) * vline->alloced);
 	vvline->active = vline->active + 1;
 
+
 	struct graph_node *start = vector_slot(cmdgraph->nodes, 0);
+	int nodes_count = vector_count(cmdgraph->nodes);
 	status = command_match_r(start, vvline, 0, stack, argv);
 	if (status == MATCHER_OK) { // successful match
 		struct listnode *head = listhead(*argv);
