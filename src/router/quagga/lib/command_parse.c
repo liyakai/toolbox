@@ -65,6 +65,7 @@
 #define yyparse         cmd_yyparse
 #define yylex           cmd_yylex
 #define yyerror         cmd_yyerror
+int cmd_yydebug = 1; // 为了编译通过修改的代码
 #define yydebug         cmd_yydebug
 #define yynerrs         cmd_yynerrs
 
@@ -1202,7 +1203,7 @@ int yychar;
 /* Default value used for initialization, for pacifying older GCCs
    or non-GCC compilers.  */
 YY_INITIAL_VALUE (static YYSTYPE yyval_default;)
-YYSTYPE yylval YY_INITIAL_VALUE (= yyval_default);
+YYSTYPE yylval_f YY_INITIAL_VALUE (= yyval_default);
 
 /* Location data for the lookahead symbol.  */
 static YYLTYPE yyloc_default
@@ -1210,7 +1211,7 @@ static YYLTYPE yyloc_default
   = { 1, 1, 1, 1 }
 # endif
 ;
-YYLTYPE yylloc = yyloc_default;
+YYLTYPE yylloc_f = yyloc_default;
 
     /* Number of syntax errors so far.  */
     int yynerrs;
@@ -1303,7 +1304,7 @@ YYLTYPE yylloc = yyloc_default;
 }
 
 #line 1306 "lib/command_parse.c" /* yacc.c:1429  */
-  yylsp[0] = yylloc;
+  yylsp[0] = yylloc_f;
   goto yysetstate;
 
 /*------------------------------------------------------------.
@@ -1409,7 +1410,7 @@ yybackup:
   if (yychar == YYEMPTY)
     {
       YYDPRINTF ((stderr, "Reading a token: "));
-      yychar = yylex (&yylval, &yylloc, scanner);
+      yychar = yylex (&yylval_f, &yylloc_f, scanner);
     }
 
   if (yychar <= YYEOF)
@@ -1420,7 +1421,7 @@ yybackup:
   else
     {
       yytoken = YYTRANSLATE (yychar);
-      YY_SYMBOL_PRINT ("Next token is", yytoken, &yylval, &yylloc);
+      YY_SYMBOL_PRINT ("Next token is", yytoken, &yylval_f, &yylloc_f);
     }
 
   /* If the proper action on seeing token YYTOKEN is to reduce or to
@@ -1443,16 +1444,16 @@ yybackup:
     yyerrstatus--;
 
   /* Shift the lookahead token.  */
-  YY_SYMBOL_PRINT ("Shifting", yytoken, &yylval, &yylloc);
+  YY_SYMBOL_PRINT ("Shifting", yytoken, &yylval_f, &yylloc_f);
 
   /* Discard the shifted token.  */
   yychar = YYEMPTY;
 
   yystate = yyn;
   YY_IGNORE_MAYBE_UNINITIALIZED_BEGIN
-  *++yyvsp = yylval;
+  *++yyvsp = yylval_f;
   YY_IGNORE_MAYBE_UNINITIALIZED_END
-  *++yylsp = yylloc;
+  *++yylsp = yylloc_f;
   goto yynewstate;
 
 
@@ -1614,10 +1615,10 @@ yyreduce:
   struct cmd_token *token = (yyval.node)->data;
 
   // get the numbers out
-  yylval.string++;
-  token->min = strtoll (yylval.string, &yylval.string, 10);
-  strsep (&yylval.string, "-");
-  token->max = strtoll (yylval.string, &yylval.string, 10);
+  yylval_f.string++;
+  token->min = strtoll (yylval_f.string, &yylval_f.string, 10);
+  strsep (&yylval_f.string, "-");
+  token->max = strtoll (yylval_f.string, &yylval_f.string, 10);
 
   // validate range
   if (token->min > token->max) cmd_yyerror (&(yylsp[0]), ctx, "Invalid range.");
@@ -1804,7 +1805,7 @@ yyerrlab:
     {
       ++yynerrs;
 #if ! YYERROR_VERBOSE
-      yyerror (&yylloc, ctx, YY_("syntax error"));
+      yyerror (&yylloc_f, ctx, YY_("syntax error"));
 #else
 # define YYSYNTAX_ERROR yysyntax_error (&yymsg_alloc, &yymsg, \
                                         yyssp, yytoken)
@@ -1831,7 +1832,7 @@ yyerrlab:
                 yymsgp = yymsg;
               }
           }
-        yyerror (&yylloc, ctx, yymsgp);
+        yyerror (&yylloc_f, ctx, yymsgp);
         if (yysyntax_error_status == 2)
           goto yyexhaustedlab;
       }
@@ -1839,7 +1840,7 @@ yyerrlab:
 #endif
     }
 
-  yyerror_range[1] = yylloc;
+  yyerror_range[1] = yylloc_f;
 
   if (yyerrstatus == 3)
     {
@@ -1855,7 +1856,7 @@ yyerrlab:
       else
         {
           yydestruct ("Error: discarding",
-                      yytoken, &yylval, &yylloc, ctx);
+                      yytoken, &yylval_f, &yylloc_f, ctx);
           yychar = YYEMPTY;
         }
     }
@@ -1919,10 +1920,10 @@ yyerrlab1:
     }
 
   YY_IGNORE_MAYBE_UNINITIALIZED_BEGIN
-  *++yyvsp = yylval;
+  *++yyvsp = yylval_f;
   YY_IGNORE_MAYBE_UNINITIALIZED_END
 
-  yyerror_range[2] = yylloc;
+  yyerror_range[2] = yylloc_f;
   /* Using YYLLOC is tempting, but would change the location of
      the lookahead.  YYLOC is available though.  */
   YYLLOC_DEFAULT (yyloc, yyerror_range, 2);
@@ -1954,7 +1955,7 @@ yyabortlab:
 | yyexhaustedlab -- memory exhaustion comes here.  |
 `-------------------------------------------------*/
 yyexhaustedlab:
-  yyerror (&yylloc, ctx, YY_("memory exhausted"));
+  yyerror (&yylloc_f, ctx, YY_("memory exhausted"));
   yyresult = 2;
   /* Fall through.  */
 #endif
@@ -1966,7 +1967,7 @@ yyreturn:
          user semantic actions for why this is necessary.  */
       yytoken = YYTRANSLATE (yychar);
       yydestruct ("Cleanup: discarding lookahead",
-                  yytoken, &yylval, &yylloc, ctx);
+                  yytoken, &yylval_f, &yylloc_f, ctx);
     }
   /* Do not reclaim the symbols of the rule whose action triggered
      this YYABORT or YYACCEPT.  */
