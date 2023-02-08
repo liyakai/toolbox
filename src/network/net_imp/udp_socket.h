@@ -101,21 +101,31 @@ namespace ToolBox
         * @param ip 地址
         * @param port 端口
         */
-        bool InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+        bool InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+
+        /*
+        *  初始化从accpet函数接收得来的socket
+        */
+
+        bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override
+        {
+            return true;    // TODO: udp 多网络线程改造
+        }
+        void InitAccpetSocket(UdpSocket* socket, const SocketAddress& address);
         /*
         * @brief 连接
         * @param ip 地址
         * @param port 端口
         * @return 是否成功
         */
-        bool InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+        bool InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * @brief 发送 [原生UDP发送接口,不适用于kcp等协议的发送入口]
         * @param buffer 数据指针
         * @param length 数据长度
         * @param address 目标地址
         */
-        void Send(const char* buffer, std::size_t length);
+        void Send(const char* buffer, std::size_t length) override;
         /*
         * @brief 发送 [KCP发送入口]
         * @param buffer 数据指针
@@ -137,7 +147,7 @@ namespace ToolBox
         /*
         * @brief 关闭套接字
         */
-        void Close(ENetErrCode net_err, int32_t sys_err = 0);
+        void Close(ENetErrCode net_err, int32_t sys_err = 0) override;
         /*
         * @brief 设置远端地址
         */
@@ -203,6 +213,7 @@ namespace ToolBox
         * @param address 数据来源地址
         */
         void KcpRecv(const char* buffer, std::size_t length, const UdpAddress&& address);
+
     private:
         /*
         * @brief 绑定ip地址和端口.[用于监听]
@@ -234,10 +245,6 @@ namespace ToolBox
         * @return UdpSocket* 新socket,如果失败则为nullptr
         */
         UdpSocket* UpdateAccept(const SocketAddress& address);
-        /*
-        *  初始化从accpet函数接收得来的socket
-        */
-        void InitAccpetSocket(UdpSocket* socket, const SocketAddress& address);
         /*
         * @brief 套接字接收数据
         */

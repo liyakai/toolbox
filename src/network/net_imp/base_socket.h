@@ -43,6 +43,11 @@ namespace ToolBox
         * @param port 端口
         */
         virtual bool InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+
+        /*
+        *  初始化从accpet函数接收得来的socket
+        */
+        virtual bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
         /*
         * @brief 连接
         * @param ip 地址

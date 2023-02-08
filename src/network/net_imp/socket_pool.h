@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <stdint.h>
 #include <deque>
 #include <vector>
@@ -29,8 +30,9 @@ namespace ToolBox
         /*
         * 初始化
         * @param max_count 最多可以连接的用户数
+        * @param thread_index 多网络线程下的序号[占8bit]
         */
-        bool Init(uint32_t max_count)
+        bool Init(uint32_t max_count, uint32_t thread_index = 0)
         {
             if (0 == max_count)
             {
@@ -41,6 +43,7 @@ namespace ToolBox
                 max_count = UINT16_MAX - 1;
             }
             max_socket_count_ = max_count;
+            thread_index_ = thread_index;
             curr_index_ = 0;
             curr_cycle_ = 0;
             socket_vector_.resize(max_count, nullptr);
@@ -172,12 +175,13 @@ namespace ToolBox
         */
         uint32_t MakeUint32(uint16_t hi_word, uint16_t lo_word)
         {
-            return (((uint32_t)hi_word) << 16 | lo_word);
+            return (((uint32_t)(hi_word & 0x00FF)) << 24 | (thread_index_ & 0x00FF) << 16 | lo_word);
         }
     private:
         uint32_t max_socket_count_ = 0; // 池子最大数量
         uint16_t curr_index_ = 0;       // 当前用到的索引值
         uint16_t curr_cycle_ = 0;       // 当前用到的第几轮
+        uint32_t thread_index_ = 0;      // 多网络线程下的序号
 
         using EpollSocketVector = std::vector<SocketType*>;
         using EpollSocketList = std::deque<SocketType*>;

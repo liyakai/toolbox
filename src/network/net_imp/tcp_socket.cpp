@@ -120,72 +120,47 @@ namespace ToolBox
             {
                 break;
             }
-            TcpSocket* new_socket = p_sock_pool_->Alloc();
-            if (nullptr == new_socket)
-            {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#elif defined(__linux__)
-                close(client_fd);
-#endif
-                p_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
-                return;
-            }
-            if (!InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_))
-            {
-                p_sock_pool_->Free(new_socket);
-                return;
-            }
-            NetworkLogDebug("[Network] accept a new socket. socket id:%d, socket state:%d", new_socket->GetSocketID(), new_socket->GetSocketState());
             // 通知主线程有新的客户端连接进来
-            p_network_->OnAccepted(new_socket->GetConnID());
+            p_network_->OnAcceptting(client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-            // 将新的连接加入iocp
-            p_iocp_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
             // 将监听socket重新加入iocp
             ReAddSocketToIocp(SOCKET_EVENT_RECV);
             break;
 #elif defined(__linux__)
-            auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-            p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #if defined (LINUX_IO_URING)
             // 将监听socket重新加入iocp
             ReAddSocketToUring(SOCKET_EVENT_RECV);
             break;
 #endif
 #elif defined(__APPLE__)
-            auto p_kqueue_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-            p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
-            p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_SEND);
 #endif
         }
     }
 
-    bool TcpSocket::InitAccpetSocket(TcpSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    bool TcpSocket::InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        socket->Init(send_buff_size, recv_buff_size);
-        socket->SetSocketMgr(p_sock_pool_);
-        socket->SetNetwork(p_network_);
-        socket->SetSocketID(socket_fd);
-        // socket->SetIP(ip);
-        // socket->SetAddressPort(port);
-        socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
+        Init(send_buff_size, recv_buff_size);
+        SetSocketID(socket_fd);
+        // SetIP(ip);
+        // SetAddressPort(port);
+        SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
+        SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
         // 建立 socket 与 iocp 的关联
-        if (!socket->AssociateSocketToIocp())
+        if (!AssociateSocketToIocp())
         {
             return false;
         }
 #elif defined(__linux__) || defined(__APPLE__)
-        socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
+        SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
 #endif
 
-        socket->SetNonBlocking(socket_fd);
-        socket->SetKeepaliveOff(socket_fd);
-        socket->SetLingerOff(socket_fd);
-        socket->SetNagleOff(socket_fd);
-        socket->SetTcpBuffSize(socket_fd);
+        SetNonBlocking(socket_fd);
+        SetKeepaliveOff(socket_fd);
+        SetLingerOff(socket_fd);
+        SetNagleOff(socket_fd);
+        SetTcpBuffSize(socket_fd);
         return true;
     }
 
