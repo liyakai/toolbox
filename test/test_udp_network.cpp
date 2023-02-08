@@ -7,29 +7,29 @@
 class TestUdpNetworkEcho : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(uint64_t conn_id) override
+    void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
     {
         Print("接到客户端连接,连接ID:%llu\n", conn_id);
     };
-    void OnConnected(uint64_t conn_id) override
+    void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
     {
         Print("主动连接成功:%llu\n", conn_id);
     };
-    void OnConnectedFailed(ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
-    void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
-    void OnReceived(uint64_t conn_id, const char* data, size_t size) override
+    void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
         // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         // PrintData(data, 16);
         Send(ToolBox::NT_UDP, conn_id, data, size);
     };
-    void OnClose(uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
@@ -39,24 +39,24 @@ public:
 class TestUdpNetworkForward : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(uint64_t conn_id) override
+    void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
     {
         Print("接到客户端连接,连接ID:%llu\n", conn_id);
     };
-    void OnConnected(uint64_t conn_id) override
+    void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
     {
         Print("主动连接成功:%llu\n", conn_id);
         echo_conn_id_ = conn_id;
     };
-    void OnConnectedFailed(ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
-    void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
-    void OnReceived(uint64_t conn_id, const char* data, size_t size) override
+    void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
         //Print("收到客户端数据长度为%d\n", size);
         //PrintData(data, 32);
@@ -102,7 +102,7 @@ public:
         }
 
     };
-    void OnClose(uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }

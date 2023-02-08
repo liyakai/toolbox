@@ -147,6 +147,11 @@ namespace ToolBox
         * @retval 初始化是否成功
         */
         bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+
+        /*
+        *  初始化从accpet函数接收得来的socket
+        */
+        bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * 初始化新的连接器
         * @param ip 连接IP
@@ -165,15 +170,12 @@ namespace ToolBox
         */
         void Close(ENetErrCode net_err, int32_t sys_err = 0) override;
 
+
     private:
         /*
         * 处理接受客户端连接的情况
         */
         void UpdateAccept();
-        /*
-        *  初始化从accpet函数接收得来的socket
-        */
-        bool InitAccpetSocket(TcpSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
         /*
         * 处理客户端数据的情况
         */

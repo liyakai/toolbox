@@ -51,27 +51,14 @@ namespace ToolBox
         */
         void PushEvent(NetEventWorker* event);
 
-    protected:
-        /*
-        * 主线程通知,工作线程内建立监听器
-        */
-        virtual uint64_t OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
-        /*
-        * 主线程通知,工作线程内建立连接器
-        */
-        virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
-        /*
-        * 主线程通知,关工作线程内闭网络连接
-        */
-        virtual void OnClose(uint64_t connect_id) = 0;
-        /*
-        * 主线程通知,工作线程内工作线程内发送
-        */
-        virtual void OnSend(uint64_t connect_id, const char* data, std::size_t size) = 0;
-
     public:
         /*
-        * 工作线程内接收到新连接,通知主线程
+        * 工作线程内接收到新连接,通知主线程[尚未加入监听]
+        * @param conn_id 连接ID
+        */
+        void OnAcceptting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+        /*
+        * 工作线程内接收到新连接,通知主线程[已加入监听]
         */
         void OnAccepted(uint64_t connect_id);
         /*
@@ -95,11 +82,38 @@ namespace ToolBox
         */
         void OnReceived(uint64_t connect_id, const char* data, uint32_t size);
 
+
+    protected:
+        /*
+        * 主线程通知,工作线程内建立监听器
+        */
+        virtual uint64_t OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        /*
+        * 主线程通知,将fd加入io多路复用
+        */
+        virtual uint64_t OnJoinIOMultiplexing(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        /*
+        * 主线程通知,工作线程内建立连接器
+        */
+        virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        /*
+        * 主线程通知,关工作线程内闭网络连接
+        */
+        virtual void OnClose(uint64_t connect_id) = 0;
+        /*
+        * 主线程通知,工作线程内工作线程内发送
+        */
+        virtual void OnSend(uint64_t connect_id, const char* data, std::size_t size) = 0;
+
     private:
         /*
         * 通知工作线程建立监听器
         */
         void OnMainToWorkerNewAccepter_(Event* event);
+        /*
+        * 通知工作线程加入io多路复用
+        */
+        void OnMainToWorkerJoinIOMultiplexing_(Event* event);
         /*
         * 通知工作线程建立连接器
         */

@@ -46,12 +46,13 @@ namespace ToolBox
 
     std::string NetEventWorker::GetIP() const
     {
-        const static std::string NullString;
+        std::string result;
         if (net_req_.address_.ip_)
         {
-            return *net_req_.address_.ip_;
+            result = *net_req_.address_.ip_;
+            GiveBackObjectLockFree(net_req_.address_.ip_);
         }
-        return NullString;
+        return result;
     }
 
     void NetEventWorker::SetAddressPort(const uint16_t port)
@@ -103,6 +104,24 @@ namespace ToolBox
         return net_req_.stream_.size_;
     }
 
+    void NetEventWorker::SetFd(int32_t fd)
+    {
+        net_req_.fd_ = fd;
+    }
+
+    int32_t NetEventWorker::GetFd() const
+    {
+        return net_req_.fd_;
+    }
+    void NetEventWorker::SetNetworkType(NetworkType network_type)
+    {
+        network_type_ = network_type;
+    }
+
+    NetworkType NetEventWorker::GetNetworkType() const
+    {
+        return network_type_;
+    }
 
 
 
@@ -123,6 +142,22 @@ namespace ToolBox
             default:
                 break;
         }
+    }
+
+    void NetEventMain::SetIP(const std::string& ip)
+    {
+        net_evt_.acceptting_.ip_ = GetObjectLockFree<std::string>(ip);
+    }
+
+    std::string NetEventMain::GetIP() const
+    {
+        std::string result;
+        if (net_evt_.acceptting_.ip_)
+        {
+            result = *net_evt_.acceptting_.ip_;
+            GiveBackObjectLockFree(net_evt_.acceptting_.ip_);
+        }
+        return result;
     }
 
     EventBasedObject::EventBasedObject()
