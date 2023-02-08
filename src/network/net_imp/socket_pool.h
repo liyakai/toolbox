@@ -172,7 +172,7 @@ namespace ToolBox
         */
         uint32_t MakeUint32(uint16_t hi_word, uint16_t lo_word)
         {
-            return ((uint32_t)hi_word | lo_word);
+            return (((uint32_t)hi_word) << 16 | lo_word);
         }
     private:
         uint32_t max_socket_count_ = 0; // 池子最大数量
