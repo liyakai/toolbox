@@ -76,19 +76,3 @@ if(CMAKE_USE_LIBIOURING)
     add_definitions(-DLINUX_IO_URING)           # linux 下使用 io_uring
 endif()
 
-# CPU评测工具
-option(CMAKE_GPERF_TOOLS_CPU "Use Gperf Tools cpu-profiler" OFF)
-if(CMAKE_GPERF_TOOLS_CPU)
-    message(STATUS "Use Gperf Tools cpu-profiler")
-    add_definitions(-DUSE_GPERF_TOOLS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lprofiler ")
-    target_link_libraries(${PROJECT_NAME}  profiler.a)
-endif()
-
-# 内存泄漏评测工具
-option(CMAKE_GPERF_TOOLS_HEAP "Use Gperf Tools heap checker" OFF)
-if(CMAKE_GPERF_TOOLS_HEAP)
-    message(STATUS "Use Gperf Tools heap checker")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltcmalloc ")
-    target_link_libraries(${PROJECT_NAME} libtcmalloc.a )
-endif()
