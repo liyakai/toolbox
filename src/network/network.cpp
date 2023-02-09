@@ -50,7 +50,7 @@ namespace ToolBox
     {
         if (event2worker_.Full())
         {
-            NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", event->network_type_);
+            NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", event->GetNetworkType());
             GIVE_BACK_OBJECT(event);
             return;
         }
