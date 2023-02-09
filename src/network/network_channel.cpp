@@ -118,7 +118,7 @@ namespace ToolBox
     bool NetworkChannel::NotifyMain(NetEventMain* event)
     {
         std::lock_guard<std::mutex> lock(lock_);
-        if (!event2main_.Full())
+        if (event2main_.Full())
         {
             NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", event->network_type_);
             GIVE_BACK_OBJECT(event);
