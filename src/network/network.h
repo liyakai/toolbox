@@ -32,7 +32,7 @@ namespace ToolBox
         /*
         * 初始化网络
         */
-        virtual bool Init(NetworkChannel* master, NetworkType network_type);
+        virtual bool Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index);
         /*
         * 逆初始化网络
         */

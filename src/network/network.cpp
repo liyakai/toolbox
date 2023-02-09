@@ -1,5 +1,6 @@
 #include "network.h"
 #include "event.h"
+#include "network_def.h"
 #include <functional>
 
 namespace ToolBox
@@ -29,7 +30,7 @@ namespace ToolBox
         event2worker_.Clear();
     }
 
-    bool INetwork::Init(NetworkChannel* master, NetworkType network_type)
+    bool INetwork::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
     {
         master_ = master;
         network_type_ = network_type;
@@ -135,10 +136,8 @@ namespace ToolBox
         {
             return;
         }
-        auto conn_id = OnJoinIOMultiplexing(acceptting_event->GetFd(), acceptting_event->GetIP(), acceptting_event->GetPort(), acceptting_event->GetSendBuffSize(), acceptting_event->GetRecvBuffSize());
-        auto bind_tcp = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAccepted);
-        bind_tcp->net_evt_.bind_.connect_id_ = conn_id;
-        master_->NotifyMain(bind_tcp);
+        NetworkLogTrace("[Network] OnMainToWorkerJoinIOMultiplexing_  fd:%d", acceptting_event->GetFd());
+        OnJoinIOMultiplexing(acceptting_event->GetFd(), acceptting_event->GetIP(), acceptting_event->GetPort(), acceptting_event->GetSendBuffSize(), acceptting_event->GetRecvBuffSize());
     }
 
     void INetwork::OnMainToWorkerNewConnecter_(Event* event)

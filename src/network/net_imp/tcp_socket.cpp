@@ -1,4 +1,6 @@
 #include "tcp_socket.h"
+#include "network/net_imp/net_imp_define.h"
+#include <system_error>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 //#include <winsock2.h>
 #pragma comment(lib,"ws2_32.lib")
@@ -214,8 +216,10 @@ namespace ToolBox
             }
 
             // 处理数据
-            if (ErrCode::ERR_SUCCESS != ProcessRecvData())
+            ErrCode err_code = ProcessRecvData();
+            if (ErrCode::ERR_SUCCESS != err_code)
             {
+                NetworkLogWarn("[Network] ProcessRecvData.err_code:$d", err_code);
                 return;
             }
 
@@ -582,6 +586,7 @@ namespace ToolBox
             // socket 已经关闭
             return;
         }
+
         if (event_type & SOCKET_EVENT_ERR)
         {
             UpdateError();

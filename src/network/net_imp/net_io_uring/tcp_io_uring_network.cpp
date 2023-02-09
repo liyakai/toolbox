@@ -9,10 +9,10 @@
 namespace ToolBox
 {
 
-    bool TcpIOUringNetwork::Init(NetworkChannel* master, NetworkType network_type)
+    bool TcpIOUringNetwork::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
     {
         base_ctrl_ = new IOUringCtrl(MAX_SOCKET_COUNT);
-        if (!ImpNetwork<TcpSocket>::Init(master, network_type))
+        if (!ImpNetwork<TcpSocket>::Init(master, network_type, net_thread_index))
         {
             NetworkLogError("[Network] Init TcpIOUringNetwork failed. network_type:%d", network_type);
             return false;

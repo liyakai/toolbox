@@ -11,10 +11,10 @@
 namespace ToolBox
 {
 
-    bool UdpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type)
+    bool UdpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
     {
         base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
-        if (!ImpNetwork<UdpSocket>::Init(master, network_type))
+        if (!ImpNetwork<UdpSocket>::Init(master, network_type, net_thread_index))
         {
             NetworkLogError("[Network] Init UdpEpollNetwork failed. network_type:%d", network_type);
             return false;

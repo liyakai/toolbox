@@ -147,12 +147,12 @@ namespace ToolBox
             } stream_;
             struct Address
             {
-                std::string* ip_;
+                char ip_[16];
                 uint16_t port_;
                 int32_t send_buff_size;
                 int32_t recv_buff_size;
+                int32_t fd_;
             } address_;
-            int32_t fd_;
             NetReq() {}
             ~NetReq() {};
         } net_req_;
@@ -201,7 +201,7 @@ namespace ToolBox
             struct Acceptting
             {
                 int32_t fd_;
-                std::string* ip_;
+                char ip_[16];
                 uint16_t port_;
                 int32_t send_buff_size_;
                 int32_t recv_buff_size_;
