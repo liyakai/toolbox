@@ -120,10 +120,13 @@ namespace ToolBox
         std::lock_guard<std::mutex> lock(lock_);
         if (!event2main_.Full())
         {
-            event2main_.Push(std::move(event));
-            return true;
+            NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", event->network_type_);
+            GIVE_BACK_OBJECT(event);
+            return false;
         }
-        return false;
+        event2main_.Push(std::move(event));
+        return true;
+
     }
 
     void NetworkChannel::Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
