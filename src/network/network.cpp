@@ -48,7 +48,14 @@ namespace ToolBox
 
     void INetwork::PushEvent(NetEventWorker* event)
     {
+        if (event2worker_.Full())
+        {
+            NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", event->network_type_);
+            GIVE_BACK_OBJECT(event);
+            return;
+        }
         event2worker_.Push(std::move(event));
+
     }
 
     void INetwork::OnAcceptting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
