@@ -21,5 +21,10 @@ fi
 
 cd $scriptDir/build
 
-cmake  -DCMAKE_USE_LIBIOURING=ON ..  
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1  -DCMAKE_GPERF_TOOLS_CPU=OFF -DCMAKE_GPERF_TOOLS_HEAP=OFF -DCMAKE_USE_LIBIOURING=OFF .. 
+
+# clangd tool
+cp compile_commands.json ../compile_commands.json
+
+cmake  .. 
 make -j8
