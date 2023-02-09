@@ -8,10 +8,10 @@
 namespace ToolBox
 {
 
-    bool TcpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type)
+    bool TcpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
     {
         base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
-        if (!ImpNetwork<TcpSocket>::Init(master, network_type))
+        if (!ImpNetwork<TcpSocket>::Init(master, network_type, net_thread_index))
         {
             NetworkLogError("[Network] Init TcpEpollNetwork failed. network_type:%d", network_type);
             return false;

@@ -1,4 +1,5 @@
 #include "network_channel.h"
+#include "network_def.h"
 #include <cstddef>
 #include <cstdint>
 #include <random>
@@ -38,24 +39,22 @@ namespace ToolBox
     bool NetworkChannel::Start(std::size_t net_thread_num/* = 1*/)
     {
         stop_.store(false);
+        networks_.resize(net_thread_num);
         for (std::size_t i = 0; i < net_thread_num; i++)
         {
-            NetworkLogInfo("[Network] start thread. network_thread_index:%d", i);
-            workers_.emplace_back(new std::thread([this]()
+            NetworkLogInfo("[Network] start thread. network_thread_index:%zu", i);
+            workers_.emplace_back(new std::thread([this, i]()
             {
                 while (!stop_.load())
                 {
                     // NetworkLogError("[Network] networks_ size :%zu", networks_.size());
                     // 驱动网络更新
-                    for (auto& networks : networks_)
+                    for (auto& network : networks_[i])
                     {
-                        for (auto& network : networks)
+                        if (network)
                         {
-                            if (network)
-                            {
-                                // NetworkLogError("[Network] Update. network_type:%d", network->GetNetworkType());
-                                network->Update();
-                            }
+                            // NetworkLogError("[Network] Update. network_type:%d", network->GetNetworkType());
+                            network->Update();
                         }
                     }
                 }
@@ -118,6 +117,7 @@ namespace ToolBox
 
     bool NetworkChannel::NotifyMain(NetEventMain* event)
     {
+        std::lock_guard<std::mutex> lock(lock_);
         if (!event2main_.Full())
         {
             event2main_.Push(std::move(event));
@@ -156,6 +156,7 @@ namespace ToolBox
 
         if (net_thread_index >= networks_.size())
         {
+            NetworkLogError("[Network] NotifyWorker net_thread_index:%u, networks_.size():%zu", net_thread_index, networks_.size());
             OnErrored(type, 0, ENetErrCode::NET_INVALID_NET_THREAD_INDEX, 0);
             return;
         }
@@ -165,7 +166,7 @@ namespace ToolBox
         auto index = static_cast<size_t>(type);
         if (nullptr == network_type[index])
         {
-            network_type[index].reset(GetNetwork_(type));
+            network_type[index].reset(GetNetwork_(type, net_thread_index));
         }
         network_type[index]->PushEvent(std::move(event));
     }
@@ -181,6 +182,7 @@ namespace ToolBox
         int32_t fd = event_main->net_evt_.acceptting_.fd_;
         NetworkType network_type = event_main->network_type_;
         OnAcceptting(network_type, fd);
+        NetworkLogTrace("[Network] OnWorkerToMainAcceptting_. network_type:%u, fd:%d", network_type, fd);
         JoinIOMultiplexing(network_type, fd
                            , event_main->GetIP()
                            , event_main->net_evt_.acceptting_.port_
@@ -195,6 +197,7 @@ namespace ToolBox
         {
             return;
         }
+        NetworkLogTrace("[Network] OnWorkerToMainAccepted_. network_type:%u, connid:%lu", event_main->network_type_, event_main->net_evt_.accept_.connect_id_);
         OnAccepted(event_main->network_type_
                    , event_main->net_evt_.accept_.connect_id_);
     }
@@ -278,7 +281,7 @@ namespace ToolBox
         }
     }
 
-    INetwork* NetworkChannel::GetNetwork_(NetworkType type)
+    INetwork* NetworkChannel::GetNetwork_(NetworkType type, uint32_t net_thread_index)
     {
         switch (type)
         {
@@ -295,7 +298,7 @@ namespace ToolBox
 #elif defined(__APPLE__)
                 auto* tcp_network = new TcpKqueueNetwork();
 #endif
-                tcp_network->Init(this, type);
+                tcp_network->Init(this, type, net_thread_index);
                 return tcp_network;
                 break;
             }
@@ -303,7 +306,7 @@ namespace ToolBox
             {
 #if defined(__linux__)
                 auto* udp_network = new UdpEpollNetwork();
-                udp_network->Init(this, type);
+                udp_network->Init(this, type, net_thread_index);
                 return udp_network;
 #endif // __linux__
                 break;
@@ -312,7 +315,7 @@ namespace ToolBox
             {
 #if defined(__linux__)
                 auto* udp_network = new UdpEpollNetwork();
-                udp_network->Init(this, type);
+                udp_network->Init(this, type, net_thread_index);
                 udp_network->OpenKcpMode();
                 return udp_network;
 #endif // __linux__
@@ -342,7 +345,7 @@ namespace ToolBox
         static std::default_random_engine dre(time(0));  // 稍微随机些的种子
         std::uniform_int_distribution<unsigned > uid(0, networks_.size() - 1);
         uint32_t random_thread_index = uid(dre);
-        NetworkLogInfo("[Network] Push JoinIOMultiplexing event to network_thread_index:%u", random_thread_index);
+        NetworkLogTrace("[Network] Push JoinIOMultiplexing event to network_thread_index:%u, fd:%d", random_thread_index, fd);
         NotifyWorker(event, type, random_thread_index);      //随机去某个线程中去连接.
     }
 

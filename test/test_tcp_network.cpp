@@ -25,8 +25,8 @@ public:
     }
     void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
-        Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
-        PrintData(data, 16);
+        // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
+        // PrintData(data, 16);
         Send(ToolBox::NT_TCP, conn_id, data, size);
     };
     void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
@@ -120,8 +120,8 @@ CASE(test_tcp_echo)
     fprintf(stderr, "网络库测试用例: test_tcp_echo \n");
     LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start();
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start(2);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("0.0.0.0", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;
     std::thread t([&]()
     {

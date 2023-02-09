@@ -36,7 +36,7 @@ namespace ToolBox
         * @param NetworkChannel* 主线程
         * @param NetworkType 网络类型
         */
-        virtual bool Init(NetworkChannel* master, NetworkType network_type) override;
+        virtual bool Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index) override;
         /*
         * @brief 逆初始化网络
         */
@@ -96,14 +96,14 @@ namespace ToolBox
     }
 
     template<typename SocketType>
-    bool ImpNetwork<SocketType>::Init(NetworkChannel* master, NetworkType network_type)
+    bool ImpNetwork<SocketType>::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
     {
-        if (!INetwork::Init(master, network_type))
+        if (!INetwork::Init(master, network_type, net_thread_index))
         {
             NetworkLogError("[Network] Init INetwork failed. network_type:%d", network_type);
             return false;
         }
-        if (!sock_mgr_.Init(MAX_SOCKET_COUNT))
+        if (!sock_mgr_.Init(MAX_SOCKET_COUNT, net_thread_index))
         {
             NetworkLogError("[Network] Init sock_mgr_ failed. network_type:%d", network_type);
             return false;
@@ -189,6 +189,7 @@ namespace ToolBox
         }
         OnAccepted(new_socket->GetConnID());
         base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        NetworkLogTrace("[Network] OnJoinIOMultiplexing. fd:%d, connid:%u", fd, new_socket->GetConnID());
         return new_socket->GetConnID();
     }
     template<typename SocketType>

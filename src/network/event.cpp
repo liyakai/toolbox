@@ -1,6 +1,8 @@
 #include "event.h"
 #include "network_def.h"
 #include <string.h>
+#include <cstddef>
+#include <string.h>
 
 namespace ToolBox
 {
@@ -41,18 +43,16 @@ namespace ToolBox
 
     void NetEventWorker::SetIP(const std::string& ip)
     {
-        net_req_.address_.ip_ = GetObjectLockFree<std::string>(ip);
+        memset(net_req_.address_.ip_, 0, sizeof(net_req_.address_.ip_));
+        for (std::size_t idx = 0; idx < sizeof(net_req_.address_.ip_) && idx < ip.size(); idx++)
+        {
+            net_req_.address_.ip_[idx] = ip[idx];
+        }
     }
 
     std::string NetEventWorker::GetIP() const
     {
-        std::string result;
-        if (net_req_.address_.ip_)
-        {
-            result = *net_req_.address_.ip_;
-            GiveBackObjectLockFree(net_req_.address_.ip_);
-        }
-        return result;
+        return net_req_.address_.ip_;
     }
 
     void NetEventWorker::SetAddressPort(const uint16_t port)
@@ -106,12 +106,12 @@ namespace ToolBox
 
     void NetEventWorker::SetFd(int32_t fd)
     {
-        net_req_.fd_ = fd;
+        net_req_.address_.fd_ = fd;
     }
 
     int32_t NetEventWorker::GetFd() const
     {
-        return net_req_.fd_;
+        return net_req_.address_.fd_;
     }
     void NetEventWorker::SetNetworkType(NetworkType network_type)
     {
@@ -146,18 +146,16 @@ namespace ToolBox
 
     void NetEventMain::SetIP(const std::string& ip)
     {
-        net_evt_.acceptting_.ip_ = GetObjectLockFree<std::string>(ip);
+        memset(net_evt_.acceptting_.ip_, 0, sizeof(net_evt_.acceptting_.ip_));
+        for (std::size_t idx = 0; idx < sizeof(net_evt_.acceptting_.ip_) && idx < ip.size(); idx++)
+        {
+            net_evt_.acceptting_.ip_[idx] = ip[idx];
+        }
     }
 
     std::string NetEventMain::GetIP() const
     {
-        std::string result;
-        if (net_evt_.acceptting_.ip_)
-        {
-            result = *net_evt_.acceptting_.ip_;
-            GiveBackObjectLockFree(net_evt_.acceptting_.ip_);
-        }
-        return result;
+        return net_evt_.acceptting_.ip_;
     }
 
     EventBasedObject::EventBasedObject()

@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic>
 #include <cstdint>
+#include <stdint.h>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -159,7 +160,7 @@ namespace ToolBox
         * 根据类型获取网络实例
         * @param type 网络类型
         */
-        INetwork* GetNetwork_(NetworkType type);
+        INetwork* GetNetwork_(NetworkType type, uint32_t net_thread_index);
         /*
         * @brief 根据connid获取网络线程序号
         */
@@ -172,6 +173,7 @@ namespace ToolBox
 
     private:
         Event2Main event2main_;     // 主线程网络事件队列
+        std::mutex lock_;           // 多网络线程需要锁.
         std::atomic_bool stop_;     // 网络线程是否退出
         std::vector<std::unique_ptr<std::thread>> workers_;   // 工作线程,执行网络动作.
         using NetworkArray = std::vector<std::array<std::unique_ptr<INetwork>, NetworkType::NT_MAX>>;
