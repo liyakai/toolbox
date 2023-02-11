@@ -5,6 +5,7 @@
 #include "tools/memory_pool_lock_free.h"
 #include "network_channel.h"
 #include "network_def.h"
+#include <cstdint>
 
 namespace ToolBox
 {
@@ -130,16 +131,25 @@ namespace ToolBox
         * 处理需要在工作线程中处理的事件
         */
         void HandleEvents_();
+
     public:
+        /*
+        * 获取网络通信类型.
+        */
         NetworkType GetNetworkType()
         {
             return network_type_;
         };
+        /*
+        * 获取网络线程序号
+        */
+        uint32_t GetThreadIndex();
 
     private:
         NetworkType network_type_;          // 网络类型: TCP,UDP,KCP
         Event2Worker event2worker_;         // 主线程到工作线程的事件队列
-        NetworkChannel* master_;             // 主线程中的网络管理器
+        NetworkChannel* master_;            // 主线程中的网络管理器
+        uint32_t net_thread_index_ = 0;     // 网络线程序号
     };
 
 };  // ToolBox

@@ -264,8 +264,8 @@ namespace ToolBox
         */
         void UnregisterEventHandler(EventID event_id);
     private:
-        using EventFuncMap = std::unordered_map<std::uint32_t, EventHandle>;
-        EventFuncMap event_func_map_; // 事件处理函数表
+        using EventFuncArray = std::array<EventHandle, EID_MAX>;
+        EventFuncArray event_func_array_; // 事件处理函数表
     };
 
 };  // ToolBox

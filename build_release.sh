@@ -21,5 +21,5 @@ fi
 
 cd $scriptDir/build
 
-cmake  -DCMAKE_USE_LIBIOURING=ON ..  
+cmake  -DCMAKE_USE_LIBIOURING=OFF ..  
 make -j8
