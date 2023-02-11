@@ -169,24 +169,19 @@ namespace ToolBox
 
     void EventBasedObject::HandleEvent(Event* event)
     {
-        auto iter = event_func_map_.find(event->GetID());
-        if (iter == event_func_map_.end())
+        EventHandle& func = event_func_array_[event->GetID()];
+        if (nullptr != func)
         {
-            return;
+            func(event);
         }
-        iter->second(event);
     }
     void EventBasedObject::RegistereventHandler(EventID event_id, EventHandle func)
     {
-        event_func_map_[event_id] = func;
+        event_func_array_[event_id] = func;
+
     }
     void EventBasedObject::UnregisterEventHandler(EventID event_id)
     {
-        auto iter = event_func_map_.find(event_id);
-        if (iter != event_func_map_.end())
-        {
-            event_func_map_.erase(event_id);
-        }
     }
 
 };  // ToolBox

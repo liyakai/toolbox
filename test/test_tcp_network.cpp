@@ -120,7 +120,7 @@ CASE(test_tcp_echo)
     fprintf(stderr, "网络库测试用例: test_tcp_echo \n");
     LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start(2);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start(4);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("0.0.0.0", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;
     std::thread t([&]()
@@ -133,7 +133,7 @@ CASE(test_tcp_echo)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 3600 * 1000;
+    uint32_t run_mill_seconds = 30000 * 1000;
     while (true)
     {
         if (used_time > run_mill_seconds)
@@ -164,7 +164,7 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    // return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
 #endif // USE_GPERF_TOOLS

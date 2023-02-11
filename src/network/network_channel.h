@@ -170,6 +170,11 @@ namespace ToolBox
         * @brief 将文件描述符加入
         */
         void JoinIOMultiplexing(NetworkType type, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+    private:
+        /*
+        * @brief 设置系统可打开的最大文件描述符[需要root权限才可成功]
+        */
+        void SetSystemMaxOpenFiles();
 
     private:
         Event2Main event2main_;     // 主线程网络事件队列

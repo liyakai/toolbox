@@ -34,6 +34,7 @@ namespace ToolBox
     {
         master_ = master;
         network_type_ = network_type;
+        net_thread_index_ = net_thread_index;
         return true;
     }
     bool INetwork::UnInit()
@@ -192,6 +193,11 @@ namespace ToolBox
                 OnErrored(0, ENetErrCode::NET_INVALID_EVENT, 0);
             }
         }
+    }
+
+    uint32_t INetwork::GetThreadIndex()
+    {
+        return net_thread_index_;
     }
 
 };  // ToolBox

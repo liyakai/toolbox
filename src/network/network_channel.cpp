@@ -6,6 +6,7 @@
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #include "network/net_imp/net_iocp/tcp_iocp_network.h"
 #elif defined(__linux__)
+#include <sys/resource.h>
 #if defined(LINUX_IO_URING)
 #include "network/net_imp/net_io_uring/tcp_io_uring_network.h"
 #else
@@ -38,6 +39,9 @@ namespace ToolBox
 
     bool NetworkChannel::Start(std::size_t net_thread_num/* = 1*/)
     {
+        // 设置进程可打开的最大文件描述符数量[需要root权限才可成功]
+        // SetSystemMaxOpenFiles();
+
         stop_.store(false);
         networks_.resize(net_thread_num);
         for (std::size_t i = 0; i < net_thread_num; i++)
@@ -350,6 +354,25 @@ namespace ToolBox
         uint32_t random_thread_index = uid(dre);
         NetworkLogTrace("[Network] Push JoinIOMultiplexing event to network_thread_index:%u, fd:%d", random_thread_index, fd);
         NotifyWorker(event, type, random_thread_index);      //随机去某个线程中去连接.
+    }
+
+    void NetworkChannel::SetSystemMaxOpenFiles()
+    {
+#if defined(__linux__)
+        struct rlimit limit;
+        limit.rlim_cur = 40960;
+        limit.rlim_max = 65535;
+        int32_t ret = setrlimit(RLIMIT_NOFILE, &limit);
+        if (-1 == ret)
+        {
+            NetworkLogInfo("[Network] SetSystemMaxOpenFiles {40960,65535} FAILED! NEED ROOT! fd:%d", ret);
+        }
+        else
+        {
+            NetworkLogInfo("[Network] SetSystemMaxOpenFiles {40960,65535} success.result fd:%d", ret);
+        }
+
+#endif // __linux__
     }
 
 };  // ToolBox
