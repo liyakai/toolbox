@@ -129,7 +129,7 @@ FIXTURE_BEGIN(TcpNetwork)
 
 CASE(test_tcp_echo)
 {
-    // return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_echo.prof");
 #endif // USE_GPERF_TOOLS
@@ -180,11 +180,12 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    //return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_tcp_forward \n");
+    LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Start(4);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("0.0.0.0", 9500, ToolBox::NT_TCP);
