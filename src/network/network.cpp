@@ -56,7 +56,6 @@ namespace ToolBox
             return;
         }
         event2worker_.Push(std::move(event));
-
     }
 
     void INetwork::OnAcceptting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
@@ -173,12 +172,12 @@ namespace ToolBox
 
     void INetwork::OnMainToWorkerSend_(Event* event)
     {
-        auto send_tcp = dynamic_cast<NetEventWorker*>(event);
-        if (nullptr == send_tcp)
+        auto send = dynamic_cast<NetEventWorker*>(event);
+        if (nullptr == send)
         {
             return;
         }
-        OnSend(send_tcp->GetConnectID(), send_tcp->GetData(), send_tcp->GetDataSize());
+        OnSend(send->GetConnectID(), send->GetData(), send->GetDataSize());
     }
 
     void INetwork::HandleEvents_()

@@ -108,7 +108,7 @@ namespace ToolBox
         */
         bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override
         {
-            return true;    // TODO: udp 多网络线程改造
+            return true;    // TODO: udp 多网络线程改造.[20230226update:udp方式下,需要一个全局管理器,管理多线程情况下客户端连接信息.]
         }
         void InitAccpetSocket(UdpSocket* socket, const SocketAddress& address);
         /*
