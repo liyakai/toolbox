@@ -143,8 +143,20 @@ namespace ToolBox
                 break;
         }
     }
+    void NetEventMain::SetBindIP(const std::string& ip)
+    {
+        memset(net_evt_.bind_.ip_, 0, sizeof(net_evt_.bind_.ip_));
+        for (std::size_t idx = 0; idx < sizeof(net_evt_.bind_.ip_) && idx < ip.size(); idx++)
+        {
+            net_evt_.bind_.ip_[idx] = ip[idx];
+        }
+    }
 
-    void NetEventMain::SetIP(const std::string& ip)
+    std::string NetEventMain::GetBindIP() const
+    {
+        return net_evt_.bind_.ip_;
+    }
+    void NetEventMain::SetAccepttingIP(const std::string& ip)
     {
         memset(net_evt_.acceptting_.ip_, 0, sizeof(net_evt_.acceptting_.ip_));
         for (std::size_t idx = 0; idx < sizeof(net_evt_.acceptting_.ip_) && idx < ip.size(); idx++)
@@ -153,7 +165,7 @@ namespace ToolBox
         }
     }
 
-    std::string NetEventMain::GetIP() const
+    std::string NetEventMain::GetAccepttingIP() const
     {
         return net_evt_.acceptting_.ip_;
     }

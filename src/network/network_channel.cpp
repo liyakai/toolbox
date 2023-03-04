@@ -1,5 +1,6 @@
 #include "network_channel.h"
 #include "network_def.h"
+#include "tools/time_util.h"
 #include <cstddef>
 #include <cstdint>
 #include <random>
@@ -23,6 +24,8 @@ namespace ToolBox
     NetworkChannel::NetworkChannel()
     {
         stop_.store(false);
+
+        RegistereventHandler(EID_WorkerToMainBinded, std::bind(&NetworkChannel::OnWorkerToMainBinded_, this, std::placeholders::_1));
         RegistereventHandler(EID_WorkerToMainAcceptting, std::bind(&NetworkChannel::OnWorkerToMainAcceptting_, this, std::placeholders::_1));
         RegistereventHandler(EID_WorkerToMainAccepted, std::bind(&NetworkChannel::OnWorkerToMainAccepted_, this, std::placeholders::_1));
         RegistereventHandler(EID_WorkerToMainClose, std::bind(&NetworkChannel::OnWorkerToMainClose_, this, std::placeholders::_1));
@@ -49,8 +52,20 @@ namespace ToolBox
             NetworkLogInfo("[Network] start thread. network_thread_index:%zu", i);
             workers_.emplace_back(new std::thread([this, i]()
             {
+                int32_t run_times_for_sleep = 0;
+                std::time_t timetamp =  GetMillSecondTimeStamp();
                 while (!stop_.load())
                 {
+                    // 降低线程空转时 CPU 占用率
+                    if (run_times_for_sleep ++ > 100)   // 100 是一个经验值,此时空转线程 CPU 占比 5%左右.
+                    {
+                        run_times_for_sleep = 0;
+                        if (GetMillSecondTimeStamp() <= timetamp )
+                        {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        }
+                        timetamp =  GetMillSecondTimeStamp();
+                    }
                     // NetworkLogError("[Network] networks_ size :%zu", networks_.size());
                     // 驱动网络更新
                     for (auto& network : networks_[i])
@@ -177,7 +192,19 @@ namespace ToolBox
         }
         network_type[index]->PushEvent(std::move(event));
     }
-
+    void NetworkChannel::OnWorkerToMainBinded_(Event* event)
+    {
+        auto event_main = dynamic_cast<NetEventMain*>(event);
+        if (nullptr == event_main)
+        {
+            return;
+        }
+        NetworkLogTrace("[Network] OnWorkerToMainBinded_. network_type:%u, connid:%lu", event_main->network_type_, event_main->net_evt_.accept_.connect_id_);
+        OnBinded(event_main->network_type_
+                 , event_main->net_evt_.bind_.connect_id_
+                 , event_main->GetBindIP()
+                 , event_main->net_evt_.bind_.port_);
+    }
 
     void NetworkChannel::OnWorkerToMainAcceptting_(Event* event)
     {
@@ -191,7 +218,7 @@ namespace ToolBox
         OnAcceptting(network_type, fd);
         NetworkLogTrace("[Network] OnWorkerToMainAcceptting_. network_type:%u, fd:%d", network_type, fd);
         JoinIOMultiplexing(network_type, fd
-                           , event_main->GetIP()
+                           , event_main->GetAccepttingIP()
                            , event_main->net_evt_.acceptting_.port_
                            , event_main->net_evt_.acceptting_.send_buff_size_
                            , event_main->net_evt_.acceptting_.recv_buff_size_);
