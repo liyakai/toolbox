@@ -174,13 +174,21 @@ namespace ToolBox
         */
         virtual ~NetEventMain();
         /*
-        * 设置 IP
+        * 设置 Bind IP
         */
-        void SetIP(const std::string& ip);
+        void SetBindIP(const std::string& ip);
         /*
-        * 获取 IP
+        * 获取 Bind IP
         */
-        std::string GetIP() const;
+        std::string GetBindIP() const;
+        /*
+        * 设置 Acceptting IP
+        */
+        void SetAccepttingIP(const std::string& ip);
+        /*
+        * 获取 Acceptting IP
+        */
+        std::string GetAccepttingIP() const;
 
     public:
         union NetEvt
@@ -197,6 +205,8 @@ namespace ToolBox
             struct Bind
             {
                 uint64_t connect_id_;
+                char ip_[16];
+                uint16_t port_;
             } bind_;
             struct Acceptting
             {

@@ -85,6 +85,11 @@ namespace ToolBox
         void NotifyWorker(NetEventWorker* event, NetworkType type, uint32_t net_thread_index);
     protected:
         /*
+        * 主线程内处理监听端口绑定事件
+        * @param conn_id 连接ID
+        */
+        virtual void OnBinded(NetworkType type, uint64_t conn_id, const std::string& ip, uint16_t port) {};
+        /*
         * 主线程内处理接受新连接事件[尚未加入监听]
         * @param conn_id 连接ID
         */
@@ -123,6 +128,10 @@ namespace ToolBox
         virtual void OnReceived(NetworkType type, uint64_t conn_id, const char* data, size_t size) {};
 
     private:
+        /*
+        * 工作线程通知主线程,监听端口已绑定.
+        */
+        void OnWorkerToMainBinded_(Event* event);
         /*
         * 工作线程通知主线程,监听到新的连接,但尚未加入io多路复用.
         */

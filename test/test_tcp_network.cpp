@@ -7,21 +7,29 @@
 class TestNetworkEcho : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
+    void OnBinded(ToolBox::NetworkType type, uint64_t conn_id, const std::string& ip, uint16_t port) override
+    {
+        Print("[TestNetworkEcho] 服务器已建立监听端口,网络类型:%d, 连接ID:%llu, ip:%s, port:%d\n", type, conn_id, ip.c_str(), port);
+    };
+    void OnAcceptting(ToolBox::NetworkType type, int32_t fd) override
+    {
+        Print("[TestNetworkEcho] 正准备将新连接加入io多路复用,网络类型:%d fd:%d\n", type, fd);
+    };
     void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
     {
-        Print("接到客户端连接,连接ID:%llu\n", conn_id);
+        Print("[TestNetworkEcho] 接到客户端连接,连接ID:%llu\n", conn_id);
     };
     void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
     {
-        Print("主动连接成功:%llu\n", conn_id);
+        Print("[TestNetworkEcho] 主动连接成功:%llu\n", conn_id);
     };
     void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
+        Print("[TestNetworkEcho] 连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
     void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id: %lu 错误码:%d, 系统错误码:%d.\n", conn_id,  err_code, err_no);
+        Print("[TestNetworkEcho] 发生错误, connect_id: %lu 错误码:%d, 系统错误码:%d.\n", conn_id,  err_code, err_no);
     }
     void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
@@ -31,29 +39,37 @@ public:
     };
     void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
-        Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
+        Print("[TestNetworkEcho] 断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
 };
 
 class TestNetworkForward : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
+    void OnBinded(ToolBox::NetworkType type, uint64_t conn_id, const std::string& ip, uint16_t port) override
+    {
+        Print("[TestNetworkForward] 服务器已建立监听端口,网络类型:%d, 连接ID:%llu, ip:%s, port:%d\n", type, conn_id, ip.c_str(), port);
+    };
+    void OnAcceptting(ToolBox::NetworkType type, int32_t fd) override
+    {
+        Print("[TestNetworkForward] 正准备将新连接加入io多路复用,网络类型:%d fd:%d\n", type, fd);
+    };
     void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
     {
-        Print("接到客户端连接,连接ID:%llu\n", conn_id);
+        Print("[TestNetworkForward] 接到客户端连接,连接ID:%llu\n", conn_id);
     };
     void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
     {
-        Print("主动连接成功:%llu\n", conn_id);
+        Print("[TestNetworkForward] 主动连接成功:%llu\n", conn_id);
         echo_conn_id_ = conn_id;
     };
     void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
+        Print("[TestNetworkForward] 连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
     void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("[TestNetworkForward] 发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
     void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
@@ -113,7 +129,7 @@ FIXTURE_BEGIN(TcpNetwork)
 
 CASE(test_tcp_echo)
 {
-    //return;
+    // return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_echo.prof");
 #endif // USE_GPERF_TOOLS
@@ -164,15 +180,15 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    return;
+    //return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_tcp_forward \n");
     ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, ToolBox::NT_TCP);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Start();
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Start(4);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("0.0.0.0", 9500, ToolBox::NT_TCP);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("0.0.0.0", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;
     std::thread t([&]()
     {

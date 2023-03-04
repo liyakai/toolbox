@@ -64,7 +64,7 @@ namespace ToolBox
         auto* accept_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAcceptting);
         accept_event->network_type_ = network_type_;
         accept_event->net_evt_.acceptting_.fd_ = fd;
-        accept_event->SetIP(ip);
+        accept_event->SetAccepttingIP(ip);
         accept_event->net_evt_.acceptting_.port_ = port;
         accept_event->net_evt_.acceptting_.send_buff_size_ = send_buff_size;
         accept_event->net_evt_.acceptting_.recv_buff_size_ = recv_buff_size;
@@ -133,7 +133,10 @@ namespace ToolBox
         }
         auto conn_id = OnNewAccepter(accepter_event->GetIP(), accepter_event->GetPort(), accepter_event->GetSendBuffSize(), accepter_event->GetRecvBuffSize());
         auto bind_tcp = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainBinded);
+        bind_tcp->network_type_ = network_type_;
         bind_tcp->net_evt_.bind_.connect_id_ = conn_id;
+        bind_tcp->SetBindIP(accepter_event->GetIP());
+        bind_tcp->net_evt_.bind_.port_ = accepter_event->GetPort();
         master_->NotifyMain(bind_tcp);
     }
 
