@@ -19,6 +19,7 @@ namespace ToolBox
         EID_MainToWorkerNewConnecter,
         EID_MainToWorkerClose,
         EID_MainToWorkerSend,
+        EID_MainToWorkerSetSimulateNagle,
         EID_WorkerToMainBinded,
         EID_WorkerToMainBindFailed,
         EID_WorkerToMainConnected,
@@ -134,6 +135,14 @@ namespace ToolBox
         * 获取网络类型
         */
         NetworkType GetNetworkType() const;
+        /*
+        * 设置特性参数
+        */
+        void SetFeatureParam(int32_t param1, int32_t param2);
+        /*
+        * 返回特性参数
+        */
+        std::tuple<int32_t, int32_t> GetFeatureParam();
 
 
     private:
@@ -153,6 +162,11 @@ namespace ToolBox
                 int32_t recv_buff_size;
                 int32_t fd_;
             } address_;
+            struct NetFeature
+            {
+                int32_t param1_ = 0;
+                int32_t param2_ = 0;
+            } net_feature_;
             NetReq() {}
             ~NetReq() {};
         } net_req_;

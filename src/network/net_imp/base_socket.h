@@ -1,6 +1,7 @@
 #pragma once
 #include "net_imp_define.h"
 #include "network/network.h"
+#include <cstdint>
 
 namespace ToolBox
 {
@@ -62,6 +63,10 @@ namespace ToolBox
         * @param address 目标地址
         */
         virtual void Send(const char* buffer, std::size_t length) = 0;
+        /*
+        * Update
+        */
+        virtual void Update(std::time_t time_stamp) {};
         /*
         * 获取socket状态
         */
@@ -223,6 +228,18 @@ namespace ToolBox
 #endif
         int32_t event_type_ = SOCKET_EVENT_INVALID;     // socket 可响应的事件类型
         INetwork* p_network_ = nullptr;                 // 工作线程
+    };
+
+    /*
+    * @brief 模拟 Nagle 算法
+    * 经过压测(100字节的小包),绝大部分时候(100%),发送缓存为空,此时会直接调用系统调用send函数,造成频繁调用send函数(用户态和系统态频繁切换),反而造成了cpu居高不下,系统压力很大.
+      所以这里采用 Nagle 算法思路,进行延迟发送,当积累一定数据包或者超时再进行发送操作.
+    */
+    struct SimulateNagle
+    {
+        uint32_t num_of_unsent_packets = 0; // 未发送的包的数量
+        uint32_t last_send_timestamp = 0;   // 上次发送时的时间戳
+        bool flag_can_be_sent = true;      // 是否能够发送
     };
 
 };  // ToolBox

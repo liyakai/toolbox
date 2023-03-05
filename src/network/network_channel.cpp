@@ -52,29 +52,24 @@ namespace ToolBox
             NetworkLogInfo("[Network] start thread. network_thread_index:%zu", i);
             workers_.emplace_back(new std::thread([this, i]()
             {
-                int32_t run_times_for_sleep = 0;
-                std::time_t timetamp =  GetMillSecondTimeStamp();
                 while (!stop_.load())
                 {
-                    // 降低线程空转时 CPU 占用率
-                    if (run_times_for_sleep ++ > 100)   // 100 是一个经验值,此时空转线程 CPU 占比 5%左右.
-                    {
-                        run_times_for_sleep = 0;
-                        if (GetMillSecondTimeStamp() <= timetamp )
-                        {
-                            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                        }
-                        timetamp =  GetMillSecondTimeStamp();
-                    }
+                    std::time_t timetamp = GetMillSecondTimeStamp();
+                    bool loaded_network = false;
                     // NetworkLogError("[Network] networks_ size :%zu", networks_.size());
                     // 驱动网络更新
                     for (auto& network : networks_[i])
                     {
                         if (network)
                         {
-                            // NetworkLogError("[Network] Update. network_type:%d", network->GetNetworkType());
-                            network->Update();
+                            network->Update(timetamp);
+                            loaded_network = true;
                         }
+                    }
+                    if (!loaded_network)
+                    {
+                        NetworkLogWarn("[Network] Sleep. networks_ size :%zu", networks_.size());
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     }
                 }
                 NetworkLogWarn("[Network] network has stoped. networks_ size :%zu", networks_.size());
@@ -145,7 +140,16 @@ namespace ToolBox
         }
         event2main_.Push(std::move(event));
         return true;
+    }
 
+    void NetworkChannel::SetSimulateNagle(uint32_t packets_num /* = 10*/, uint32_t timeout/* = 2*/)
+    {
+        for (uint32_t net_index = 0; net_index < networks_.size(); net_index++)
+        {
+            auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerSetSimulateNagle);
+            event->SetFeatureParam(packets_num, timeout);
+            NotifyWorker(event, NT_TCP, net_index);
+        }
     }
 
     void NetworkChannel::Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)

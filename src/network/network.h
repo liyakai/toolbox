@@ -41,7 +41,7 @@ namespace ToolBox
         /*
         * 运行一次网络循环 派生类要调用基类的 Update()
         */
-        virtual void Update();
+        virtual void Update(std::time_t time_stamp);
         /*
         * @brief 在io多路复用中关闭监听socket
         * @param socket 的文件描述符
@@ -82,6 +82,16 @@ namespace ToolBox
         * 工作线程内接收到数据,通知主线程
         */
         void OnReceived(uint64_t connect_id, const char* data, uint32_t size);
+    public:
+        /*
+        * @brief 获取网络库特性参数->最大累计包数.网络线程模拟 Nagle 算法,减少系统调用,代价是在通信不够频繁的情况下可能会增加延迟.
+        */
+        int32_t GetSimulateNaglePacketsNum();
+        /*
+        * @brief 获取网络库特性参数->超时时间,单位毫秒(ms).网络线程模拟 Nagle 算法,减少系统调用,代价是在通信不够频繁的情况下可能会增加延迟.
+        */
+        int32_t GetSimulateNagleTimeout();
+
 
 
     protected:
@@ -106,29 +116,42 @@ namespace ToolBox
         */
         virtual void OnSend(uint64_t connect_id, const char* data, std::size_t size) = 0;
 
+    protected:
+        /*
+        * 时间函数,统一更新,减少系统调用
+        */
+        std::time_t GetNetTime() const
+        {
+            return update_timestamp_;
+        }
+
     private:
         /*
-        * 通知工作线程建立监听器
+        * 通知网络线程建立监听器
         */
         void OnMainToWorkerNewAccepter_(Event* event);
         /*
-        * 通知工作线程加入io多路复用
+        * 通知网络线程加入io多路复用
         */
         void OnMainToWorkerJoinIOMultiplexing_(Event* event);
         /*
-        * 通知工作线程建立连接器
+        * 通知网络线程建立连接器
         */
         void OnMainToWorkerNewConnecter_(Event* event);
         /*
-        * 通知工作线程关闭网络连接
+        * 通知网络线程关闭网络连接
         */
         void OnMainToWorkerClose_(Event* event);
         /*
-        * 通知工作线程发送消息
+        * 通知网络线程发送消息
         */
         void OnMainToWorkerSend_(Event* event);
         /*
-        * 处理需要在工作线程中处理的事件
+        * 通知网络线程设置模拟Nagle算法
+        */
+        void SetSimulateNagle_(Event* event);
+        /*
+        * 处理需要在网络线程中处理的事件
         */
         void HandleEvents_();
 
@@ -150,6 +173,9 @@ namespace ToolBox
         Event2Worker event2worker_;         // 主线程到工作线程的事件队列
         NetworkChannel* master_;            // 主线程中的网络管理器
         uint32_t net_thread_index_ = 0;     // 网络线程序号
+        std::time_t update_timestamp_ = 0;  // 由Update更新的时间
+        int32_t nagle_packets_num_ = -1;    // 模拟Nagle 参数,累计 packets_num_ 包后再进行发送操作.
+        int32_t nagle_timeout_ = -1;        // 模拟Nagle 参数,timeout_ 后触发发送操作.单位毫秒(ms)
     };
 
 };  // ToolBox

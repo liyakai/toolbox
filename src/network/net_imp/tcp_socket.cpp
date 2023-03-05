@@ -1,5 +1,7 @@
 #include "tcp_socket.h"
 #include "network/net_imp/net_imp_define.h"
+#include "network/network_def.h"
+#include <cstdint>
 #include <system_error>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 //#include <winsock2.h>
@@ -355,11 +357,16 @@ namespace ToolBox
             send_ring_buffer_.AdjustReadPos(bytes);
             if (bytes < static_cast<int32_t>(size))
             {
+                sim_nagle_.flag_can_be_sent = false;           //  模拟nagle 是否可发送置为 false
                 break;
             }
 #endif  // LINUX_IO_URING
 
 #endif
+        }
+        if (0 == send_ring_buffer_.ContinuouslyReadableSize())
+        {
+            sim_nagle_.num_of_unsent_packets = 0;       //  模拟nagle 计数置为 0
         }
     }
 
@@ -445,6 +452,14 @@ namespace ToolBox
             p_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
             socket_state_ = SocketState::SOCK_STATE_INVALIED;
             p_sock_pool_->Free(this);
+        }
+    }
+
+    void TcpSocket::Update(std::time_t time_stamp)
+    {
+        if (sim_nagle_.flag_can_be_sent)
+        {
+            UpdateSend();
         }
     }
 
@@ -611,7 +626,15 @@ namespace ToolBox
             }
             else
             {
-                UpdateSend();
+                if (p_network_->GetSimulateNaglePacketsNum() > 0 || p_network_->GetSimulateNagleTimeout() > 0)
+                {
+                    sim_nagle_.flag_can_be_sent = true;
+                }
+                else
+                {
+                    UpdateSend();
+                }
+
             }
         }
     }
@@ -764,37 +787,66 @@ namespace ToolBox
             return;
         }
 
-        if (false == send_ring_buffer_.Empty())
+        if (debug_statistic_save_ + debug_statistic_send_ >= 2000)
         {
-            send_ring_buffer_.Write(data, len);
-            // UpdateSend();
-            if (!CheckSendRingBufferSize())
+            NetworkLogDebug("[Network] #### debug #### socket_id:%d debug_statistic_save_:%d, debug_statistic_send_:%d, config packet num:%d", GetSocketID(), debug_statistic_save_, debug_statistic_send_, p_network_->GetSimulateNaglePacketsNum());
+            debug_statistic_save_ = 0;
+            debug_statistic_send_ = 0;
+        }
+        if (p_network_->GetSimulateNaglePacketsNum() > 0)
+        {
+            if (sim_nagle_.num_of_unsent_packets < uint32_t(p_network_->GetSimulateNaglePacketsNum()))
+            {
+                debug_statistic_save_++;
+                send_ring_buffer_.Write(data, len);
+                sim_nagle_.num_of_unsent_packets++; // 模拟nagle 计数增加
+                if (!CheckSendRingBufferSize())
+                {
+                    return;
+                }
+                return;
+            }
+            else
+            {
+                debug_statistic_send_++;
+                UpdateSend();
+                return;
+            }
+
+        }
+        else
+        {
+            if (false == send_ring_buffer_.Empty())
+            {
+                send_ring_buffer_.Write(data, len);
+                if (!CheckSendRingBufferSize())
+                {
+                    return;
+                }
+                return;
+            }
+
+            int32_t sended = SocketSend(GetSocketID(), data, len);
+            if (-1 == sended)
+            {
+                Close(ENetErrCode::NET_SYS_ERROR, errno);
+                return;
+            }
+            else if ((int32_t)len == sended)
             {
                 return;
             }
-            return;
-        }
-
-        int32_t sended = SocketSend(GetSocketID(), data, len);
-        if (-1 == sended)
-        {
-            Close(ENetErrCode::NET_SYS_ERROR, errno);
-            return;
-        }
-        else if ((int32_t)len == sended)
-        {
-            return;
-        }
-        else if ((int32_t)len > sended)
-        {
-            send_ring_buffer_.Write(data + sended, len - sended);
+            else if ((int32_t)len > sended)
+            {
+                send_ring_buffer_.Write(data + sended, len - sended);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            ReAddSocketToIocp(SOCKET_EVENT_SEND);
+                ReAddSocketToIocp(SOCKET_EVENT_SEND);
 #elif defined(__linux__) || defined(__APPLE__)
 #if defined (LINUX_IO_URING)
-            ReAddSocketToUring(SOCKET_EVENT_SEND);
+                ReAddSocketToUring(SOCKET_EVENT_SEND);
 #endif
 #endif
+            }
         }
     }
 

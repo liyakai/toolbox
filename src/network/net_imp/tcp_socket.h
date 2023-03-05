@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <stdint.h>
 #include <time.h>
 #include "network/net_imp/base_socket.h"
@@ -169,6 +170,10 @@ namespace ToolBox
         * 关闭套接字
         */
         void Close(ENetErrCode net_err, int32_t sys_err = 0) override;
+        /*
+        * Update
+        */
+        void Update(std::time_t time_stamp) override;
 
 
     private:
@@ -262,9 +267,14 @@ namespace ToolBox
 #elif defined(__linux__)
 #if defined(LINUX_IO_URING)
         UringSockContext uring_socket_;
-#endif
-#endif
+#endif  // LINUX_IO_URING
+#endif  // WIN32
+
         SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
+        SimulateNagle sim_nagle_;             // 模拟 Nagle
+        uint32_t debug_statistic_save_ = 0;   // 测试统计字段
+        uint32_t debug_statistic_send_ = 0;   // 测试统计字段
+
 
     };
 

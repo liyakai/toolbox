@@ -1,6 +1,8 @@
 #include "network/network_channel.h"
 #include "unit_test_frame/unittest.h"
 #include "tools/log.h"
+#include <stdint.h>
+#include "tools/time_util.h"
 #ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
 #endif // USE_GPERF_TOOLS
@@ -36,11 +38,22 @@ public:
         // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         // PrintData(data, 16);
         Send(ToolBox::NT_TCP, conn_id, data, size);
+        recv_packets_++;
+        std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
+        if (now_time > last_update_time_ + 1000)
+        {
+            Print("[TestNetworkEcho] 连接ID:%llu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
+            last_update_time_ = now_time;
+            recv_packets_ = 0;
+        }
     };
     void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("[TestNetworkEcho] 断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
+private:
+    std::time_t last_update_time_ = 0;
+    uint32_t recv_packets_ = 0;
 };
 
 class TestNetworkForward : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
@@ -97,6 +110,20 @@ public:
             Send(ToolBox::NT_TCP, client_conn_id, send_data, send_data_size);
 
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data1");
+
+
+            std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
+            recv_packets_++;
+            if (now_time > last_update_time_ + 1000)
+            {
+                Print("[TestNetworkEcho] 连接ID:%llu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
+                last_update_time_ = now_time;
+                recv_packets_ = 0;
+            }
+            if (3 == client_conn_id)
+            {
+                Print("[TestNetworkEcho] 连接ID:%llu now_time:%llu\n", conn_id, now_time);
+            }
         }
         else
         {
@@ -114,6 +141,19 @@ public:
             //PrintData(send_data, 16);
             Send(ToolBox::NT_TCP, echo_conn_id_, send_data, send_data_size);
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data2");
+
+            client_recv_packets_++;
+            std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
+            if (now_time > client_last_update_time_ + 1000)
+            {
+                Print("[TestNetworkEcho] 客户端:%llu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
+                client_last_update_time_ = now_time;
+                client_recv_packets_ = 0;
+            }
+            if (3 == conn_id)
+            {
+                Print("[TestNetworkEcho] 连接ID:%llu now_time:%llu\n", conn_id, now_time);
+            }
         }
 
     };
@@ -123,6 +163,12 @@ public:
     }
 private:
     uint64_t echo_conn_id_ = -1;
+private:
+    std::time_t last_update_time_ = 0;
+    uint32_t recv_packets_ = 0;
+
+    std::time_t client_last_update_time_ = 0;
+    uint32_t client_recv_packets_ = 0;
 };
 
 FIXTURE_BEGIN(TcpNetwork)
@@ -136,7 +182,8 @@ CASE(test_tcp_echo)
     fprintf(stderr, "网络库测试用例: test_tcp_echo \n");
     LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start(4);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Start(1);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->SetSimulateNagle(10, 2);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("0.0.0.0", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;
     std::thread t([&]()
@@ -149,7 +196,7 @@ CASE(test_tcp_echo)
     });
     uint32_t used_time = 0;
     uint32_t old_time = 0;
-    uint32_t run_mill_seconds = 30000 * 1000;
+    uint32_t run_mill_seconds = 300000 * 1000;
     while (true)
     {
         if (used_time > run_mill_seconds)
@@ -180,14 +227,14 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    return;
+    // return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_tcp_forward \n");
     LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Start(4);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Start(1);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("0.0.0.0", 9500, ToolBox::NT_TCP);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("0.0.0.0", 9600, ToolBox::NT_TCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;

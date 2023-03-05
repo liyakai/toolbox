@@ -1,9 +1,12 @@
 #pragma once
 #include "network/network.h"
+#include "network/network_def.h"
 #include "socket_pool.h"
 #include "base_ctrl.h"
 #include "tcp_socket.h"
+#include "tools/virtual_print.h"
 #include "udp_socket.h"
+#include <cstdint>
 
 namespace ToolBox
 {
@@ -44,7 +47,7 @@ namespace ToolBox
         /*
         * @brief 执行一次网络循环
         */
-        virtual void Update() override;
+        virtual void Update(std::time_t time_stamp) override;
         /*
         * @brief 获取控制器
         */
@@ -81,6 +84,7 @@ namespace ToolBox
     protected:
         SocketPool<SocketType> sock_mgr_;       // socket 池
         IOMultiplexingInterface* base_ctrl_;    // io多路复用接口
+        std::time_t last_update_timestamp = 0;  // 上次update时的时间戳
     };
 
     template<typename SocketType>
@@ -138,11 +142,30 @@ namespace ToolBox
     }
 
     template<typename SocketType>
-    void ImpNetwork<SocketType>::Update()
+    void ImpNetwork<SocketType>::Update(std::time_t time_stamp)
     {
-        // NetworkLogInfo("[Network] Update. network_type:%d", GetNetworkType());
-        INetwork::Update();
+
+        // NetworkLogInfo("[Network] Update. network_type:%d,time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), time_stamp, last_update_timestamp);
+        INetwork::Update(time_stamp);
         base_ctrl_->RunOnce();
+
+        int32_t nagle_timeout = GetSimulateNagleTimeout();
+        // NetworkLogDebug("[Network] Update. network_type:%d, nagle_timeout:%d, time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), nagle_timeout, time_stamp, last_update_timestamp);
+        if (nagle_timeout > 0 && time_stamp >= last_update_timestamp + nagle_timeout)
+        {
+            // NetworkLogDebug("[Network] Update. network_type:%d, nagle_timeout:%d, time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), nagle_timeout, time_stamp, last_update_timestamp);
+            last_update_timestamp = time_stamp;
+            sock_mgr_.Foreach([time_stamp](SocketType * socket) -> bool
+            {
+                if (socket)
+                {
+                    socket->Update(time_stamp);
+                }
+                return true;
+            });
+        }
+
+
     }
 
     template<typename SocketType>

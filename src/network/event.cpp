@@ -123,10 +123,16 @@ namespace ToolBox
         return network_type_;
     }
 
+    void NetEventWorker::SetFeatureParam(int32_t param1, int32_t param2)
+    {
+        net_req_.net_feature_.param1_ = param1;
+        net_req_.net_feature_.param2_ = param2;
+    }
 
-
-
-
+    std::tuple<int32_t, int32_t> NetEventWorker::GetFeatureParam()
+    {
+        return std::tuple<int32_t, int32_t> {net_req_.net_feature_.param1_, net_req_.net_feature_.param2_};
+    }
 
     NetEventMain::NetEventMain(EventID event_id)
         : Event(event_id)
