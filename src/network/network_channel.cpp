@@ -383,7 +383,6 @@ namespace ToolBox
         static std::default_random_engine dre(time(0));  // 稍微随机些的种子
         std::uniform_int_distribution<unsigned > uid(0, networks_.size() - 1);
         uint32_t random_thread_index = uid(dre);
-        NetworkLogTrace("[Network] Push JoinIOMultiplexing event to network_thread_index:%u, fd:%d", random_thread_index, fd);
         NotifyWorker(event, type, random_thread_index);      //随机去某个线程中去连接.
     }
 
