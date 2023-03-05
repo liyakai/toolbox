@@ -13,6 +13,7 @@ namespace ToolBox
         RegistereventHandler(EID_MainToWorkerNewConnecter, std::bind(&INetwork::OnMainToWorkerNewConnecter_, this, std::placeholders::_1));
         RegistereventHandler(EID_MainToWorkerSend, std::bind(&INetwork::OnMainToWorkerSend_, this, std::placeholders::_1));
         RegistereventHandler(EID_MainToWorkerClose, std::bind(&INetwork::OnMainToWorkerClose_, this, std::placeholders::_1));
+        RegistereventHandler(EID_MainToWorkerSetSimulateNagle, std::bind(&INetwork::SetSimulateNagle_, this, std::placeholders::_1));
 
     }
 
@@ -41,8 +42,9 @@ namespace ToolBox
     {
         return true;
     }
-    void INetwork::Update()
+    void INetwork::Update(std::time_t time_stamp)
     {
+        update_timestamp_ = time_stamp;
         // 处理主线程发来的事件
         HandleEvents_();
     }
@@ -124,11 +126,21 @@ namespace ToolBox
         master_->NotifyMain(receive_event);
     }
 
+    int32_t INetwork::GetSimulateNaglePacketsNum()
+    {
+        return nagle_packets_num_;
+    }
+    int32_t INetwork::GetSimulateNagleTimeout()
+    {
+        return nagle_timeout_;
+    }
+
     void INetwork::OnMainToWorkerNewAccepter_(Event* event)
     {
         auto accepter_event = dynamic_cast<NetEventWorker*>(event);
         if (nullptr == accepter_event)
         {
+            NetworkLogError("[Network] event is null.");
             return;
         }
         auto conn_id = OnNewAccepter(accepter_event->GetIP(), accepter_event->GetPort(), accepter_event->GetSendBuffSize(), accepter_event->GetRecvBuffSize());
@@ -145,6 +157,7 @@ namespace ToolBox
         auto acceptting_event = dynamic_cast<NetEventWorker*>(event);
         if (nullptr == acceptting_event)
         {
+            NetworkLogError("[Network] event is null.");
             return;
         }
         NetworkLogTrace("[Network] OnMainToWorkerJoinIOMultiplexing_  fd:%d", acceptting_event->GetFd());
@@ -156,6 +169,7 @@ namespace ToolBox
         auto connecter_tcp = dynamic_cast<NetEventWorker*>(event);
         if (nullptr == connecter_tcp)
         {
+            NetworkLogError("[Network] event is null.");
             return;
         }
         OnNewConnecter(connecter_tcp->GetIP(), connecter_tcp->GetPort(), connecter_tcp->GetSendBuffSize(), connecter_tcp->GetRecvBuffSize());
@@ -166,6 +180,7 @@ namespace ToolBox
         auto close_tcp = dynamic_cast<NetEventWorker*>(event);
         if (nullptr == close_tcp)
         {
+            NetworkLogError("[Network] event is null.");
             return;
         }
         OnClose(close_tcp->GetConnectID());
@@ -176,9 +191,24 @@ namespace ToolBox
         auto send_tcp = dynamic_cast<NetEventWorker*>(event);
         if (nullptr == send_tcp)
         {
+            NetworkLogError("[Network] event is null.");
             return;
         }
         OnSend(send_tcp->GetConnectID(), send_tcp->GetData(), send_tcp->GetDataSize());
+    }
+
+    void INetwork::SetSimulateNagle_(Event* event)
+    {
+        auto set_nagle_event = dynamic_cast<NetEventWorker*>(event);
+        if (nullptr == set_nagle_event)
+        {
+            NetworkLogError("[Network] event is null.");
+            return;
+        }
+        const auto& nagle_params = set_nagle_event->GetFeatureParam();
+        nagle_packets_num_ = std::get<0>(nagle_params);
+        nagle_timeout_ = std::get<1>(nagle_params);
+        NetworkLogDebug("[Network] Set nagle_packets_num_:%d, set nagle_timeout_:%d.", nagle_packets_num_, nagle_timeout_);
     }
 
     void INetwork::HandleEvents_()

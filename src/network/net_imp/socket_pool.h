@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+#include <functional>
+#include <list>
 #include <stdint.h>
 #include <deque>
 #include <vector>
@@ -46,6 +48,7 @@ namespace ToolBox
             thread_index_ = thread_index;
             curr_index_ = 0;
             curr_cycle_ = 0;
+            alloced_socketes_.clear();
             socket_vector_.resize(max_count, nullptr);
             for (uint16_t i = 0; i < max_count; i++)
             {
@@ -72,6 +75,7 @@ namespace ToolBox
                 }
             }
             socket_vector_.clear();
+            alloced_socketes_.clear();
             return true;
         }
         /*
@@ -111,6 +115,8 @@ namespace ToolBox
             socket->SetConnID(conn_id);
             uint16_t index = GetLoWord(conn_id);
             socket_vector_[index] = socket;
+            alloced_socketes_.emplace_back(socket);
+
             return socket;
         }
         /*
@@ -124,10 +130,31 @@ namespace ToolBox
             }
             uint16_t index = GetLoWord(socket->GetConnID());
             socket_vector_[index] = nullptr;
+            alloced_socketes_.remove(socket);
+
             free_slot_list_.emplace_back(index);
             socket->Reset();
             free_list_.emplace_back(socket);
-
+        }
+        /*
+        * 循环socket
+        */
+        void Foreach(const std::function<bool(SocketType* socket)>& func)
+        {
+            for (SocketType* p_socket : alloced_socketes_)
+            {
+                if (p_socket)
+                {
+                    if (func(p_socket))
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
         }
     private:
         /*
@@ -186,11 +213,14 @@ namespace ToolBox
         using EpollSocketVector = std::vector<SocketType*>;
         using EpollSocketList = std::deque<SocketType*>;
         using SlotIndexList = std::deque<uint16_t>;
+        using AllocedList = std::list<SocketType*>;
 
         EpollSocketVector socket_vector_;       // socket 管理容器
         EpollSocketList free_list_;             // 回收的实体socket对象
         SlotIndexList active_slot_list_;        // 可用的 socket 索引
         SlotIndexList free_slot_list_;          // 回收的管理器索引
+        AllocedList alloced_socketes_;    // 存放已经分配对象的指针的序号[为了foreach函数]
+
     };
 
 };  // ToolBox

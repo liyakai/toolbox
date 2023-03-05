@@ -29,7 +29,7 @@ namespace ToolBox
         /*
         * 执行一次网络循环
         */
-        virtual void Update() override;
+        virtual void Update(std::time_t time_stamp) override;
     public:
         /*
         * @brief UdpAddress 是否存在
