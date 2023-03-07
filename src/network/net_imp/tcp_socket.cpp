@@ -1,6 +1,7 @@
 #include "tcp_socket.h"
 #include "network/net_imp/net_imp_define.h"
 #include "network/network_def.h"
+#include "tools/time_util.h"
 #include <cstdint>
 #include <system_error>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -295,6 +296,15 @@ namespace ToolBox
             }
             char* buff_block = MemPoolLockFreeMgr->GetMemory(len);
             recv_ring_buffer_.Read(buff_block, len);
+
+            // std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
+            // uint64_t connect_id = 0;
+            // memmove(&connect_id, buff_block + sizeof(uint32_t), sizeof(connect_id));
+            // if (3 == connect_id)
+            // {
+            //     NetworkLogDebug("[Network] ProcessRecvData 连接ID:%llu now_time:%llu, data size:%zu\n", connect_id, now_time, len);
+            // }
+
             p_network_->OnReceived(GetConnID(), buff_block, len);
         }
 
@@ -795,11 +805,11 @@ namespace ToolBox
         }
         if (p_network_->GetSimulateNaglePacketsNum() > 0)
         {
+            send_ring_buffer_.Write(data, len);
+            sim_nagle_.num_of_unsent_packets++; // 模拟nagle 计数增加
             if (sim_nagle_.num_of_unsent_packets < uint32_t(p_network_->GetSimulateNaglePacketsNum()))
             {
                 debug_statistic_save_++;
-                send_ring_buffer_.Write(data, len);
-                sim_nagle_.num_of_unsent_packets++; // 模拟nagle 计数增加
                 if (!CheckSendRingBufferSize())
                 {
                     return;
@@ -825,7 +835,6 @@ namespace ToolBox
                 }
                 return;
             }
-
             int32_t sended = SocketSend(GetSocketID(), data, len);
             if (-1 == sended)
             {
