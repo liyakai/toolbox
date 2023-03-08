@@ -65,7 +65,7 @@ namespace ToolBox
         /*
         * 执行一次 iocp
         */
-        bool RunOnce() override;
+        bool RunOnce(std::time_t time_stamp) override;
     private:
         HANDLE iocp_fd_;            // iocp 文件描述符
     };

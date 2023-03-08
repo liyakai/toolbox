@@ -239,7 +239,9 @@ namespace ToolBox
     {
         uint32_t num_of_unsent_packets = 0; // 未发送的包的数量
         uint32_t last_send_timestamp = 0;   // 上次发送时的时间戳
-        bool flag_can_be_sent = true;      // 是否能够发送
+        uint32_t last_recv_timestamp = 0;   // 上次接收时的时间戳
+        bool flag_can_sent = true;      // 是否能够发送
+        bool flag_can_recv = false;      // 是否能够接收
     };
 
 };  // ToolBox

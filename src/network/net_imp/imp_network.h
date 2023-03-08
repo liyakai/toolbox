@@ -147,7 +147,7 @@ namespace ToolBox
 
         // NetworkLogInfo("[Network] Update. network_type:%d,time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), time_stamp, last_update_timestamp);
         INetwork::Update(time_stamp);
-        base_ctrl_->RunOnce();
+        base_ctrl_->RunOnce(time_stamp);
 
         int32_t nagle_timeout = GetSimulateNagleTimeout();
         // NetworkLogDebug("[Network] Update. network_type:%d, nagle_timeout:%d, time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), nagle_timeout, time_stamp, last_update_timestamp);
