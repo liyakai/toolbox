@@ -211,6 +211,7 @@ namespace ToolBox
             }
             else if (0 == bytes)
             {
+                sim_nagle_.flag_can_recv = false;           //  模拟nagle 是否可接收置为 false
                 break;
             }
             else
@@ -367,7 +368,7 @@ namespace ToolBox
             send_ring_buffer_.AdjustReadPos(bytes);
             if (bytes < static_cast<int32_t>(size))
             {
-                sim_nagle_.flag_can_be_sent = false;           //  模拟nagle 是否可发送置为 false
+                sim_nagle_.flag_can_sent = false;           //  模拟nagle 是否可发送置为 false
                 break;
             }
 #endif  // LINUX_IO_URING
@@ -467,9 +468,13 @@ namespace ToolBox
 
     void TcpSocket::Update(std::time_t time_stamp)
     {
-        if (sim_nagle_.flag_can_be_sent)
+        if (sim_nagle_.flag_can_sent)
         {
             UpdateSend();
+        }
+        if (sim_nagle_.flag_can_recv)
+        {
+            UpdateRecv();
         }
     }
 
@@ -625,7 +630,15 @@ namespace ToolBox
             else
             {
                 last_recv_ts_ = ts; // 更新最后一次读到数据的时间戳
-                UpdateRecv();
+                if (p_network_->GetSimulateNagleTimeout() > 0)
+                {
+                    sim_nagle_.flag_can_recv = true;
+                }
+                else
+                {
+                    UpdateRecv();
+                }
+
             }
         }
         if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
@@ -638,7 +651,7 @@ namespace ToolBox
             {
                 if (p_network_->GetSimulateNaglePacketsNum() > 0 || p_network_->GetSimulateNagleTimeout() > 0)
                 {
-                    sim_nagle_.flag_can_be_sent = true;
+                    sim_nagle_.flag_can_sent = true;
                 }
                 else
                 {
@@ -797,7 +810,7 @@ namespace ToolBox
             return;
         }
 
-        if (debug_statistic_save_ + debug_statistic_send_ >= 2000)
+        if (debug_statistic_save_ + debug_statistic_send_ >= 6000)
         {
             NetworkLogDebug("[Network] #### debug #### socket_id:%d debug_statistic_save_:%d, debug_statistic_send_:%d, config packet num:%d", GetSocketID(), debug_statistic_save_, debug_statistic_send_, p_network_->GetSimulateNaglePacketsNum());
             debug_statistic_save_ = 0;
