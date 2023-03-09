@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <stdint.h>
 #include <time.h>
 #include "network/net_imp/base_socket.h"
@@ -147,6 +148,11 @@ namespace ToolBox
         * @retval 初始化是否成功
         */
         bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+
+        /*
+        *  初始化从accpet函数接收得来的socket
+        */
+        bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * 初始化新的连接器
         * @param ip 连接IP
@@ -164,16 +170,17 @@ namespace ToolBox
         * 关闭套接字
         */
         void Close(ENetErrCode net_err, int32_t sys_err = 0) override;
+        /*
+        * Update
+        */
+        void Update(std::time_t time_stamp) override;
+
 
     private:
         /*
         * 处理接受客户端连接的情况
         */
         void UpdateAccept();
-        /*
-        *  初始化从accpet函数接收得来的socket
-        */
-        bool InitAccpetSocket(TcpSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
         /*
         * 处理客户端数据的情况
         */
@@ -260,9 +267,14 @@ namespace ToolBox
 #elif defined(__linux__)
 #if defined(LINUX_IO_URING)
         UringSockContext uring_socket_;
-#endif
-#endif
+#endif  // LINUX_IO_URING
+#endif  // WIN32
+
         SocketState socket_state_ = SocketState::SOCK_STATE_INVALIED;  // socket 状态
+        SimulateNagle sim_nagle_;             // 模拟 Nagle
+        uint32_t debug_statistic_save_ = 0;   // 测试统计字段
+        uint32_t debug_statistic_send_ = 0;   // 测试统计字段
+
 
     };
 

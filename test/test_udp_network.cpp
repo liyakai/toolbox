@@ -7,29 +7,37 @@
 class TestUdpNetworkEcho : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(uint64_t conn_id) override
+    void OnBinded(ToolBox::NetworkType type, uint64_t conn_id, const std::string& ip, uint16_t port) override
     {
-        Print("接到客户端连接,连接ID:%llu\n", conn_id);
+        Print("[TestNetworkEcho] 服务器已建立监听端口,网络类型:%d, 连接ID:%llu, ip:%s, port:%d\n", type, conn_id, ip.c_str(), port);
     };
-    void OnConnected(uint64_t conn_id) override
+    void OnAcceptting(ToolBox::NetworkType type, int32_t fd) override
     {
-        Print("主动连接成功:%llu\n", conn_id);
+        Print("[TestNetworkEcho] 正准备将新连接加入io多路复用,网络类型:%d fd:%d\n", type, fd);
     };
-    void OnConnectedFailed(ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
     {
-        Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
+        Print("[TestNetworkEcho] 接到客户端连接,连接ID:%llu\n", conn_id);
     };
-    void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
     {
-        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("[TestNetworkEcho] 主动连接成功:%llu\n", conn_id);
+    };
+    void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    {
+        Print("[TestNetworkEcho] 连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
+    };
+    void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    {
+        Print("[TestNetworkEcho] 发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
-    void OnReceived(uint64_t conn_id, const char* data, size_t size) override
+    void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
         // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         // PrintData(data, 16);
         Send(ToolBox::NT_UDP, conn_id, data, size);
     };
-    void OnClose(uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
@@ -39,24 +47,32 @@ public:
 class TestUdpNetworkForward : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(uint64_t conn_id) override
+    void OnBinded(ToolBox::NetworkType type, uint64_t conn_id, const std::string& ip, uint16_t port) override
     {
-        Print("接到客户端连接,连接ID:%llu\n", conn_id);
+        Print("[TestUdpNetworkForward] 服务器已建立监听端口,网络类型:%d, 连接ID:%llu, ip:%s, port:%d\n", type, conn_id, ip.c_str(), port);
     };
-    void OnConnected(uint64_t conn_id) override
+    void OnAcceptting(ToolBox::NetworkType type, int32_t fd) override
     {
-        Print("主动连接成功:%llu\n", conn_id);
+        Print("[TestUdpNetworkForward] 正准备将新连接加入io多路复用,网络类型:%d fd:%d\n", type, fd);
+    };
+    void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
+    {
+        Print("[TestUdpNetworkForward] 接到客户端连接,连接ID:%llu\n", conn_id);
+    };
+    void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
+    {
+        Print("[TestUdpNetworkForward] 主动连接成功:%llu\n", conn_id);
         echo_conn_id_ = conn_id;
     };
-    void OnConnectedFailed(ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
+        Print("[TestUdpNetworkForward] 连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
-    void OnErrored(uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("[TestUdpNetworkForward] 发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
-    void OnReceived(uint64_t conn_id, const char* data, size_t size) override
+    void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
         //Print("收到客户端数据长度为%d\n", size);
         //PrintData(data, 32);
@@ -102,7 +118,7 @@ public:
         }
 
     };
-    void OnClose(uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
@@ -122,8 +138,9 @@ CASE(test_udp_echo)
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_echo \n");
     ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
-    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Start();
+    LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Start(4);
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Accept("0.0.0.0", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;
     std::thread t([&]()
     {
@@ -173,8 +190,8 @@ CASE(test_udp_forward)
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_forward \n");
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Accept("127.0.0.1", 9500, ToolBox::NT_UDP);
-    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Accept("0.0.0.0", 9500, ToolBox::NT_UDP);
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Connect("0.0.0.0", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&]()

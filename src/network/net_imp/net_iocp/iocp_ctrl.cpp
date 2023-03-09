@@ -156,9 +156,8 @@ namespace ToolBox
         return false;
     }
 
-    bool IocpCtrl::RunOnce()
+    bool IocpCtrl::RunOnce(std::time_t time_stamp)
     {
-        time_t      time_stamp = time(0);    // 时间戳
         DWORD       bytes = 0;
         BaseSocket* socket = nullptr;
         PerIOContext* per_io = nullptr;
