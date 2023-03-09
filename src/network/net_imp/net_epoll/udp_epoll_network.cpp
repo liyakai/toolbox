@@ -4,17 +4,16 @@
 
 #include "epoll_define.h"
 #include "network/net_imp/udp_socket.h"
-#include "tools/time_util.h"
 #include "epoll_ctrl.h"
 #include "network/net_imp/socket_pool.h"
 
 namespace ToolBox
 {
 
-    bool UdpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type)
+    bool UdpEpollNetwork::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
     {
         base_ctrl_ = new EpollCtrl(MAX_SOCKET_COUNT);
-        if (!ImpNetwork<UdpSocket>::Init(master, network_type))
+        if (!ImpNetwork<UdpSocket>::Init(master, network_type, net_thread_index))
         {
             NetworkLogError("[Network] Init UdpEpollNetwork failed. network_type:%d", network_type);
             return false;
@@ -22,13 +21,12 @@ namespace ToolBox
         return true;
     }
 
-    void UdpEpollNetwork::Update()
+    void UdpEpollNetwork::Update(std::time_t time_stamp)
     {
-        ImpNetwork<UdpSocket>::Update();
+        ImpNetwork<UdpSocket>::Update(time_stamp);
         if (is_kcp_open_)
         {
-            auto current = GetMillSecondTimeStamp();
-            // ���� kcp [TODO: �����update�����Ż��ռ�]
+            // 更新 kcp [TODO: 这里的update存在优化空间]
             for (auto iter : address_to_connect_)
             {
                 auto socket = sock_mgr_.GetSocket(iter.second);
@@ -36,7 +34,7 @@ namespace ToolBox
                 {
                     continue;
                 }
-                socket->KcpUpdate(current);
+                socket->KcpUpdate(time_stamp);
             }
         }
     }

@@ -1,6 +1,8 @@
 #include "event.h"
 #include "network_def.h"
 #include <string.h>
+#include <cstddef>
+#include <string.h>
 
 namespace ToolBox
 {
@@ -41,17 +43,16 @@ namespace ToolBox
 
     void NetEventWorker::SetIP(const std::string& ip)
     {
-        net_req_.address_.ip_ = GetObjectLockFree<std::string>(ip);
+        memset(net_req_.address_.ip_, 0, sizeof(net_req_.address_.ip_));
+        for (std::size_t idx = 0; idx < sizeof(net_req_.address_.ip_) && idx < ip.size(); idx++)
+        {
+            net_req_.address_.ip_[idx] = ip[idx];
+        }
     }
 
     std::string NetEventWorker::GetIP() const
     {
-        const static std::string NullString;
-        if (net_req_.address_.ip_)
-        {
-            return *net_req_.address_.ip_;
-        }
-        return NullString;
+        return net_req_.address_.ip_;
     }
 
     void NetEventWorker::SetAddressPort(const uint16_t port)
@@ -103,11 +104,35 @@ namespace ToolBox
         return net_req_.stream_.size_;
     }
 
+    void NetEventWorker::SetFd(int32_t fd)
+    {
+        net_req_.address_.fd_ = fd;
+    }
 
+    int32_t NetEventWorker::GetFd() const
+    {
+        return net_req_.address_.fd_;
+    }
+    void NetEventWorker::SetNetworkType(NetworkType network_type)
+    {
+        network_type_ = network_type;
+    }
 
+    NetworkType NetEventWorker::GetNetworkType() const
+    {
+        return network_type_;
+    }
 
+    void NetEventWorker::SetFeatureParam(int32_t param1, int32_t param2)
+    {
+        net_req_.net_feature_.param1_ = param1;
+        net_req_.net_feature_.param2_ = param2;
+    }
 
-
+    std::tuple<int32_t, int32_t> NetEventWorker::GetFeatureParam()
+    {
+        return std::tuple<int32_t, int32_t> {net_req_.net_feature_.param1_, net_req_.net_feature_.param2_};
+    }
 
     NetEventMain::NetEventMain(EventID event_id)
         : Event(event_id)
@@ -124,6 +149,32 @@ namespace ToolBox
                 break;
         }
     }
+    void NetEventMain::SetBindIP(const std::string& ip)
+    {
+        memset(net_evt_.bind_.ip_, 0, sizeof(net_evt_.bind_.ip_));
+        for (std::size_t idx = 0; idx < sizeof(net_evt_.bind_.ip_) && idx < ip.size(); idx++)
+        {
+            net_evt_.bind_.ip_[idx] = ip[idx];
+        }
+    }
+
+    std::string NetEventMain::GetBindIP() const
+    {
+        return net_evt_.bind_.ip_;
+    }
+    void NetEventMain::SetAccepttingIP(const std::string& ip)
+    {
+        memset(net_evt_.acceptting_.ip_, 0, sizeof(net_evt_.acceptting_.ip_));
+        for (std::size_t idx = 0; idx < sizeof(net_evt_.acceptting_.ip_) && idx < ip.size(); idx++)
+        {
+            net_evt_.acceptting_.ip_[idx] = ip[idx];
+        }
+    }
+
+    std::string NetEventMain::GetAccepttingIP() const
+    {
+        return net_evt_.acceptting_.ip_;
+    }
 
     EventBasedObject::EventBasedObject()
     {
@@ -136,24 +187,19 @@ namespace ToolBox
 
     void EventBasedObject::HandleEvent(Event* event)
     {
-        auto iter = event_func_map_.find(event->GetID());
-        if (iter == event_func_map_.end())
+        EventHandle& func = event_func_array_[event->GetID()];
+        if (nullptr != func)
         {
-            return;
+            func(event);
         }
-        iter->second(event);
     }
     void EventBasedObject::RegistereventHandler(EventID event_id, EventHandle func)
     {
-        event_func_map_[event_id] = func;
+        event_func_array_[event_id] = func;
+
     }
     void EventBasedObject::UnregisterEventHandler(EventID event_id)
     {
-        auto iter = event_func_map_.find(event_id);
-        if (iter != event_func_map_.end())
-        {
-            event_func_map_.erase(event_id);
-        }
     }
 
 };  // ToolBox

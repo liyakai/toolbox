@@ -88,10 +88,9 @@ namespace ToolBox
         /*
         * 执行一次 epoll wait
         */
-        bool RunOnce() override
+        bool RunOnce(std::time_t time_stamp) override
         {
             epoll_event evt;
-            time_t time_stamp = time(0);    // 时间戳
             int32_t count = EpollWait(EPOLL_WAIT_MSECONDS);
             if (count < 0)
             {

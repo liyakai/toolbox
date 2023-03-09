@@ -27,7 +27,7 @@ namespace ToolBox
         /*
         * 初始化
         */
-        virtual bool Init(NetworkChannel* master, NetworkType network_type) override;
+        virtual bool Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index) override;
         /*
         * @brief 在io多路复用中关闭监听socket
         * @param socket 的文件描述符

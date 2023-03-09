@@ -10,9 +10,9 @@
 namespace ToolBox
 {
 
-#ifndef ENABLE_OBJECT_POOL
-#define ENABLE_OBJECT_POOL 1
-#endif
+    // #ifndef ENABLE_OBJECT_POOL
+    // #define ENABLE_OBJECT_POOL 1
+    // #endif
 
 #ifndef ENABLE_DEBUG_OBJECT_POOL
 #define ENABLE_DEBUG_OBJECT_POOL 0

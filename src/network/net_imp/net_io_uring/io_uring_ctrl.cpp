@@ -129,9 +129,8 @@ namespace ToolBox
         return io_uring_submit_and_wait(ring_, 1);
     }
 
-    bool IOUringCtrl::RunOnce()
+    bool IOUringCtrl::RunOnce(std::time_t time_stamp)
     {
-        time_t time_stamp = time(0);    // 时间戳
         int32_t count = URingWait(URING_WAIT_MSECONDS);
         if (count < 0)
         {

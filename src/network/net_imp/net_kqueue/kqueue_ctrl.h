@@ -40,7 +40,7 @@ namespace ToolBox
         /*
         * 执行一次 epoll wait
         */
-        bool RunOnce()override;
+        bool RunOnce(std::time_t time_stamp)override;
     private:
         uint32_t fd_num_ = 0;       // 最大文件描述符监视数
         int kqueue_fd_ = 0;         // kqueue 文件描述符

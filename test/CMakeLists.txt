@@ -32,5 +32,29 @@ if(CMAKE_USE_LIBIOURING)
 endif(CMAKE_USE_LIBIOURING)
 endif()
 
+# CPU评测工具
+option(CMAKE_GPERF_TOOLS_CPU "Use Gperf Tools cpu-profiler" OFF)
+if(CMAKE_GPERF_TOOLS_CPU)
+    message(STATUS "Use Gperf Tools cpu-profiler")
+    add_definitions(-DUSE_GPERF_TOOLS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lprofiler ")
+    target_link_libraries(test_tools ${PROJECT_SOURCE_DIR}/lib/libprofiler.a)
+endif()
 
+# 内存泄漏评测工具
+option(CMAKE_GPERF_TOOLS_HEAP "Use Gperf Tools heap checker" OFF)
+if(CMAKE_GPERF_TOOLS_HEAP)
+    message(STATUS "Use Gperf Tools heap checker")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltcmalloc")
+    target_link_libraries(test_tools libtcmalloc.a )
+endif()
+
+# 内存分配器 jemalloc
+option(CMAKE_JEMALLOC "Use jemalloc" OFF)
+if(CMAKE_JEMALLOC)
+    message(STATUS "Use jemalloc")
+    add_definitions(-DUSE_CMAKE_JEMALLOC)           # 使用 jemalloc
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ljemalloc -pthread")
+    target_link_libraries(test_tools libjemalloc.a )
+endif()
 

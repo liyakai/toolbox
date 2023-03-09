@@ -1,4 +1,9 @@
 #include "tcp_socket.h"
+#include "network/net_imp/net_imp_define.h"
+#include "network/network_def.h"
+#include "tools/time_util.h"
+#include <cstdint>
+#include <system_error>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 //#include <winsock2.h>
 #pragma comment(lib,"ws2_32.lib")
@@ -120,72 +125,47 @@ namespace ToolBox
             {
                 break;
             }
-            TcpSocket* new_socket = p_sock_pool_->Alloc();
-            if (nullptr == new_socket)
-            {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#elif defined(__linux__)
-                close(client_fd);
-#endif
-                p_network_->OnErrored(GetConnID(), ENetErrCode::NET_ALLOC_FAILED, 0);
-                return;
-            }
-            if (!InitAccpetSocket(new_socket, client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_))
-            {
-                p_sock_pool_->Free(new_socket);
-                return;
-            }
-            NetworkLogDebug("[Network] accept a new socket. socket id:%d, socket state:%d", new_socket->GetSocketID(), new_socket->GetSocketState());
             // 通知主线程有新的客户端连接进来
-            p_network_->OnAccepted(new_socket->GetConnID());
+            p_network_->OnAcceptting(client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-            // 将新的连接加入iocp
-            p_iocp_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
             // 将监听socket重新加入iocp
             ReAddSocketToIocp(SOCKET_EVENT_RECV);
             break;
 #elif defined(__linux__)
-            auto p_epoll_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-            p_epoll_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 #if defined (LINUX_IO_URING)
             // 将监听socket重新加入iocp
             ReAddSocketToUring(SOCKET_EVENT_RECV);
             break;
 #endif
 #elif defined(__APPLE__)
-            auto p_kqueue_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-            p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
-            p_kqueue_network->GetBaseCtrl()->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_SEND);
 #endif
         }
     }
 
-    bool TcpSocket::InitAccpetSocket(TcpSocket* socket, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    bool TcpSocket::InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        socket->Init(send_buff_size, recv_buff_size);
-        socket->SetSocketMgr(p_sock_pool_);
-        socket->SetNetwork(p_network_);
-        socket->SetSocketID(socket_fd);
-        // socket->SetIP(ip);
-        // socket->SetAddressPort(port);
-        socket->SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
+        Init(send_buff_size, recv_buff_size);
+        SetSocketID(socket_fd);
+        // SetIP(ip);
+        // SetAddressPort(port);
+        SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
+        SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
         // 建立 socket 与 iocp 的关联
-        if (!socket->AssociateSocketToIocp())
+        if (!AssociateSocketToIocp())
         {
             return false;
         }
 #elif defined(__linux__) || defined(__APPLE__)
-        socket->SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
+        SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
 #endif
 
-        socket->SetNonBlocking(socket_fd);
-        socket->SetKeepaliveOff(socket_fd);
-        socket->SetLingerOff(socket_fd);
-        socket->SetNagleOff(socket_fd);
-        socket->SetTcpBuffSize(socket_fd);
+        SetNonBlocking(socket_fd);
+        SetKeepaliveOff(socket_fd);
+        SetLingerOff(socket_fd);
+        SetNagleOff(socket_fd);
+        SetTcpBuffSize(socket_fd);
         return true;
     }
 
@@ -231,6 +211,7 @@ namespace ToolBox
             }
             else if (0 == bytes)
             {
+                sim_nagle_.flag_can_recv = false;           //  模拟nagle 是否可接收置为 false
                 break;
             }
             else
@@ -239,8 +220,10 @@ namespace ToolBox
             }
 
             // 处理数据
-            if (ErrCode::ERR_SUCCESS != ProcessRecvData())
+            ErrCode err_code = ProcessRecvData();
+            if (ErrCode::ERR_SUCCESS != err_code)
             {
+                NetworkLogWarn("[Network] ProcessRecvData.err_code:$d", err_code);
                 return;
             }
 
@@ -314,6 +297,15 @@ namespace ToolBox
             }
             char* buff_block = MemPoolLockFreeMgr->GetMemory(len);
             recv_ring_buffer_.Read(buff_block, len);
+
+            // std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
+            // uint64_t connect_id = 0;
+            // memmove(&connect_id, buff_block + sizeof(uint32_t), sizeof(connect_id));
+            // if (3 == connect_id)
+            // {
+            //     NetworkLogDebug("[Network] ProcessRecvData 连接ID:%llu now_time:%llu, data size:%zu\n", connect_id, now_time, len);
+            // }
+
             p_network_->OnReceived(GetConnID(), buff_block, len);
         }
 
@@ -376,11 +368,16 @@ namespace ToolBox
             send_ring_buffer_.AdjustReadPos(bytes);
             if (bytes < static_cast<int32_t>(size))
             {
+                sim_nagle_.flag_can_sent = false;           //  模拟nagle 是否可发送置为 false
                 break;
             }
 #endif  // LINUX_IO_URING
 
 #endif
+        }
+        if (0 == send_ring_buffer_.ContinuouslyReadableSize())
+        {
+            sim_nagle_.num_of_unsent_packets = 0;       //  模拟nagle 计数置为 0
         }
     }
 
@@ -466,6 +463,18 @@ namespace ToolBox
             p_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
             socket_state_ = SocketState::SOCK_STATE_INVALIED;
             p_sock_pool_->Free(this);
+        }
+    }
+
+    void TcpSocket::Update(std::time_t time_stamp)
+    {
+        if (sim_nagle_.flag_can_sent)
+        {
+            UpdateSend();
+        }
+        if (sim_nagle_.flag_can_recv)
+        {
+            UpdateRecv();
         }
     }
 
@@ -607,6 +616,7 @@ namespace ToolBox
             // socket 已经关闭
             return;
         }
+
         if (event_type & SOCKET_EVENT_ERR)
         {
             UpdateError();
@@ -620,7 +630,15 @@ namespace ToolBox
             else
             {
                 last_recv_ts_ = ts; // 更新最后一次读到数据的时间戳
-                UpdateRecv();
+                if (p_network_->GetSimulateNagleTimeout() > 0)
+                {
+                    sim_nagle_.flag_can_recv = true;
+                }
+                else
+                {
+                    UpdateRecv();
+                }
+
             }
         }
         if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
@@ -631,7 +649,15 @@ namespace ToolBox
             }
             else
             {
-                UpdateSend();
+                if (p_network_->GetSimulateNaglePacketsNum() > 0 || p_network_->GetSimulateNagleTimeout() > 0)
+                {
+                    sim_nagle_.flag_can_sent = true;
+                }
+                else
+                {
+                    UpdateSend();
+                }
+
             }
         }
     }
@@ -784,37 +810,65 @@ namespace ToolBox
             return;
         }
 
-        if (false == send_ring_buffer_.Empty())
+        if (debug_statistic_save_ + debug_statistic_send_ >= 6000)
+        {
+            NetworkLogDebug("[Network] #### debug #### socket_id:%d debug_statistic_save_:%d, debug_statistic_send_:%d, config packet num:%d", GetSocketID(), debug_statistic_save_, debug_statistic_send_, p_network_->GetSimulateNaglePacketsNum());
+            debug_statistic_save_ = 0;
+            debug_statistic_send_ = 0;
+        }
+        if (p_network_->GetSimulateNaglePacketsNum() > 0)
         {
             send_ring_buffer_.Write(data, len);
-            // UpdateSend();
-            if (!CheckSendRingBufferSize())
+            sim_nagle_.num_of_unsent_packets++; // 模拟nagle 计数增加
+            if (sim_nagle_.num_of_unsent_packets < uint32_t(p_network_->GetSimulateNaglePacketsNum()))
+            {
+                debug_statistic_save_++;
+                if (!CheckSendRingBufferSize())
+                {
+                    return;
+                }
+                return;
+            }
+            else
+            {
+                debug_statistic_send_++;
+                UpdateSend();
+                return;
+            }
+
+        }
+        else
+        {
+            if (false == send_ring_buffer_.Empty())
+            {
+                send_ring_buffer_.Write(data, len);
+                if (!CheckSendRingBufferSize())
+                {
+                    return;
+                }
+                return;
+            }
+            int32_t sended = SocketSend(GetSocketID(), data, len);
+            if (-1 == sended)
+            {
+                Close(ENetErrCode::NET_SYS_ERROR, errno);
+                return;
+            }
+            else if ((int32_t)len == sended)
             {
                 return;
             }
-            return;
-        }
-
-        int32_t sended = SocketSend(GetSocketID(), data, len);
-        if (-1 == sended)
-        {
-            Close(ENetErrCode::NET_SYS_ERROR, errno);
-            return;
-        }
-        else if ((int32_t)len == sended)
-        {
-            return;
-        }
-        else if ((int32_t)len > sended)
-        {
-            send_ring_buffer_.Write(data + sended, len - sended);
+            else if ((int32_t)len > sended)
+            {
+                send_ring_buffer_.Write(data + sended, len - sended);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            ReAddSocketToIocp(SOCKET_EVENT_SEND);
+                ReAddSocketToIocp(SOCKET_EVENT_SEND);
 #elif defined(__linux__) || defined(__APPLE__)
 #if defined (LINUX_IO_URING)
-            ReAddSocketToUring(SOCKET_EVENT_SEND);
+                ReAddSocketToUring(SOCKET_EVENT_SEND);
 #endif
 #endif
+            }
         }
     }
 

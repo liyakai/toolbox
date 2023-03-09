@@ -23,6 +23,7 @@ namespace ToolBox
         NET_NO_ERROR = 0,
         NET_SYS_ERROR,            // 系统错误，同时会返回errno
         NET_INVALID_NETWORK_TYPE, // 发送非法的网络类型.合法范围见 NetworkType
+        NET_INVALID_NET_THREAD_INDEX, // 发送非法的网络线程序号.序号超出了实际线程数量
         NET_INVALID_PACKET_SIZE,  // 错误的包长
         NET_CONNECT_FAILED,       // 连接出错
         NET_LISTEN_FAILED,        // 监听出错
@@ -34,7 +35,7 @@ namespace ToolBox
         NET_RECV_BUFF_OVERFLOW,   // 接收缓冲区满
         NET_ENCODE_BUFF_OVERFLOW, // 打包缓冲区满
         NET_DECODE_BUFF_OVERFLOW, // 解包缓冲区满
-        NET_INVALID_SOCKET,       // socket 无效
+        NET_INVALID_EVENT,        // event 无效
 
         NET_SEND_PIPE_OVERFLOW, // 发送ringbuffer满
         NET_RECV_PIPE_OVERFLOW, // 接收ringbuffer满

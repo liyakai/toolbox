@@ -1,9 +1,12 @@
 #pragma once
 #include "network/network.h"
+#include "network/network_def.h"
 #include "socket_pool.h"
 #include "base_ctrl.h"
 #include "tcp_socket.h"
+#include "tools/virtual_print.h"
 #include "udp_socket.h"
+#include <cstdint>
 
 namespace ToolBox
 {
@@ -36,7 +39,7 @@ namespace ToolBox
         * @param NetworkChannel* 主线程
         * @param NetworkType 网络类型
         */
-        virtual bool Init(NetworkChannel* master, NetworkType network_type) override;
+        virtual bool Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index) override;
         /*
         * @brief 逆初始化网络
         */
@@ -44,7 +47,7 @@ namespace ToolBox
         /*
         * @brief 执行一次网络循环
         */
-        virtual void Update() override;
+        virtual void Update(std::time_t time_stamp) override;
         /*
         * @brief 获取控制器
         */
@@ -63,6 +66,10 @@ namespace ToolBox
         */
         virtual uint64_t OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
+        * 主线程通知,将fd加入io多路复用
+        */
+        virtual uint64_t OnJoinIOMultiplexing(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        /*
         * 工作线程内建立连接器
         */
         virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
@@ -77,6 +84,7 @@ namespace ToolBox
     protected:
         SocketPool<SocketType> sock_mgr_;       // socket 池
         IOMultiplexingInterface* base_ctrl_;    // io多路复用接口
+        std::time_t last_update_timestamp = 0;  // 上次update时的时间戳
     };
 
     template<typename SocketType>
@@ -92,14 +100,14 @@ namespace ToolBox
     }
 
     template<typename SocketType>
-    bool ImpNetwork<SocketType>::Init(NetworkChannel* master, NetworkType network_type)
+    bool ImpNetwork<SocketType>::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
     {
-        if (!INetwork::Init(master, network_type))
+        if (!INetwork::Init(master, network_type, net_thread_index))
         {
             NetworkLogError("[Network] Init INetwork failed. network_type:%d", network_type);
             return false;
         }
-        if (!sock_mgr_.Init(MAX_SOCKET_COUNT))
+        if (!sock_mgr_.Init(MAX_SOCKET_COUNT, net_thread_index))
         {
             NetworkLogError("[Network] Init sock_mgr_ failed. network_type:%d", network_type);
             return false;
@@ -134,11 +142,30 @@ namespace ToolBox
     }
 
     template<typename SocketType>
-    void ImpNetwork<SocketType>::Update()
+    void ImpNetwork<SocketType>::Update(std::time_t time_stamp)
     {
-        // NetworkLogInfo("[Network] Update. network_type:%d", GetNetworkType());
-        INetwork::Update();
-        base_ctrl_->RunOnce();
+
+        // NetworkLogInfo("[Network] Update. network_type:%d,time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), time_stamp, last_update_timestamp);
+        INetwork::Update(time_stamp);
+        base_ctrl_->RunOnce(time_stamp);
+
+        int32_t nagle_timeout = GetSimulateNagleTimeout();
+        // NetworkLogDebug("[Network] Update. network_type:%d, nagle_timeout:%d, time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), nagle_timeout, time_stamp, last_update_timestamp);
+        if (nagle_timeout > 0 && time_stamp >= last_update_timestamp + nagle_timeout)
+        {
+            // NetworkLogDebug("[Network] Update. network_type:%d, nagle_timeout:%d, time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), nagle_timeout, time_stamp, last_update_timestamp);
+            last_update_timestamp = time_stamp;
+            sock_mgr_.Foreach([time_stamp](SocketType * socket) -> bool
+            {
+                if (socket)
+                {
+                    socket->Update(time_stamp);
+                }
+                return true;
+            });
+        }
+
+
     }
 
     template<typename SocketType>
@@ -164,6 +191,28 @@ namespace ToolBox
             return INVALID_CONN_ID;
         }
         base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        return new_socket->GetConnID();
+    }
+    template<typename SocketType>
+    uint64_t ImpNetwork<SocketType>::OnJoinIOMultiplexing(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    {
+        auto new_socket = sock_mgr_.Alloc();
+        if (nullptr == new_socket)
+        {
+            OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
+            return INVALID_CONN_ID;
+        }
+        new_socket->SetSocketMgr(&sock_mgr_);
+        new_socket->SetNetwork(this);
+
+        if (false == new_socket->InitAccpetSocket(fd, ip, port, send_buff_size, recv_buff_size))
+        {
+            sock_mgr_.Free(new_socket);
+            return INVALID_CONN_ID;
+        }
+        OnAccepted(new_socket->GetConnID());
+        base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        NetworkLogTrace("[Network] OnJoinIOMultiplexing. fd:%d, connid:%u", fd, new_socket->GetConnID());
         return new_socket->GetConnID();
     }
     template<typename SocketType>

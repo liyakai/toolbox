@@ -60,7 +60,7 @@ namespace ToolBox
         /*
         * 执行一次 epoll wait
         */
-        bool RunOnce() override;
+        bool RunOnce(std::time_t time_stamp) override;
     private:
         /*
         * @brief 接收消息

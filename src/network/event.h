@@ -1,8 +1,10 @@
 #pragma once
+#include <cstdint>
 #include <stdint.h>
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include "network_def.h"
 
 namespace ToolBox
 {
@@ -13,14 +15,17 @@ namespace ToolBox
     {
         EID_NONE = 0,
         EID_MainToWorkerNewAccepter,
+        EID_MainToWorkerJoinIOMultiplexing,
         EID_MainToWorkerNewConnecter,
         EID_MainToWorkerClose,
         EID_MainToWorkerSend,
+        EID_MainToWorkerSetSimulateNagle,
         EID_WorkerToMainBinded,
         EID_WorkerToMainBindFailed,
         EID_WorkerToMainConnected,
         EID_WorkerToMainConnectFailed,
         EID_WorkerToMainErrored,
+        EID_WorkerToMainAcceptting,
         EID_WorkerToMainAccepted,
         EID_WorkerToMainClose,
         EID_WorkerToMainRecv,
@@ -114,6 +119,30 @@ namespace ToolBox
         * 获取数据大小
         */
         uint32_t GetDataSize() const;
+        /*
+        * 设置新连接的文件描述符
+        */
+        void SetFd(int32_t fd);
+        /*
+        * 获取新连接的文件描述符
+        */
+        int32_t GetFd() const;
+        /*
+        * 设置网络类型
+        */
+        void SetNetworkType(NetworkType network_type);
+        /*
+        * 获取网络类型
+        */
+        NetworkType GetNetworkType() const;
+        /*
+        * 设置特性参数
+        */
+        void SetFeatureParam(int32_t param1, int32_t param2);
+        /*
+        * 返回特性参数
+        */
+        std::tuple<int32_t, int32_t> GetFeatureParam();
 
 
     private:
@@ -127,14 +156,21 @@ namespace ToolBox
             } stream_;
             struct Address
             {
-                std::string* ip_;
+                char ip_[16];
                 uint16_t port_;
                 int32_t send_buff_size;
                 int32_t recv_buff_size;
+                int32_t fd_;
             } address_;
+            struct NetFeature
+            {
+                int32_t param1_ = 0;
+                int32_t param2_ = 0;
+            } net_feature_;
             NetReq() {}
             ~NetReq() {};
         } net_req_;
+        NetworkType network_type_ = NT_UNKNOWN;
     };
 
     /*
@@ -151,6 +187,23 @@ namespace ToolBox
         * 析构
         */
         virtual ~NetEventMain();
+        /*
+        * 设置 Bind IP
+        */
+        void SetBindIP(const std::string& ip);
+        /*
+        * 获取 Bind IP
+        */
+        std::string GetBindIP() const;
+        /*
+        * 设置 Acceptting IP
+        */
+        void SetAccepttingIP(const std::string& ip);
+        /*
+        * 获取 Acceptting IP
+        */
+        std::string GetAccepttingIP() const;
+
     public:
         union NetEvt
         {
@@ -166,7 +219,17 @@ namespace ToolBox
             struct Bind
             {
                 uint64_t connect_id_;
+                char ip_[16];
+                uint16_t port_;
             } bind_;
+            struct Acceptting
+            {
+                int32_t fd_;
+                char ip_[16];
+                uint16_t port_;
+                int32_t send_buff_size_;
+                int32_t recv_buff_size_;
+            } acceptting_;
             struct Accept
             {
                 uint64_t connect_id_;
@@ -190,7 +253,7 @@ namespace ToolBox
                 int32_t sys_err_;
             } close_;
         } net_evt_;
-
+        NetworkType network_type_ = NT_UNKNOWN;
     };
 
     using EventHandle = std::function<void(Event* event)>;
@@ -225,8 +288,8 @@ namespace ToolBox
         */
         void UnregisterEventHandler(EventID event_id);
     private:
-        using EventFuncMap = std::unordered_map<std::uint32_t, EventHandle>;
-        EventFuncMap event_func_map_; // 事件处理函数表
+        using EventFuncArray = std::array<EventHandle, EID_MAX>;
+        EventFuncArray event_func_array_; // 事件处理函数表
     };
 
 };  // ToolBox

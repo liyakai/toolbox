@@ -25,11 +25,11 @@ namespace ToolBox
         /*
         * 初始化
         */
-        virtual bool Init(NetworkChannel* master, NetworkType network_type) override;
+        virtual bool Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index) override;
         /*
         * 执行一次网络循环
         */
-        virtual void Update() override;
+        virtual void Update(std::time_t time_stamp) override;
     public:
         /*
         * @brief UdpAddress 是否存在
