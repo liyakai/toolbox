@@ -1,11 +1,9 @@
 #pragma once
 
 #ifdef __linux__
-
+#include "../base_ctrl.h"
 #include "tools/singleton.h"
 #include <sys/epoll.h>
-#include "network/net_imp/net_imp_define.h"
-#include "network/net_imp/base_ctrl.h"
 
 namespace ToolBox
 {

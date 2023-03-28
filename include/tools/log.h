@@ -1,5 +1,5 @@
 #pragma once
-
+#include <stdarg.h>
 // 实现日志模块
 namespace ToolBox
 {

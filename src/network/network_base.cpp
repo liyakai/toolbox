@@ -1,19 +1,20 @@
-#include "network.h"
-#include "event.h"
-#include "network_def.h"
+#include "network_base.h"
+#include "network_def_internal.h"
 #include <functional>
+#include "event.h"
 
 namespace ToolBox
 {
 
     INetwork::INetwork()
     {
-        RegistereventHandler(EID_MainToWorkerNewAccepter, std::bind(&INetwork::OnMainToWorkerNewAccepter_, this, std::placeholders::_1));
-        RegistereventHandler(EID_MainToWorkerJoinIOMultiplexing, std::bind(&INetwork::OnMainToWorkerJoinIOMultiplexing_, this, std::placeholders::_1));
-        RegistereventHandler(EID_MainToWorkerNewConnecter, std::bind(&INetwork::OnMainToWorkerNewConnecter_, this, std::placeholders::_1));
-        RegistereventHandler(EID_MainToWorkerSend, std::bind(&INetwork::OnMainToWorkerSend_, this, std::placeholders::_1));
-        RegistereventHandler(EID_MainToWorkerClose, std::bind(&INetwork::OnMainToWorkerClose_, this, std::placeholders::_1));
-        RegistereventHandler(EID_MainToWorkerSetSimulateNagle, std::bind(&INetwork::SetSimulateNagle_, this, std::placeholders::_1));
+        event_dispatcher_ = new EventDispatcher();
+        event_dispatcher_->RegistereventHandler(EID_MainToWorkerNewAccepter, std::bind(&INetwork::OnMainToWorkerNewAccepter_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_MainToWorkerJoinIOMultiplexing, std::bind(&INetwork::OnMainToWorkerJoinIOMultiplexing_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_MainToWorkerNewConnecter, std::bind(&INetwork::OnMainToWorkerNewConnecter_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_MainToWorkerSend, std::bind(&INetwork::OnMainToWorkerSend_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_MainToWorkerClose, std::bind(&INetwork::OnMainToWorkerClose_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_MainToWorkerSetSimulateNagle, std::bind(&INetwork::SetSimulateNagle_, this, std::placeholders::_1));
 
     }
 
@@ -29,6 +30,8 @@ namespace ToolBox
 
         }
         event2worker_.Clear();
+        delete event_dispatcher_;
+        event_dispatcher_ = nullptr;
     }
 
     bool INetwork::Init(NetworkChannel* master, NetworkType network_type, uint32_t net_thread_index)
@@ -217,7 +220,7 @@ namespace ToolBox
             NetEventWorker* event = event2worker_.Pop();
             if (nullptr != event)
             {
-                HandleEvent(event);
+                event_dispatcher_->HandleEvent(event);
                 GIVE_BACK_OBJECT(event);
             }
             else
