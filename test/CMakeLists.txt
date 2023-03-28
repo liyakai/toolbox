@@ -8,7 +8,6 @@ INCLUDE_DIRECTORIES(
     .
     ..
     ../include/
-    ../src/
     ../src/thirdparty/
 )
 # 源文件

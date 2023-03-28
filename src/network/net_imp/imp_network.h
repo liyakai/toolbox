@@ -1,6 +1,6 @@
 #pragma once
-#include "network/network.h"
-#include "network/network_def.h"
+#include "network/network_base.h"
+#include "network/network_def_internal.h"
 #include "socket_pool.h"
 #include "base_ctrl.h"
 #include "tcp_socket.h"

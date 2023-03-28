@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
-#include "network_def.h"
+#include "network_def_internal.h"
 
 namespace ToolBox
 {
@@ -258,19 +258,19 @@ namespace ToolBox
 
     using EventHandle = std::function<void(Event* event)>;
     /*
-    * 可以处理事件的对象
+    * 事件分发器
     */
-    class EventBasedObject
+    class EventDispatcher
     {
     public:
         /*
         * 构造
         */
-        EventBasedObject();
+        EventDispatcher();
         /*
         * 析构
         */
-        virtual ~EventBasedObject();
+        virtual ~EventDispatcher();
         /*
         * 处理事件
         * @param event 事件指针

@@ -1,8 +1,9 @@
-#include "network/network_channel.h"
+#include "network/network_api.h"
 #include "unit_test_frame/unittest.h"
 #include "tools/log.h"
 #include <stdint.h>
 #include "tools/time_util.h"
+#include "tools/memory_pool_lock_free.h"
 #ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
 #endif // USE_GPERF_TOOLS

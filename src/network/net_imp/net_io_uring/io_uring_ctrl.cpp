@@ -1,7 +1,7 @@
 #include "io_uring_ctrl.h"
 #ifdef LINUX_IO_URING
 
-#include "network_def.h"
+#include "network_def_internal.h"
 #include <unistd.h>
 
 

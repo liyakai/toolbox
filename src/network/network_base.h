@@ -1,17 +1,19 @@
 #pragma once
 
-#include "event.h"
 #include "tools/ringbuffer.h"
 #include "tools/memory_pool_lock_free.h"
 #include "network_channel.h"
-#include "network_def.h"
+#include "network_def_internal.h"
 #include <cstdint>
+#include <functional>
 
 namespace ToolBox
 {
 
     class NetworkChannel;
-
+    class EventDispatcher;
+    class NetEventWorker;
+    class Event;
     /// 事件队列
     using Event2Worker = RingBufferSPSC<NetEventWorker*, NETWORK_EVENT_QUEUE_MAX_COUNT>;
     /// 事件处理函数
@@ -19,7 +21,7 @@ namespace ToolBox
     /*
     * Worker 网络基类
     */
-    class INetwork : public EventBasedObject
+    class INetwork
     {
     public:
         /*
@@ -171,6 +173,7 @@ namespace ToolBox
     private:
         NetworkType network_type_;          // 网络类型: TCP,UDP,KCP
         Event2Worker event2worker_;         // 主线程到工作线程的事件队列
+        EventDispatcher* event_dispatcher_;  // 事件分发器
         NetworkChannel* master_;            // 主线程中的网络管理器
         uint32_t net_thread_index_ = 0;     // 网络线程序号
         std::time_t update_timestamp_ = 0;  // 由Update更新的时间

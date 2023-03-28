@@ -1,5 +1,5 @@
 #include "event.h"
-#include "network_def.h"
+#include "network_def_internal.h"
 #include <string.h>
 #include <cstddef>
 #include <string.h>
@@ -176,16 +176,16 @@ namespace ToolBox
         return net_evt_.acceptting_.ip_;
     }
 
-    EventBasedObject::EventBasedObject()
+    EventDispatcher::EventDispatcher()
     {
     }
 
-    EventBasedObject:: ~EventBasedObject()
+    EventDispatcher:: ~EventDispatcher()
     {
 
     }
 
-    void EventBasedObject::HandleEvent(Event* event)
+    void EventDispatcher::HandleEvent(Event* event)
     {
         EventHandle& func = event_func_array_[event->GetID()];
         if (nullptr != func)
@@ -193,12 +193,12 @@ namespace ToolBox
             func(event);
         }
     }
-    void EventBasedObject::RegistereventHandler(EventID event_id, EventHandle func)
+    void EventDispatcher::RegistereventHandler(EventID event_id, EventHandle func)
     {
         event_func_array_[event_id] = func;
 
     }
-    void EventBasedObject::UnregisterEventHandler(EventID event_id)
+    void EventDispatcher::UnregisterEventHandler(EventID event_id)
     {
     }
 

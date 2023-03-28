@@ -30,12 +30,11 @@ INCLUDE_DIRECTORIES(
     ../include/
     ./tools
     ./network
-    ./net_work/network
-	./net_work/network/net_imp
-    ./net_work/network/net_imp/net_epoll
-	./net_work/network/net_imp/net_iocp
-    ./net_work/network/net_imp/net_kqueue
-    ./net_work/network/net_imp/net_io_uring
+	./net_work/net_imp
+    ./net_work/net_imp/net_epoll
+	./net_work/net_imp/net_iocp
+    ./net_work/net_imp/net_kqueue
+    ./net_work/net_imp/net_io_uring
     ./thirdparty
 )
 

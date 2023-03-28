@@ -1,6 +1,7 @@
 #include "network_channel.h"
-#include "network_def.h"
+#include "network_def_internal.h"
 #include "tools/time_util.h"
+#include "event.h"
 #include <cstddef>
 #include <cstdint>
 #include <random>
@@ -24,20 +25,22 @@ namespace ToolBox
     NetworkChannel::NetworkChannel()
     {
         stop_.store(false);
-
-        RegistereventHandler(EID_WorkerToMainBinded, std::bind(&NetworkChannel::OnWorkerToMainBinded_, this, std::placeholders::_1));
-        RegistereventHandler(EID_WorkerToMainAcceptting, std::bind(&NetworkChannel::OnWorkerToMainAcceptting_, this, std::placeholders::_1));
-        RegistereventHandler(EID_WorkerToMainAccepted, std::bind(&NetworkChannel::OnWorkerToMainAccepted_, this, std::placeholders::_1));
-        RegistereventHandler(EID_WorkerToMainClose, std::bind(&NetworkChannel::OnWorkerToMainClose_, this, std::placeholders::_1));
-        RegistereventHandler(EID_WorkerToMainConnected, std::bind(&NetworkChannel::OnWorkerToMainConnected_, this, std::placeholders::_1));
-        RegistereventHandler(EID_WorkerToMainConnectFailed, std::bind(&NetworkChannel::OnWorkerToMainConnectFailed_, this, std::placeholders::_1));
-        RegistereventHandler(EID_WorkerToMainErrored, std::bind(&NetworkChannel::OnWorkerToMainErrored_, this, std::placeholders::_1));
-        RegistereventHandler(EID_WorkerToMainRecv, std::bind(&NetworkChannel::OnWorkerToMainRecv_, this, std::placeholders::_1));
+        event_dispatcher_ =  new EventDispatcher();
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainBinded, std::bind(&NetworkChannel::OnWorkerToMainBinded_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainAcceptting, std::bind(&NetworkChannel::OnWorkerToMainAcceptting_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainAccepted, std::bind(&NetworkChannel::OnWorkerToMainAccepted_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainClose, std::bind(&NetworkChannel::OnWorkerToMainClose_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainConnected, std::bind(&NetworkChannel::OnWorkerToMainConnected_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainConnectFailed, std::bind(&NetworkChannel::OnWorkerToMainConnectFailed_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainErrored, std::bind(&NetworkChannel::OnWorkerToMainErrored_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainRecv, std::bind(&NetworkChannel::OnWorkerToMainRecv_, this, std::placeholders::_1));
     }
 
     NetworkChannel::~NetworkChannel()
     {
         event2main_.Clear();
+        delete event_dispatcher_;
+        event_dispatcher_ = nullptr;
     }
 
     bool NetworkChannel::Start(std::size_t net_thread_num/* = 1*/)
@@ -314,7 +317,7 @@ namespace ToolBox
                 OnErrored(NT_UNKNOWN, 0, ENetErrCode::NET_INVALID_EVENT, 0);
                 continue;
             }
-            HandleEvent(event);
+            event_dispatcher_ ->HandleEvent(event);
             GIVE_BACK_OBJECT(event);
         }
     }

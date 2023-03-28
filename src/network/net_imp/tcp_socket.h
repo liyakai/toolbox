@@ -7,7 +7,7 @@
 #include "tools/ringbuffer.h"
 #include "socket_pool.h"
 #include "network/net_imp/net_imp_define.h"
-#include "network/network_def.h"
+#include "network/network_def_internal.h"
 
 namespace ToolBox
 {

@@ -1,6 +1,6 @@
 #include "tcp_socket.h"
 #include "network/net_imp/net_imp_define.h"
-#include "network/network_def.h"
+#include "network/network_def_internal.h"
 #include "tools/time_util.h"
 #include <cstdint>
 #include <system_error>
