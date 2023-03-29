@@ -1,5 +1,4 @@
 #pragma once
-#include "tools/log.h"
 
 namespace ToolBox
 {
@@ -40,11 +39,11 @@ namespace ToolBox
     // 主线程与网络线程之间的队列的最大数量
     constexpr std::size_t NETWORK_EVENT_QUEUE_MAX_COUNT = 32 * 1024;
 
-    // 定义 网络库日志接口
-#define NetworkLogTrace(LogFormat, ...)     LogTrace(LogFormat, ## __VA_ARGS__)
-#define NetworkLogDebug(LogFormat, ...)     LogDebug(LogFormat, ## __VA_ARGS__)
-#define NetworkLogInfo(LogFormat, ...)      LogInfo(LogFormat, ## __VA_ARGS__)
-#define NetworkLogWarn(LogFormat, ...)      LogWarn(LogFormat, ## __VA_ARGS__)
-#define NetworkLogError(LogFormat, ...)     LogError(LogFormat, ## __VA_ARGS__)
-#define NetworkLogFatal(LogFormat, ...)     LogFatal(LogFormat, ## __VA_ARGS__)
+    // 定义 网络库日志接口,如果需要输出网络库日志,定义如下接口即可
+#define NetworkLogTrace(LogFormat, ...)     // LogTrace(LogFormat, ## __VA_ARGS__)
+#define NetworkLogDebug(LogFormat, ...)     // LogDebug(LogFormat, ## __VA_ARGS__)
+#define NetworkLogInfo(LogFormat, ...)      // LogInfo(LogFormat, ## __VA_ARGS__)
+#define NetworkLogWarn(LogFormat, ...)      // LogWarn(LogFormat, ## __VA_ARGS__)
+#define NetworkLogError(LogFormat, ...)     // LogError(LogFormat, ## __VA_ARGS__)
+#define NetworkLogFatal(LogFormat, ...)     // LogFatal(LogFormat, ## __VA_ARGS__)
 };  // ToolBox

@@ -4,7 +4,7 @@
 #include "tools/memory_pool.h"
 #include "tools/memory_pool_lock_free.h"
 #include "tools/log.h"
-
+#include "network/network_def.h"
 namespace ToolBox
 {
 
@@ -44,13 +44,25 @@ namespace ToolBox
     //     // 主线程与网络线程之间的队列的最大数量
     //     constexpr std::size_t NETWORK_EVENT_QUEUE_MAX_COUNT = 32 * 1024;
 
-    //     // 定义 网络库日志接口
-    // #define NetworkLogTrace(LogFormat, ...)     LogTrace(LogFormat, ## __VA_ARGS__)
-    // #define NetworkLogDebug(LogFormat, ...)     LogDebug(LogFormat, ## __VA_ARGS__)
-    // #define NetworkLogInfo(LogFormat, ...)      LogInfo(LogFormat, ## __VA_ARGS__)
-    // #define NetworkLogWarn(LogFormat, ...)      LogWarn(LogFormat, ## __VA_ARGS__)
-    // #define NetworkLogError(LogFormat, ...)     LogError(LogFormat, ## __VA_ARGS__)
-    // #define NetworkLogFatal(LogFormat, ...)     LogFatal(LogFormat, ## __VA_ARGS__)
+    // 定义 网络库日志接口
+#ifndef NetworkLogTrace
+#define NetworkLogTrace(LogFormat, ...)     LogTrace(LogFormat, ## __VA_ARGS__)
+#endif  // NetworkLogTrace
+#ifndef NetworkLogDebug
+#define NetworkLogDebug(LogFormat, ...)     LogDebug(LogFormat, ## __VA_ARGS__)
+#endif  // NetworkLogDebug
+#ifndef NetworkLogInfo
+#define NetworkLogInfo(LogFormat, ...)      LogInfo(LogFormat, ## __VA_ARGS__)
+#endif  // NetworkLogInfo
+#ifndef NetworkLogWarn
+#define NetworkLogWarn(LogFormat, ...)      LogWarn(LogFormat, ## __VA_ARGS__)
+#endif  // NetworkLogWarn
+#ifndef NetworkLogError
+#define NetworkLogError(LogFormat, ...)     LogError(LogFormat, ## __VA_ARGS__)
+#endif  // NetworkLogError
+#ifndef NetworkLogFatal
+#define NetworkLogFatal(LogFormat, ...)     LogFatal(LogFormat, ## __VA_ARGS__)
+#endif  // NetworkLogFatal
 
     /************************************************************
     **********     网络库获取对象的三种方法       ****************
@@ -124,4 +136,3 @@ namespace ToolBox
 
 };  // ToolBox
 
-#include "network/network_def.h"
