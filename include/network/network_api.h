@@ -10,7 +10,6 @@
 #include <mutex>
 #include "network_def.h"
 #include "tools/ringbuffer.h"
-#include "network/network_api.h"
 
 namespace ToolBox
 {
