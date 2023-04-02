@@ -162,18 +162,18 @@ namespace ToolBox
     {
         return net_evt_.bind_.ip_;
     }
-    void NetEventMain::SetAccepttingIP(const std::string& ip)
+    void NetEventMain::SetAcceptingIP(const std::string& ip)
     {
-        memset(net_evt_.acceptting_.ip_, 0, sizeof(net_evt_.acceptting_.ip_));
-        for (std::size_t idx = 0; idx < sizeof(net_evt_.acceptting_.ip_) && idx < ip.size(); idx++)
+        memset(net_evt_.accepting_.ip_, 0, sizeof(net_evt_.accepting_.ip_));
+        for (std::size_t idx = 0; idx < sizeof(net_evt_.accepting_.ip_) && idx < ip.size(); idx++)
         {
-            net_evt_.acceptting_.ip_[idx] = ip[idx];
+            net_evt_.accepting_.ip_[idx] = ip[idx];
         }
     }
 
-    std::string NetEventMain::GetAccepttingIP() const
+    std::string NetEventMain::GetAcceptingIP() const
     {
-        return net_evt_.acceptting_.ip_;
+        return net_evt_.accepting_.ip_;
     }
 
     EventDispatcher::EventDispatcher()

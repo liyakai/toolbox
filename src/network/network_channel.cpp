@@ -27,7 +27,7 @@ namespace ToolBox
         stop_.store(false);
         event_dispatcher_ =  new EventDispatcher();
         event_dispatcher_->RegistereventHandler(EID_WorkerToMainBinded, std::bind(&NetworkChannel::OnWorkerToMainBinded_, this, std::placeholders::_1));
-        event_dispatcher_->RegistereventHandler(EID_WorkerToMainAcceptting, std::bind(&NetworkChannel::OnWorkerToMainAcceptting_, this, std::placeholders::_1));
+        event_dispatcher_->RegistereventHandler(EID_WorkerToMainAccepting, std::bind(&NetworkChannel::OnWorkerToMainAccepting_, this, std::placeholders::_1));
         event_dispatcher_->RegistereventHandler(EID_WorkerToMainAccepted, std::bind(&NetworkChannel::OnWorkerToMainAccepted_, this, std::placeholders::_1));
         event_dispatcher_->RegistereventHandler(EID_WorkerToMainClose, std::bind(&NetworkChannel::OnWorkerToMainClose_, this, std::placeholders::_1));
         event_dispatcher_->RegistereventHandler(EID_WorkerToMainConnected, std::bind(&NetworkChannel::OnWorkerToMainConnected_, this, std::placeholders::_1));
@@ -155,7 +155,72 @@ namespace ToolBox
         }
     }
 
-    void NetworkChannel::Accept(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
+    /*
+    * @brief 设置绑定成功的回调
+    */
+    NetworkChannel& NetworkChannel::SetOnBinded(BindedMethod binded_method)
+    {
+        binded_ = binded_method;
+        return *this;
+    }
+    /*
+    * @brief 设置有新的连接事件的回调[尚未加入监听]
+    */
+    NetworkChannel& NetworkChannel::SetOnAccepting(AcceptingMethod accepting_method)
+    {
+        accepting_ = accepting_method;
+        return *this;
+    }
+    /*
+    * @brief 设置有新的连接事件的回调[已经加入监听]
+    */
+    NetworkChannel& NetworkChannel::SetOnAccepted(AcceptedMethod accepted_method)
+    {
+        accepted_ = accepted_method;
+        return *this;
+    }
+    /*
+    * @brief 设置主动连接成功的回调
+    */
+    NetworkChannel& NetworkChannel::SetOnConnected(ConnectedMethod connected_method)
+    {
+        connected_ = connected_method;
+        return *this;
+    }
+    /*
+    * @brief 设置主动连接失败的回调
+    */
+    NetworkChannel& NetworkChannel::SetOnConnectFailed(ConnectFailedMethod connect_failed_method)
+    {
+        connect_failed_ = connect_failed_method;
+        return *this;
+    }
+    /*
+    * @brief 设置发生错误的回调
+    */
+    NetworkChannel& NetworkChannel::SetOnErrored(ErroredMethod errored_method)
+    {
+        errored_ = errored_method;
+        return *this;
+    }
+    /*
+    * @brief 设置关闭连接的回调
+    */
+    NetworkChannel& NetworkChannel::SetOnClose(CloseMethod close_method)
+    {
+        close_ = close_method;
+        return *this;
+    }
+    /*
+    * @brief 设置接收的回调
+    */
+    NetworkChannel& NetworkChannel::SetOnReceived(ReceivedMethod received_method)
+    {
+        received_ = received_method;
+        return *this;
+    }
+
+    void NetworkChannel::Accept(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewAccepter);
         event->SetIP(ip);
@@ -163,7 +228,7 @@ namespace ToolBox
         event->SetBuffSize(send_buff_size, recv_buff_size);
         NotifyWorker(event, type, 0);   // 多网络线程下,第0个线程专门作为 acceptor
     }
-    void NetworkChannel::Connect(const std::string& ip, uint16_t port, NetworkType type, int32_t send_buff_size, int32_t recv_buff_size)
+    void NetworkChannel::Connect(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewConnecter);
         event->SetIP(ip);
@@ -211,24 +276,35 @@ namespace ToolBox
                  , event_main->net_evt_.bind_.connect_id_
                  , event_main->GetBindIP()
                  , event_main->net_evt_.bind_.port_);
+        if (binded_)
+        {
+            binded_(event_main->network_type_
+                    , event_main->net_evt_.bind_.connect_id_
+                    , event_main->GetBindIP()
+                    , event_main->net_evt_.bind_.port_);
+        }
     }
 
-    void NetworkChannel::OnWorkerToMainAcceptting_(Event* event)
+    void NetworkChannel::OnWorkerToMainAccepting_(Event* event)
     {
         auto event_main = dynamic_cast<NetEventMain*>(event);
         if (nullptr == event_main)
         {
             return;
         }
-        int32_t fd = event_main->net_evt_.acceptting_.fd_;
+        int32_t fd = event_main->net_evt_.accepting_.fd_;
         NetworkType network_type = event_main->network_type_;
-        OnAcceptting(network_type, fd);
-        NetworkLogTrace("[Network] OnWorkerToMainAcceptting_. network_type:%u, fd:%d", network_type, fd);
+        OnAccepting(network_type, fd);
+        if (accepting_)
+        {
+            accepting_(network_type, fd);
+        }
+        NetworkLogTrace("[Network] OnWorkerToMainAccepting_. network_type:%u, fd:%d", network_type, fd);
         JoinIOMultiplexing(network_type, fd
-                           , event_main->GetAccepttingIP()
-                           , event_main->net_evt_.acceptting_.port_
-                           , event_main->net_evt_.acceptting_.send_buff_size_
-                           , event_main->net_evt_.acceptting_.recv_buff_size_);
+                           , event_main->GetAcceptingIP()
+                           , event_main->net_evt_.accepting_.port_
+                           , event_main->net_evt_.accepting_.send_buff_size_
+                           , event_main->net_evt_.accepting_.recv_buff_size_);
     }
 
     void NetworkChannel::OnWorkerToMainAccepted_(Event* event)
@@ -241,6 +317,11 @@ namespace ToolBox
         NetworkLogTrace("[Network] OnWorkerToMainAccepted_. network_type:%u, connid:%lu", event_main->network_type_, event_main->net_evt_.accept_.connect_id_);
         OnAccepted(event_main->network_type_
                    , event_main->net_evt_.accept_.connect_id_);
+        if (accepted_)
+        {
+            accepted_(event_main->network_type_
+                      , event_main->net_evt_.accept_.connect_id_);
+        }
     }
 
     void NetworkChannel::OnWorkerToMainClose_(Event* event)
@@ -254,6 +335,13 @@ namespace ToolBox
                 event_main->net_evt_.error_.connect_id_,
                 event_main->net_evt_.error_.net_err_code,
                 event_main->net_evt_.error_.sys_err_code);
+        if (close_)
+        {
+            close_(event_main->network_type_,
+                   event_main->net_evt_.error_.connect_id_,
+                   event_main->net_evt_.error_.net_err_code,
+                   event_main->net_evt_.error_.sys_err_code);
+        }
     }
 
     void NetworkChannel::OnWorkerToMainConnected_(Event* event)
@@ -265,6 +353,11 @@ namespace ToolBox
         }
         OnConnected(event_main->network_type_
                     , event_main->net_evt_.connect_sucessed_.connect_id_);
+        if (connected_)
+        {
+            connected_(event_main->network_type_
+                       , event_main->net_evt_.connect_sucessed_.connect_id_);
+        }
     }
 
     void NetworkChannel::OnWorkerToMainConnectFailed_(Event* event)
@@ -277,6 +370,13 @@ namespace ToolBox
         OnConnectedFailed(event_main->network_type_,
                           event_main->net_evt_.connect_failed_.net_err_code,
                           event_main->net_evt_.connect_failed_.sys_err_code);
+        if (connect_failed_)
+        {
+            connect_failed_(event_main->network_type_,
+                            event_main->net_evt_.connect_failed_.net_err_code,
+                            event_main->net_evt_.connect_failed_.sys_err_code);
+        }
+
     }
 
     void NetworkChannel::OnWorkerToMainErrored_(Event* event)
@@ -290,6 +390,13 @@ namespace ToolBox
                   event_main->net_evt_.error_.connect_id_,
                   event_main->net_evt_.error_.net_err_code,
                   event_main->net_evt_.error_.sys_err_code);
+        if (errored_)
+        {
+            errored_(event_main->network_type_,
+                     event_main->net_evt_.error_.connect_id_,
+                     event_main->net_evt_.error_.net_err_code,
+                     event_main->net_evt_.error_.sys_err_code);
+        }
     }
 
     void NetworkChannel::OnWorkerToMainRecv_(Event* event)
@@ -303,6 +410,13 @@ namespace ToolBox
                    event_main->net_evt_.recv_.connect_id_,
                    event_main->net_evt_.recv_.data_,
                    event_main->net_evt_.recv_.size_);
+        if (received_)
+        {
+            received_(event_main->network_type_,
+                      event_main->net_evt_.recv_.connect_id_,
+                      event_main->net_evt_.recv_.data_,
+                      event_main->net_evt_.recv_.size_);
+        }
     }
 
 
@@ -407,5 +521,112 @@ namespace ToolBox
 
 #endif // __linux__
     }
+
+
+    /////////////////////////////// network/network_api.h 实现部分 ///////////////////////////////
+    Network::Network()
+    {
+        if (nullptr == network_channel_)
+        {
+            network_channel_ = new NetworkChannel();
+        }
+    }
+
+    Network::~Network()
+    {
+        if (nullptr != network_channel_)
+        {
+            delete network_channel_;
+            network_channel_ = nullptr;
+        }
+    }
+
+    bool Network::Start(std::size_t net_thread_num /* = 1 */)
+    {
+        return network_channel_->Start(net_thread_num);
+    }
+
+    void Network::Update()
+    {
+        network_channel_->Update();
+    }
+
+    void Network::StopWait()
+    {
+        network_channel_->StopWait();
+    }
+
+    void Network::Close(NetworkType type, uint64_t conn_id)
+    {
+        network_channel_->Close(type, conn_id);
+    }
+
+    void Network::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size)
+    {
+        network_channel_->Send(type, conn_id, data, size);
+    }
+
+    void Network::Accept(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size /*= 0*/, int32_t recv_buff_size /*= 0*/)
+    {
+        network_channel_->Accept(type, ip, port, send_buff_size, recv_buff_size);
+    }
+
+    void Network::Connect(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size /*= 0*/, int32_t recv_buff_size /*= 0*/)
+    {
+        network_channel_->Connect(type, ip, port, send_buff_size, recv_buff_size);
+    }
+
+    void Network::SetSimulateNagle(uint32_t packets_num /*= 10*/, uint32_t timeout /*= 2*/)
+    {
+        network_channel_->SetSimulateNagle(packets_num, timeout);
+    }
+
+    Network& Network::SetOnBinded(BindedMethod binded_method)
+    {
+        network_channel_->SetOnBinded(binded_method);
+        return *this;
+    }
+
+    Network& Network::SetOnAccepting(AcceptingMethod accepting_method)
+    {
+        network_channel_->SetOnAccepting(accepting_method);
+        return *this;
+    }
+
+    Network& Network::SetOnAccepted(AcceptedMethod accepted_method)
+    {
+        network_channel_->SetOnAccepted(accepted_method);
+        return *this;
+    }
+
+    Network& Network::SetOnConnected(ConnectedMethod connected_method)
+    {
+        network_channel_->SetOnConnected(connected_method);
+        return *this;
+    }
+
+    Network& Network::SetOnConnectFailed(ConnectFailedMethod connect_failed_method)
+    {
+        network_channel_->SetOnConnectFailed(connect_failed_method);
+        return *this;
+    };
+
+    Network& Network::SetOnErrored(ErroredMethod errored_method)
+    {
+        network_channel_->SetOnErrored(errored_method);
+        return *this;
+    };
+
+    Network& Network::SetOnClose(CloseMethod close_method)
+    {
+        network_channel_->SetOnClose(close_method);
+        return *this;
+    };
+
+    Network& Network::SetOnReceived(ReceivedMethod receive_method)
+    {
+        network_channel_->SetOnReceived(receive_method);
+        return *this;
+    };
 
 };  // ToolBox

@@ -25,7 +25,7 @@ namespace ToolBox
         EID_WorkerToMainConnected,
         EID_WorkerToMainConnectFailed,
         EID_WorkerToMainErrored,
-        EID_WorkerToMainAcceptting,
+        EID_WorkerToMainAccepting,
         EID_WorkerToMainAccepted,
         EID_WorkerToMainClose,
         EID_WorkerToMainRecv,
@@ -196,13 +196,13 @@ namespace ToolBox
         */
         std::string GetBindIP() const;
         /*
-        * 设置 Acceptting IP
+        * 设置 Accepting IP
         */
-        void SetAccepttingIP(const std::string& ip);
+        void SetAcceptingIP(const std::string& ip);
         /*
-        * 获取 Acceptting IP
+        * 获取 Accepting IP
         */
-        std::string GetAccepttingIP() const;
+        std::string GetAcceptingIP() const;
 
     public:
         union NetEvt
@@ -222,14 +222,14 @@ namespace ToolBox
                 char ip_[16];
                 uint16_t port_;
             } bind_;
-            struct Acceptting
+            struct Accepting
             {
                 int32_t fd_;
                 char ip_[16];
                 uint16_t port_;
                 int32_t send_buff_size_;
                 int32_t recv_buff_size_;
-            } acceptting_;
+            } accepting_;
             struct Accept
             {
                 uint64_t connect_id_;

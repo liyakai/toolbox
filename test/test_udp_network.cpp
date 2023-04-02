@@ -1,4 +1,4 @@
-#include "network/network_api.h"
+#include "src/network/network_channel.h"
 #include "unit_test_frame/unittest.h"
 #ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
@@ -11,7 +11,7 @@ public:
     {
         Print("[TestNetworkEcho] 服务器已建立监听端口,网络类型:%d, 连接ID:%llu, ip:%s, port:%d\n", type, conn_id, ip.c_str(), port);
     };
-    void OnAcceptting(ToolBox::NetworkType type, int32_t fd) override
+    void OnAccepting(ToolBox::NetworkType type, int32_t fd) override
     {
         Print("[TestNetworkEcho] 正准备将新连接加入io多路复用,网络类型:%d fd:%d\n", type, fd);
     };
@@ -51,7 +51,7 @@ public:
     {
         Print("[TestUdpNetworkForward] 服务器已建立监听端口,网络类型:%d, 连接ID:%llu, ip:%s, port:%d\n", type, conn_id, ip.c_str(), port);
     };
-    void OnAcceptting(ToolBox::NetworkType type, int32_t fd) override
+    void OnAccepting(ToolBox::NetworkType type, int32_t fd) override
     {
         Print("[TestUdpNetworkForward] 正准备将新连接加入io多路复用,网络类型:%d fd:%d\n", type, fd);
     };
@@ -140,7 +140,7 @@ CASE(test_udp_echo)
     ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->SetDebugPrint(true);
     LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Start(4);
-    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Accept("0.0.0.0", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Accept(ToolBox::NT_UDP, "0.0.0.0", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;
     std::thread t([&]()
     {
@@ -190,8 +190,8 @@ CASE(test_udp_forward)
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_forward \n");
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Accept("0.0.0.0", 9500, ToolBox::NT_UDP);
-    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Connect("0.0.0.0", 9600, ToolBox::NT_UDP, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Accept(ToolBox::NT_UDP, "0.0.0.0", 9500);
+    ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Connect(ToolBox::NT_UDP, "0.0.0.0", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&]()
