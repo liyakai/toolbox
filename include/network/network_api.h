@@ -1,6 +1,9 @@
 
 #pragma once
+
+#include <stdint.h>
 #include <functional>
+#include <string>
 #include "network/network_def.h"
 
 namespace ToolBox
