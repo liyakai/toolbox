@@ -23,7 +23,7 @@ public:
     };
     void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
     void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
@@ -56,7 +56,7 @@ public:
     };
     void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
-        Print("发生错误, connect_id：%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
+        Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
     void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
     {
@@ -125,7 +125,7 @@ CASE(test_kcp_echo)
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_kcp_echo \n");
     ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept("127.0.0.1", 9600, ToolBox::NT_KCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept(ToolBox::NT_KCP, "127.0.0.1", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->Start();
     bool run = true;
     std::thread t([&]()
@@ -176,8 +176,8 @@ CASE(test_kcp_forward)
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_forward \n");
     ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept("127.0.0.1", 9500, ToolBox::NT_KCP);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect("127.0.0.1", 9600, ToolBox::NT_KCP, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept(ToolBox::NT_KCP, "127.0.0.1", 9500);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect( ToolBox::NT_KCP, "127.0.0.1", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&]()

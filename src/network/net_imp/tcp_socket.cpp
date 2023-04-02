@@ -126,7 +126,7 @@ namespace ToolBox
                 break;
             }
             // 通知主线程有新的客户端连接进来
-            p_network_->OnAcceptting(client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
+            p_network_->OnAccepting(client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
             // 将监听socket重新加入iocp

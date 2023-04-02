@@ -59,7 +59,7 @@ namespace ToolBox
         * 工作线程内接收到新连接,通知主线程[尚未加入监听]
         * @param conn_id 连接ID
         */
-        void OnAcceptting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+        void OnAccepting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
         /*
         * 工作线程内接收到新连接,通知主线程[已加入监听]
         */

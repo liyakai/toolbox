@@ -63,15 +63,15 @@ namespace ToolBox
         event2worker_.Push(std::move(event));
     }
 
-    void INetwork::OnAcceptting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    void INetwork::OnAccepting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto* accept_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAcceptting);
+        auto* accept_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAccepting);
         accept_event->network_type_ = network_type_;
-        accept_event->net_evt_.acceptting_.fd_ = fd;
-        accept_event->SetAccepttingIP(ip);
-        accept_event->net_evt_.acceptting_.port_ = port;
-        accept_event->net_evt_.acceptting_.send_buff_size_ = send_buff_size;
-        accept_event->net_evt_.acceptting_.recv_buff_size_ = recv_buff_size;
+        accept_event->net_evt_.accepting_.fd_ = fd;
+        accept_event->SetAcceptingIP(ip);
+        accept_event->net_evt_.accepting_.port_ = port;
+        accept_event->net_evt_.accepting_.send_buff_size_ = send_buff_size;
+        accept_event->net_evt_.accepting_.recv_buff_size_ = recv_buff_size;
         master_->NotifyMain(accept_event);
     }
     void INetwork::OnAccepted(uint64_t connect_id)
@@ -156,14 +156,14 @@ namespace ToolBox
 
     void INetwork::OnMainToWorkerJoinIOMultiplexing_(Event* event)
     {
-        auto acceptting_event = dynamic_cast<NetEventWorker*>(event);
-        if (nullptr == acceptting_event)
+        auto accepting_event = dynamic_cast<NetEventWorker*>(event);
+        if (nullptr == accepting_event)
         {
             NetworkLogError("[Network] event is null.");
             return;
         }
-        NetworkLogTrace("[Network] OnMainToWorkerJoinIOMultiplexing_  fd:%d", acceptting_event->GetFd());
-        OnJoinIOMultiplexing(acceptting_event->GetFd(), acceptting_event->GetIP(), acceptting_event->GetPort(), acceptting_event->GetSendBuffSize(), acceptting_event->GetRecvBuffSize());
+        NetworkLogTrace("[Network] OnMainToWorkerJoinIOMultiplexing_  fd:%d", accepting_event->GetFd());
+        OnJoinIOMultiplexing(accepting_event->GetFd(), accepting_event->GetIP(), accepting_event->GetPort(), accepting_event->GetSendBuffSize(), accepting_event->GetRecvBuffSize());
     }
 
     void INetwork::OnMainToWorkerNewConnecter_(Event* event)
