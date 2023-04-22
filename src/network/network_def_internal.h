@@ -20,7 +20,7 @@ namespace ToolBox
 
     //     enum class ENetErrCode
     //     {
-    //         NET_NO_ERROR = 0,
+    //         NET_SUCCESS = 0,
     //         NET_SYS_ERROR,            // 系统错误，同时会返回errno
     //         NET_INVALID_NETWORK_TYPE, // 发送非法的网络类型.合法范围见 NetworkType
     //         NET_INVALID_NET_THREAD_INDEX, // 发送非法的网络线程序号.序号超出了实际线程数量

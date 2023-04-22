@@ -15,7 +15,7 @@ namespace ToolBox
 
     enum class ENetErrCode
     {
-        NET_NO_ERROR = 0,
+        NET_SUCCESS = 0,
         NET_SYS_ERROR,            // 系统错误，同时会返回errno
         NET_INVALID_NETWORK_TYPE, // 发送非法的网络类型.合法范围见 NetworkType
         NET_INVALID_NET_THREAD_INDEX, // 发送非法的网络线程序号.序号超出了实际线程数量
@@ -32,8 +32,9 @@ namespace ToolBox
         NET_DECODE_BUFF_OVERFLOW, // 解包缓冲区满
         NET_INVALID_EVENT,        // event 无效
 
-        NET_SEND_PIPE_OVERFLOW, // 发送ringbuffer满
-        NET_RECV_PIPE_OVERFLOW, // 接收ringbuffer满
+        NET_SEND_PIPE_OVERFLOW,   // 发送ringbuffer满
+        NET_RECV_PIPE_OVERFLOW,   // 接收ringbuffer满
+        NET_INVALID_CONNID,       // 无效的连接ID
     };
 
     // 主线程与网络线程之间的队列的最大数量

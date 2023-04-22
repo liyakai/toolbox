@@ -114,22 +114,35 @@ namespace ToolBox
                 network.reset();
             }
         }
-
+        conn_type_.clear();
     }
-    void NetworkChannel::Close(NetworkType type, uint64_t conn_id)
+    ENetErrCode NetworkChannel::Close(uint64_t conn_id)
     {
+        auto iter = conn_type_.find(conn_id);
+        if (iter == conn_type_.end())
+        {
+            return ENetErrCode::NET_INVALID_CONNID;
+        }
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerClose);
         event->SetConnectID(conn_id);
-        NotifyWorker(event, type, GetNetThreadIndex(conn_id));
+        NotifyWorker(event, iter->second, GetNetThreadIndex(conn_id));
+        conn_type_.erase(iter);
+        return ENetErrCode::NET_SUCCESS;
     }
-    void NetworkChannel::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size)
+    ENetErrCode NetworkChannel::Send(uint64_t conn_id, const char* data, uint32_t size)
     {
+        auto iter = conn_type_.find(conn_id);
+        if (iter == conn_type_.end())
+        {
+            return ENetErrCode::NET_INVALID_CONNID;
+        }
         auto* data_to_worker = GET_NET_MEMORY(size);
         memmove(data_to_worker, data, size);
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerSend);
         event->SetConnectID(conn_id);
         event->SetData(data_to_worker, size);
-        NotifyWorker(event, type, GetNetThreadIndex(conn_id));
+        NotifyWorker(event, iter->second, GetNetThreadIndex(conn_id));
+        return ENetErrCode::NET_SUCCESS;
     }
 
     bool NetworkChannel::NotifyMain(NetEventMain* event)
@@ -276,6 +289,9 @@ namespace ToolBox
                  , event_main->net_evt_.bind_.connect_id_
                  , event_main->GetBindIP()
                  , event_main->net_evt_.bind_.port_);
+        // 建立 conn_id 到 network_type 的映射
+        conn_type_[event_main->net_evt_.bind_.connect_id_] = event_main->network_type_;
+        // 回调
         if (binded_)
         {
             binded_(event_main->network_type_
@@ -317,6 +333,9 @@ namespace ToolBox
         NetworkLogTrace("[Network] OnWorkerToMainAccepted_. network_type:%u, connid:%lu", event_main->network_type_, event_main->net_evt_.accept_.connect_id_);
         OnAccepted(event_main->network_type_
                    , event_main->net_evt_.accept_.connect_id_);
+        // 建立 conn_id 到 network_type 的映射
+        conn_type_[event_main->net_evt_.accept_.connect_id_] = event_main->network_type_;
+        // 回调
         if (accepted_)
         {
             accepted_(event_main->network_type_
@@ -335,6 +354,9 @@ namespace ToolBox
                 event_main->net_evt_.error_.connect_id_,
                 event_main->net_evt_.error_.net_err_code,
                 event_main->net_evt_.error_.sys_err_code);
+        // 删除映射
+        conn_type_.erase(event_main->net_evt_.error_.connect_id_);
+        // 回调
         if (close_)
         {
             close_(event_main->network_type_,
@@ -353,6 +375,9 @@ namespace ToolBox
         }
         OnConnected(event_main->network_type_
                     , event_main->net_evt_.connect_sucessed_.connect_id_);
+        // 建立 conn_id 到 network_type 的映射
+        conn_type_[event_main->net_evt_.connect_sucessed_.connect_id_] = event_main->network_type_;
+        // 回调
         if (connected_)
         {
             connected_(event_main->network_type_
@@ -556,14 +581,14 @@ namespace ToolBox
         network_channel_->StopWait();
     }
 
-    void Network::Close(NetworkType type, uint64_t conn_id)
+    ENetErrCode Network::Close(uint64_t conn_id)
     {
-        network_channel_->Close(type, conn_id);
+        return network_channel_->Close(conn_id);
     }
 
-    void Network::Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size)
+    ENetErrCode Network::Send(uint64_t conn_id, const char* data, uint32_t size)
     {
-        network_channel_->Send(type, conn_id, data, size);
+        return network_channel_->Send(conn_id, data, size);
     }
 
     void Network::Accept(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size /*= 0*/, int32_t recv_buff_size /*= 0*/)

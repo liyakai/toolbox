@@ -35,7 +35,7 @@ public:
     {
         // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         // PrintData(data, 16);
-        Send(ToolBox::NT_UDP, conn_id, data, size);
+        Send(conn_id, data, size);
     };
     void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
@@ -95,7 +95,7 @@ public:
             // Print("转发给 client 的数据长度为%d,conn_id:%lu\n", send_data_size, client_conn_id);
             // PrintData(send_data, 32);
             // Print("\n\n");
-            Send(ToolBox::NT_UDP, client_conn_id, send_data, send_data_size);
+            Send(client_conn_id, send_data, send_data_size);
 
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data1");
         }
@@ -113,7 +113,7 @@ public:
             memmove(send_data + sizeof(uint32_t) + sizeof(uint64_t), data + sizeof(uint32_t), size - sizeof(uint32_t)); // data
             // Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
             //PrintData(send_data, 16);
-            Send(ToolBox::NT_UDP, echo_conn_id_, send_data, send_data_size);
+            Send(echo_conn_id_, send_data, send_data_size);
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data2");
         }
 
