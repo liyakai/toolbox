@@ -241,7 +241,7 @@ namespace ToolBox
         {
             return;
         }
-        socket->Close(ENetErrCode::NET_NO_ERROR);
+        socket->Close(ENetErrCode::NET_SUCCESS);
     }
     template<typename SocketType>
     void ImpNetwork<SocketType>::OnSend(uint64_t connect_id, const char* data, std::size_t size)

@@ -55,7 +55,7 @@ namespace ToolBox
         * @param type 网络类型
         * @param conn_id 需要关闭连接的id
         */
-        void Close(NetworkType type, uint64_t conn_id);
+        ENetErrCode Close(uint64_t conn_id);
         /*
         * @brief 通知工作线程发送数据
         * @param type 网络类型
@@ -63,7 +63,7 @@ namespace ToolBox
         * @param data 被发送数据的指针
         * @param conn_id 被发送数据的长度
         */
-        void Send(NetworkType type, uint64_t conn_id, const char* data, uint32_t size);
+        ENetErrCode Send(uint64_t conn_id, const char* data, uint32_t size);
         /*
         * 通知网络线程建立一个监听器
         * @param type 网络类型
@@ -246,6 +246,7 @@ namespace ToolBox
         std::vector<std::unique_ptr<std::thread>> workers_;   // 工作线程,执行网络动作.
         using NetworkArray = std::vector<std::array<std::unique_ptr<INetwork>, NetworkType::NT_MAX>>;
         NetworkArray networks_;     // 网络实现
+        std::unordered_map<uint64_t, NetworkType> conn_type_;   // conn_id 到 NetworkType的映射
     private:    // 回调函数
         BindedMethod binded_;           // 绑定的回调
         AcceptingMethod accepting_;    // 新连接事件[尚未加入监听]

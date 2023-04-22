@@ -214,7 +214,7 @@ CASE(test_tcp_echo)
     {
         // printf("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         // PrintData(data, 16);
-        network_echo.Send(ToolBox::NT_TCP, conn_id, data, size);
+        network_echo.Send(conn_id, data, size);
 
         recv_packets_++;
         std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
@@ -279,7 +279,7 @@ CASE(test_tcp_echo)
 
 CASE(test_tcp_forward)
 {
-    return;
+    //return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_tcp_forward.prof");
 #endif // USE_GPERF_TOOLS
@@ -334,7 +334,7 @@ CASE(test_tcp_forward)
             // Print("转发给 client 的数据长度为%d,conn_id:%lu\n", send_data_size, client_conn_id);
             // PrintData(send_data, 32);
             // Print("\n\n");
-            network_forward.Send(ToolBox::NT_TCP, client_conn_id, send_data, send_data_size);
+            network_forward.Send(client_conn_id, send_data, send_data_size);
 
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data1");
 
@@ -366,7 +366,7 @@ CASE(test_tcp_forward)
             memmove(send_data + sizeof(uint32_t) + sizeof(uint64_t), data + sizeof(uint32_t), size - sizeof(uint32_t)); // data
             // printf("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
             //PrintData(send_data, 16);
-            network_forward.Send(ToolBox::NT_TCP, echo_conn_id_, send_data, send_data_size);
+            network_forward.Send(echo_conn_id_, send_data, send_data_size);
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data2");
 
             client_recv_packets_++;
