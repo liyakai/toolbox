@@ -33,6 +33,34 @@ namespace ToolBox
             p_network_ = network;
         }
         /*
+        * 获取连接ID
+        */
+        uint32_t GetConnID()
+        {
+            return conn_id_;
+        }
+        /*
+        * 设置 分配的连接ID
+        */
+        void SetConnID(uint32_t id)
+        {
+            conn_id_ = id;
+        }
+        /*
+        * 获取信道标记
+        */
+        uint32_t GetOpaque()
+        {
+            return opaque_;
+        }
+        /*
+        * 设置 分配的连接ID
+        */
+        void SetOpaque(uint64_t opaque)
+        {
+            opaque_ = opaque;
+        }
+        /*
         * 更新事件
         * @params event_type 事件类型
         * @params ts 时间戳
@@ -43,19 +71,19 @@ namespace ToolBox
         * @param ip 地址
         * @param port 端口
         */
-        virtual bool InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        virtual bool InitNewAccepter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
 
         /*
         *  初始化从accpet函数接收得来的socket
         */
-        virtual bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        virtual bool InitAccpetSocket(uint64_t opaque, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
         /*
         * @brief 连接
         * @param ip 地址
         * @param port 端口
         * @return 是否成功
         */
-        virtual bool InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        virtual bool InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
         /*
         * @brief 发送 [原生UDP发送接口,不适用于kcp等协议的发送入口]
         * @param buffer 数据指针
@@ -189,20 +217,6 @@ namespace ToolBox
 #endif
 
         /*
-        * 获取连接ID
-        */
-        uint32_t GetConnID()
-        {
-            return conn_id_;
-        }
-        /*
-        * 设置 分配的连接ID
-        */
-        void SetConnID(uint32_t id)
-        {
-            conn_id_ = id;
-        }
-        /*
         * @brief 关闭
         */
         virtual void Close(ENetErrCode net_err, int32_t sys_err);
@@ -217,6 +231,7 @@ namespace ToolBox
         int32_t GetSocketError();
 
     protected:
+        uint64_t opaque_ = 0;   // 信道标记
         uint32_t conn_id_ = INVALID_CONN_ID;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         SOCKET socket_id_ = 0;

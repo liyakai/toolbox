@@ -67,9 +67,9 @@ namespace ToolBox
     }
 
 
-    uint64_t UdpEpollNetwork::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    uint64_t UdpEpollNetwork::OnNewAccepter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto conn_id = ImpNetwork<UdpSocket>::OnNewAccepter(ip, port, send_buff_size, recv_buff_size);
+        auto conn_id = ImpNetwork<UdpSocket>::OnNewAccepter(opaque, ip, port, send_buff_size, recv_buff_size);
         auto* new_socket = sock_mgr_.GetSocket(conn_id);
         if (nullptr != new_socket)
         {
@@ -83,9 +83,9 @@ namespace ToolBox
         }
         return INVALID_CONN_ID;
     }
-    uint64_t UdpEpollNetwork::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    uint64_t UdpEpollNetwork::OnNewConnecter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto conn_id = ImpNetwork<UdpSocket>::OnNewConnecter(ip, port, send_buff_size, recv_buff_size);
+        auto conn_id = ImpNetwork<UdpSocket>::OnNewConnecter(opaque, ip, port, send_buff_size, recv_buff_size);
         auto* new_socket = sock_mgr_.GetSocket(conn_id);
         if (nullptr != new_socket)
         {
@@ -98,7 +98,7 @@ namespace ToolBox
             address_to_connect_[remote_address_id] = new_socket->GetConnID();
             if (remote_address_id > 0)
             {
-                OnConnected(remote_address_id);
+                OnConnected(opaque, remote_address_id);
             }
             return remote_address_id;
         }

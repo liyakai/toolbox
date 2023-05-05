@@ -64,15 +64,15 @@ namespace ToolBox
         /*
         * 工作线程内建立监听器
         */
-        virtual uint64_t OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        virtual uint64_t OnNewAccepter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * 主线程通知,将fd加入io多路复用
         */
-        virtual uint64_t OnJoinIOMultiplexing(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        virtual uint64_t OnJoinIOMultiplexing(uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * 工作线程内建立连接器
         */
-        virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        virtual uint64_t OnNewConnecter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * 工作线程内闭网络连接
         */
@@ -175,58 +175,58 @@ namespace ToolBox
     }
 
     template<typename SocketType>
-    uint64_t ImpNetwork<SocketType>::OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    uint64_t ImpNetwork<SocketType>::OnNewAccepter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         SocketType* new_socket = sock_mgr_.Alloc();
         if (nullptr == new_socket)
         {
-            OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
+            OnErrored(opaque, 0, ENetErrCode::NET_ALLOC_FAILED, 0);
             return INVALID_CONN_ID;
         }
         new_socket->SetSocketMgr(&sock_mgr_);
         new_socket->SetNetwork(this);
-        if (false == new_socket->InitNewAccepter(ip, port, send_buff_size, recv_buff_size))
+        if (false == new_socket->InitNewAccepter(opaque, ip, port, send_buff_size, recv_buff_size))
         {
-            OnErrored(0, ENetErrCode::NET_ACCEPT_FAILED, 0);
+            OnErrored(opaque, 0, ENetErrCode::NET_ACCEPT_FAILED, 0);
             return INVALID_CONN_ID;
         }
         base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         return new_socket->GetConnID();
     }
     template<typename SocketType>
-    uint64_t ImpNetwork<SocketType>::OnJoinIOMultiplexing(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    uint64_t ImpNetwork<SocketType>::OnJoinIOMultiplexing(uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         auto new_socket = sock_mgr_.Alloc();
         if (nullptr == new_socket)
         {
-            OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
+            OnErrored(opaque, 0, ENetErrCode::NET_ALLOC_FAILED, 0);
             return INVALID_CONN_ID;
         }
         new_socket->SetSocketMgr(&sock_mgr_);
         new_socket->SetNetwork(this);
 
-        if (false == new_socket->InitAccpetSocket(fd, ip, port, send_buff_size, recv_buff_size))
+        if (false == new_socket->InitAccpetSocket(opaque, fd, ip, port, send_buff_size, recv_buff_size))
         {
             sock_mgr_.Free(new_socket);
             return INVALID_CONN_ID;
         }
-        OnAccepted(new_socket->GetConnID());
+        OnAccepted(opaque, new_socket->GetConnID());
         base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         NetworkLogTrace("[Network] OnJoinIOMultiplexing. fd:%d, connid:%u", fd, new_socket->GetConnID());
         return new_socket->GetConnID();
     }
     template<typename SocketType>
-    uint64_t ImpNetwork<SocketType>::OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    uint64_t ImpNetwork<SocketType>::OnNewConnecter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         auto new_socket = sock_mgr_.Alloc();
         if (nullptr == new_socket)
         {
-            OnErrored(0, ENetErrCode::NET_ALLOC_FAILED, 0);
+            OnErrored(opaque, 0, ENetErrCode::NET_ALLOC_FAILED, 0);
             return INVALID_CONN_ID;
         }
         new_socket->SetSocketMgr(&sock_mgr_);
         new_socket->SetNetwork(this);
-        if (false == new_socket->InitNewConnecter(ip, port, send_buff_size, recv_buff_size))
+        if (false == new_socket->InitNewConnecter(opaque, ip, port, send_buff_size, recv_buff_size))
         {
             return INVALID_CONN_ID;
         }

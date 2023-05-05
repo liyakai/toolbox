@@ -126,7 +126,7 @@ namespace ToolBox
                 break;
             }
             // 通知主线程有新的客户端连接进来
-            p_network_->OnAccepting(client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
+            p_network_->OnAccepting(GetOpaque(), client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
             // 将监听socket重新加入iocp
@@ -143,8 +143,9 @@ namespace ToolBox
         }
     }
 
-    bool TcpSocket::InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    bool TcpSocket::InitAccpetSocket(uint64_t opaque, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
+        SetOpaque(opaque);
         Init(send_buff_size, recv_buff_size);
         SetSocketID(socket_fd);
         // SetIP(ip);
@@ -306,7 +307,7 @@ namespace ToolBox
             //     NetworkLogDebug("[Network] ProcessRecvData 连接ID:%llu now_time:%llu, data size:%zu\n", connect_id, now_time, len);
             // }
 
-            p_network_->OnReceived(GetConnID(), buff_block, len);
+            p_network_->OnReceived(GetOpaque(), GetConnID(), buff_block, len);
         }
 
         return ErrCode::ERR_SUCCESS;
@@ -336,7 +337,7 @@ namespace ToolBox
         }
         p_iocp_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 
-        p_network_->OnConnected(GetConnID());
+        p_network_->OnConnected(GetOpaque(), GetConnID());
     }
 
     void TcpSocket::UpdateSend()
@@ -426,7 +427,7 @@ namespace ToolBox
         }
         else
         {
-            p_network_->OnConnectedFailed(ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
+            p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
         }
     }
 
@@ -460,7 +461,7 @@ namespace ToolBox
             BaseSocket::Close(net_err, sys_err);
             p_network_->CloseListenInMultiplexing(GetSocketID());
             // 通知主线程 socket 关闭
-            p_network_->OnClosed((uint64_t)GetConnID(), net_err, sys_err);
+            p_network_->OnClosed(GetOpaque(), (uint64_t)GetConnID(), net_err, sys_err);
             socket_state_ = SocketState::SOCK_STATE_INVALIED;
             p_sock_pool_->Free(this);
         }
@@ -662,13 +663,14 @@ namespace ToolBox
         }
     }
 
-    bool TcpSocket::InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    bool TcpSocket::InitNewAccepter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         if (SocketState::SOCK_STATE_LISTENING == socket_state_)
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, 0);
+            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, 0);
             return false;
         }
+        SetOpaque(opaque);
         Init(send_buff_size, recv_buff_size);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         socket_id_ = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
@@ -678,7 +680,7 @@ namespace ToolBox
         if (socket_id_ < 0)
 #endif
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
             return false;
         }
 
@@ -709,13 +711,13 @@ namespace ToolBox
         int32_t error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
         if (error < 0)
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
             return false;
         }
         error = listen(socket_id_, DEFAULT_BACKLOG_SIZE);
         if (error < 0)
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
             return false;
         }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -733,21 +735,20 @@ namespace ToolBox
         return true;
     }
 
-    bool TcpSocket::InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    bool TcpSocket::InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, 0);
+            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_CONNECT_FAILED, 0);
             return false;
         }
-
-        send_buff_len_ = send_buff_size;
-        recv_buff_len_ = recv_buff_size;
+        SetOpaque(opaque);
+        Init(send_buff_size, recv_buff_size);
 
         socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (socket_id_ < 0)
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, errno);
+            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_CONNECT_FAILED, errno);
             return false;
         }
 
@@ -783,7 +784,7 @@ namespace ToolBox
 #endif
         {
             // 通知 主线程连接失败
-            p_network_->OnConnectedFailed(ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
+            p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
             Close(ENetErrCode::NET_SYS_ERROR, errno);
             return false;
         }

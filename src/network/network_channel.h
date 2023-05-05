@@ -59,6 +59,7 @@ namespace ToolBox
         /*
         * @brief 通知工作线程发送数据
         * @param type 网络类型
+        * @param opaque 信道标记,通过此监听器建立的"连接"都携带此标记
         * @param conn_id 需要关闭连接的id
         * @param data 被发送数据的指针
         * @param conn_id 被发送数据的长度
@@ -67,12 +68,13 @@ namespace ToolBox
         /*
         * 通知网络线程建立一个监听器
         * @param type 网络类型
+        * @param opaque 信道标记,主动建立的连接会携带此标记
         * @param ip 监听ip
         * @param port 监听端口
         * @param send_buff_size 发送缓冲区大小
         * @param recv_buff_size 接收缓冲区大小
         */
-        void Accept(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
+        void Accept(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
         /*
         * 通知网络线程建立一个主动连接
         * @param type 网络类型
@@ -81,7 +83,7 @@ namespace ToolBox
         * @param send_buff_size 发送缓冲区大小
         * @param recv_buff_size 接收缓冲区大小
         */
-        void Connect(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
+        void Connect(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
         /*
         * @brief 网络线程投递事件到逻辑线程接口
         * @param event 事件
@@ -135,44 +137,44 @@ namespace ToolBox
         * 逻辑线程内处理监听端口绑定事件
         * @param conn_id 连接ID
         */
-        virtual void OnBinded(NetworkType type, uint64_t conn_id, const std::string& ip, uint16_t port) {};
+        virtual void OnBinded(NetworkType type, uint64_t opaque, uint64_t conn_id, const std::string& ip, uint16_t port) {};
         /*
         * 逻辑线程内处理接受新连接事件[尚未加入监听]
         * @param conn_id 连接ID
         */
-        virtual void OnAccepting(NetworkType type, int32_t fd) {};
+        virtual void OnAccepting(NetworkType type, uint64_t opaque, int32_t fd) {};
         /*
         * 逻辑线程内处理接受新连接事件[已加入监听]
         * @param conn_id 连接ID
         */
-        virtual void OnAccepted(NetworkType type, uint64_t conn_id) {};
+        virtual void OnAccepted(NetworkType type, uint64_t opaque, uint64_t conn_id) {};
         /*
         * 逻辑线程内处理主动连接事件
         * @param conn_id 连接ID
         */
-        virtual void OnConnected(NetworkType type, uint64_t conn_id) {};
+        virtual void OnConnected(NetworkType type, uint64_t opaque, uint64_t conn_id) {};
         /*
         * 逻辑线程内处理主动连接事件
         * @param conn_id 连接ID
         */
-        virtual void OnConnectedFailed(NetworkType type, ENetErrCode err_code, int32_t err_no) {};
+        virtual void OnConnectedFailed(NetworkType type, uint64_t opaque, ENetErrCode err_code, int32_t err_no) {};
         /*
         * 逻辑线程内处理错误事件
         * @param conn_id 连接ID
         */
-        virtual void OnErrored(NetworkType type, uint64_t conn_id, ENetErrCode err_code, int32_t err_no) {};
+        virtual void OnErrored(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode err_code, int32_t err_no) {};
         /*
         * 逻辑线程内处理连接关闭事件
         * @param conn_id 连接ID
         */
-        virtual void OnClose(NetworkType type, uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) {};
+        virtual void OnClose(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) {};
         /*
         * 逻辑线程内处理数据可读事件
         * @param conn_id 连接ID
         * @param data 内存指针
         * @param size 数据长度
         */
-        virtual void OnReceived(NetworkType type, uint64_t conn_id, const char* data, size_t size) {};
+        virtual void OnReceived(NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) {};
 
     private:
         /*
@@ -231,7 +233,7 @@ namespace ToolBox
         /*
         * @brief 将文件描述符加入
         */
-        void JoinIOMultiplexing(NetworkType type, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+        void JoinIOMultiplexing(NetworkType type, uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
     private:
         /*
         * @brief 设置系统可打开的最大文件描述符[需要root权限才可成功]

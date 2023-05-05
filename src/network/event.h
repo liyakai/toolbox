@@ -43,7 +43,7 @@ namespace ToolBox
         * 构造
         * @param id 事件ID
         */
-        Event(EventID id);
+        Event(EventID id, uint64_t opaque = 0);
         /*
         * 析构
         */
@@ -52,8 +52,13 @@ namespace ToolBox
         * 获取事件 ID
         */
         EventID GetID();
+        /*
+        * 获取信道标记
+        */
+        uint64_t GetOpaque();
     private:
         EventID id_ = EID_NONE;   // 事件ID
+        uint64_t opaque_ = 0;     // 信道标记
     };
 
     /*
@@ -66,7 +71,7 @@ namespace ToolBox
         * 构造
         * @param type 事件类型
         */
-        NetEventWorker(EventID event_id);
+        NetEventWorker(EventID event_id, uint64_t opaque = 0);
         /*
         * 析构
         */
@@ -128,14 +133,6 @@ namespace ToolBox
         */
         int32_t GetFd() const;
         /*
-        * 设置网络类型
-        */
-        void SetNetworkType(NetworkType network_type);
-        /*
-        * 获取网络类型
-        */
-        NetworkType GetNetworkType() const;
-        /*
         * 设置特性参数
         */
         void SetFeatureParam(int32_t param1, int32_t param2);
@@ -170,7 +167,6 @@ namespace ToolBox
             NetReq() {}
             ~NetReq() {};
         } net_req_;
-        NetworkType network_type_ = NT_UNKNOWN;
     };
 
     /*
@@ -182,7 +178,7 @@ namespace ToolBox
         /*
         * 构造
         */
-        NetEventMain(EventID event_id);
+        NetEventMain(EventID event_id, uint64_t opaque = 0);
         /*
         * 析构
         */
