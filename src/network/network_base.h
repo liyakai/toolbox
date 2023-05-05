@@ -57,33 +57,33 @@ namespace ToolBox
     public:
         /*
         * 工作线程内接收到新连接,通知主线程[尚未加入监听]
-        * @param conn_id 连接ID
+
         */
-        void OnAccepting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
+        void OnAccepting(uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size);
         /*
         * 工作线程内接收到新连接,通知主线程[已加入监听]
         */
-        void OnAccepted(uint64_t connect_id);
+        void OnAccepted(uint64_t opaque, uint64_t connect_id);
         /*
         * 工作线程内连接到远端成功,通知主线程
         */
-        void OnConnected(uint64_t connect_id);
+        void OnConnected(uint64_t opaque, uint64_t connect_id);
         /*
         * 工作线程内连接到远端失败,通知主线程
         */
-        void OnConnectedFailed(ENetErrCode err_code, int32_t err_no);
+        void OnConnectedFailed(uint64_t opaque, ENetErrCode err_code, int32_t err_no);
         /*
         * 工作线程内产生错误,通知主线程
         */
-        void OnErrored(uint64_t connect_id, ENetErrCode err_code, int32_t err_no);
+        void OnErrored(uint64_t opaque, uint64_t connect_id, ENetErrCode err_code, int32_t err_no);
         /*
         * 工作线程内关闭网络连接,通知主线程
         */
-        void OnClosed(uint64_t connect_id, ENetErrCode err_code, int32_t err_no);
+        void OnClosed(uint64_t opaque, uint64_t connect_id, ENetErrCode err_code, int32_t err_no);
         /*
         * 工作线程内接收到数据,通知主线程
         */
-        void OnReceived(uint64_t connect_id, const char* data, uint32_t size);
+        void OnReceived(uint64_t opaque, uint64_t connect_id, const char* data, uint32_t size);
     public:
         /*
         * @brief 获取网络库特性参数->最大累计包数.网络线程模拟 Nagle 算法,减少系统调用,代价是在通信不够频繁的情况下可能会增加延迟.
@@ -100,15 +100,15 @@ namespace ToolBox
         /*
         * 主线程通知,工作线程内建立监听器
         */
-        virtual uint64_t OnNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        virtual uint64_t OnNewAccepter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
         /*
         * 主线程通知,将fd加入io多路复用
         */
-        virtual uint64_t OnJoinIOMultiplexing(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        virtual uint64_t OnJoinIOMultiplexing(uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
         /*
         * 主线程通知,工作线程内建立连接器
         */
-        virtual uint64_t OnNewConnecter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
+        virtual uint64_t OnNewConnecter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) = 0;
         /*
         * 主线程通知,关工作线程内闭网络连接
         */

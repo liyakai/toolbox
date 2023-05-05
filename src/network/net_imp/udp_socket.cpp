@@ -103,15 +103,16 @@ namespace ToolBox
     }
 
 
-    bool UdpSocket::InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    bool UdpSocket::InitNewAccepter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         Bind(ip, port);
         type_ = UdpType::ACCEPTOR;
         local_address_.SetAddress(ip, port);
         event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_ERR;
+        SetOpaque(opaque);
         return true;
     }
-    bool UdpSocket::InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    bool UdpSocket::InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
         Bind();
         type_ = UdpType::CONNECTOR;
@@ -165,7 +166,7 @@ namespace ToolBox
             // 通知主线程 socket 关闭
             if (UdpType::ACCEPTOR == type_)
             {
-                p_network_->OnClosed(GetLocalAddressID(), net_err, sys_err);
+                p_network_->OnClosed(GetOpaque(), GetLocalAddressID(), net_err, sys_err);
                 p_network_->CloseListenInMultiplexing(GetSocketID());
             }
             else
@@ -174,7 +175,7 @@ namespace ToolBox
                 {
                     p_network_->CloseListenInMultiplexing(GetSocketID());
                 }
-                p_network_->OnClosed(GetRemoteAddressID(), net_err, sys_err);
+                p_network_->OnClosed(GetOpaque(), GetRemoteAddressID(), net_err, sys_err);
             }
             p_sock_pool_->Free(this);
         }
@@ -186,7 +187,7 @@ namespace ToolBox
         socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket_id_ < 0)
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_LISTEN_FAILED, errno);
+            p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_LISTEN_FAILED, errno);
             return false;
         }
 
@@ -199,7 +200,7 @@ namespace ToolBox
         int32_t error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
         if (error < 0)
         {
-            p_network_->OnErrored(socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
+            p_network_->OnErrored(GetOpaque(), socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
             return false;
         }
         return true;
@@ -210,7 +211,7 @@ namespace ToolBox
         socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket_id_ < 0)
         {
-            p_network_->OnErrored(0, ENetErrCode::NET_CONNECT_FAILED, errno);
+            p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_CONNECT_FAILED, errno);
             return false;
         }
 
@@ -223,7 +224,7 @@ namespace ToolBox
         int32_t error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(SocketAddress));
         if (error < 0)
         {
-            p_network_->OnErrored(socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
+            p_network_->OnErrored(GetOpaque(), socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
             return false;
         }
         return true;
@@ -260,7 +261,7 @@ namespace ToolBox
         {
             char* buff_block = GET_NET_MEMORY(bytes_size);
             memcpy(buff_block, out_buffer, bytes_size);
-            p_network_->OnReceived(UdpAddress(address).GetID(), buff_block, bytes_size);
+            p_network_->OnReceived(GetOpaque(), UdpAddress(address).GetID(), buff_block, bytes_size);
         }
     }
 
@@ -289,7 +290,7 @@ namespace ToolBox
                 {
                     char* buff_block = GET_NET_MEMORY(size);
                     memcpy(buff_block, array.data(), size);
-                    p_network_->OnReceived(UdpAddress(address).GetID(), buff_block, size);
+                    p_network_->OnReceived(GetOpaque(), UdpAddress(address).GetID(), buff_block, size);
                 }
                 else                    // 开启了kcp
                 {
@@ -342,7 +343,7 @@ namespace ToolBox
         auto* new_socket = p_sock_pool_->Alloc();
         if (nullptr == new_socket)
         {
-            p_network_->OnErrored(GetLocalAddressID(), ENetErrCode::NET_ALLOC_FAILED, 0);
+            p_network_->OnErrored(GetOpaque(), GetLocalAddressID(), ENetErrCode::NET_ALLOC_FAILED, 0);
             return nullptr;
         }
         InitAccpetSocket(new_socket, address);
@@ -352,7 +353,7 @@ namespace ToolBox
             new_socket->OpenKcpMode();
         }
         // 通知主线程有新的客户端连接进来
-        p_udp_epoll_network->OnAccepted(new_socket->GetRemoteAddressID());
+        p_udp_epoll_network->OnAccepted(GetOpaque(), new_socket->GetRemoteAddressID());
         p_udp_epoll_network->AddUdpAddress(address, new_socket->GetConnID());
         return new_socket;
     }
@@ -380,7 +381,7 @@ namespace ToolBox
             }
             else
             {
-                p_network_->OnErrored(GetLocalAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
+                p_network_->OnErrored(GetOpaque(), GetLocalAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
                 return false;
             }
         }
@@ -401,7 +402,7 @@ namespace ToolBox
             }
             else
             {
-                p_network_->OnErrored(GetRemoteAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
+                p_network_->OnErrored(GetOpaque(), GetRemoteAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
                 return false;
             }
         }

@@ -98,26 +98,28 @@ namespace ToolBox
         void UpdateEvent(SockEventType event_type, time_t ts) override;
         /*
         * @brief 监听(模拟)
+        * @param opaque 信道标记
         * @param ip 地址
         * @param port 端口
         */
-        bool InitNewAccepter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        bool InitNewAccepter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
 
         /*
         *  初始化从accpet函数接收得来的socket
         */
-        bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override
+        bool InitAccpetSocket(uint64_t opaque, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override
         {
             return true;    // TODO: udp 多网络线程改造.[20230226update:udp方式下,需要一个全局管理器,管理多线程情况下客户端连接信息.]
         }
         void InitAccpetSocket(UdpSocket* socket, const SocketAddress& address);
         /*
         * @brief 连接
+        * @param opaque 信道标记
         * @param ip 地址
         * @param port 端口
         * @return 是否成功
         */
-        bool InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        bool InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * @brief 发送 [原生UDP发送接口,不适用于kcp等协议的发送入口]
         * @param buffer 数据指针

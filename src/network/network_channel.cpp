@@ -233,17 +233,17 @@ namespace ToolBox
         return *this;
     }
 
-    void NetworkChannel::Accept(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    void NetworkChannel::Accept(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewAccepter);
+        auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewAccepter, opaque);
         event->SetIP(ip);
         event->SetAddressPort(port);
         event->SetBuffSize(send_buff_size, recv_buff_size);
         NotifyWorker(event, type, 0);   // 多网络线程下,第0个线程专门作为 acceptor
     }
-    void NetworkChannel::Connect(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    void NetworkChannel::Connect(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewConnecter);
+        auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerNewConnecter, opaque);
         event->SetIP(ip);
         event->SetAddressPort(port);
         event->SetBuffSize(send_buff_size, recv_buff_size);
@@ -257,14 +257,14 @@ namespace ToolBox
     {
         if (type >= NT_MAX || type <= NT_UNKNOWN )
         {
-            OnErrored(type, 0, ENetErrCode::NET_INVALID_NETWORK_TYPE, 0);
+            OnErrored(type, 0, 0, ENetErrCode::NET_INVALID_NETWORK_TYPE, 0);
             return;
         }
 
         if (net_thread_index >= networks_.size())
         {
             NetworkLogError("[Network] NotifyWorker net_thread_index:%u, networks_.size():%zu", net_thread_index, networks_.size());
-            OnErrored(type, 0, ENetErrCode::NET_INVALID_NET_THREAD_INDEX, 0);
+            OnErrored(type, 0, 0, ENetErrCode::NET_INVALID_NET_THREAD_INDEX, 0);
             return;
         }
 
@@ -286,6 +286,7 @@ namespace ToolBox
         }
         NetworkLogTrace("[Network] OnWorkerToMainBinded_. network_type:%u, connid:%lu", event_main->network_type_, event_main->net_evt_.accept_.connect_id_);
         OnBinded(event_main->network_type_
+                 , event_main->GetOpaque()
                  , event_main->net_evt_.bind_.connect_id_
                  , event_main->GetBindIP()
                  , event_main->net_evt_.bind_.port_);
@@ -295,6 +296,7 @@ namespace ToolBox
         if (binded_)
         {
             binded_(event_main->network_type_
+                    , event_main->GetOpaque()
                     , event_main->net_evt_.bind_.connect_id_
                     , event_main->GetBindIP()
                     , event_main->net_evt_.bind_.port_);
@@ -303,20 +305,20 @@ namespace ToolBox
 
     void NetworkChannel::OnWorkerToMainAccepting_(Event* event)
     {
-        auto event_main = dynamic_cast<NetEventMain*>(event);
+        auto* event_main = dynamic_cast<NetEventMain*>(event);
         if (nullptr == event_main)
         {
             return;
         }
         int32_t fd = event_main->net_evt_.accepting_.fd_;
         NetworkType network_type = event_main->network_type_;
-        OnAccepting(network_type, fd);
+        OnAccepting(network_type, event_main->GetOpaque(), fd);
         if (accepting_)
         {
-            accepting_(network_type, fd);
+            accepting_(network_type, event_main->GetOpaque(), fd);
         }
         NetworkLogTrace("[Network] OnWorkerToMainAccepting_. network_type:%u, fd:%d", network_type, fd);
-        JoinIOMultiplexing(network_type, fd
+        JoinIOMultiplexing(network_type, event_main->GetOpaque(), fd
                            , event_main->GetAcceptingIP()
                            , event_main->net_evt_.accepting_.port_
                            , event_main->net_evt_.accepting_.send_buff_size_
@@ -332,6 +334,7 @@ namespace ToolBox
         }
         NetworkLogTrace("[Network] OnWorkerToMainAccepted_. network_type:%u, connid:%lu", event_main->network_type_, event_main->net_evt_.accept_.connect_id_);
         OnAccepted(event_main->network_type_
+                   , event_main->GetOpaque()
                    , event_main->net_evt_.accept_.connect_id_);
         // 建立 conn_id 到 network_type 的映射
         conn_type_[event_main->net_evt_.accept_.connect_id_] = event_main->network_type_;
@@ -339,6 +342,7 @@ namespace ToolBox
         if (accepted_)
         {
             accepted_(event_main->network_type_
+                      , event_main->GetOpaque()
                       , event_main->net_evt_.accept_.connect_id_);
         }
     }
@@ -350,19 +354,21 @@ namespace ToolBox
         {
             return;
         }
-        OnClose(event_main->network_type_,
-                event_main->net_evt_.error_.connect_id_,
-                event_main->net_evt_.error_.net_err_code,
-                event_main->net_evt_.error_.sys_err_code);
+        OnClose(event_main->network_type_
+                , event_main->GetOpaque()
+                , event_main->net_evt_.error_.connect_id_
+                , event_main->net_evt_.error_.net_err_code
+                , event_main->net_evt_.error_.sys_err_code);
         // 删除映射
         conn_type_.erase(event_main->net_evt_.error_.connect_id_);
         // 回调
         if (close_)
         {
-            close_(event_main->network_type_,
-                   event_main->net_evt_.error_.connect_id_,
-                   event_main->net_evt_.error_.net_err_code,
-                   event_main->net_evt_.error_.sys_err_code);
+            close_(event_main->network_type_
+                   , event_main->GetOpaque()
+                   , event_main->net_evt_.error_.connect_id_
+                   , event_main->net_evt_.error_.net_err_code
+                   , event_main->net_evt_.error_.sys_err_code);
         }
     }
 
@@ -374,6 +380,7 @@ namespace ToolBox
             return;
         }
         OnConnected(event_main->network_type_
+                    , event_main->GetOpaque()
                     , event_main->net_evt_.connect_sucessed_.connect_id_);
         // 建立 conn_id 到 network_type 的映射
         conn_type_[event_main->net_evt_.connect_sucessed_.connect_id_] = event_main->network_type_;
@@ -381,6 +388,7 @@ namespace ToolBox
         if (connected_)
         {
             connected_(event_main->network_type_
+                       , event_main->GetOpaque()
                        , event_main->net_evt_.connect_sucessed_.connect_id_);
         }
     }
@@ -392,14 +400,16 @@ namespace ToolBox
         {
             return;
         }
-        OnConnectedFailed(event_main->network_type_,
-                          event_main->net_evt_.connect_failed_.net_err_code,
-                          event_main->net_evt_.connect_failed_.sys_err_code);
+        OnConnectedFailed(event_main->network_type_
+                          , event_main->GetOpaque()
+                          , event_main->net_evt_.connect_failed_.net_err_code
+                          , event_main->net_evt_.connect_failed_.sys_err_code);
         if (connect_failed_)
         {
-            connect_failed_(event_main->network_type_,
-                            event_main->net_evt_.connect_failed_.net_err_code,
-                            event_main->net_evt_.connect_failed_.sys_err_code);
+            connect_failed_(event_main->network_type_
+                            , event_main->GetOpaque()
+                            , event_main->net_evt_.connect_failed_.net_err_code
+                            , event_main->net_evt_.connect_failed_.sys_err_code);
         }
 
     }
@@ -411,16 +421,18 @@ namespace ToolBox
         {
             return;
         }
-        OnErrored(event_main->network_type_,
-                  event_main->net_evt_.error_.connect_id_,
-                  event_main->net_evt_.error_.net_err_code,
-                  event_main->net_evt_.error_.sys_err_code);
+        OnErrored(event_main->network_type_
+                  , event_main->GetOpaque()
+                  , event_main->net_evt_.error_.connect_id_
+                  , event_main->net_evt_.error_.net_err_code
+                  , event_main->net_evt_.error_.sys_err_code);
         if (errored_)
         {
-            errored_(event_main->network_type_,
-                     event_main->net_evt_.error_.connect_id_,
-                     event_main->net_evt_.error_.net_err_code,
-                     event_main->net_evt_.error_.sys_err_code);
+            errored_(event_main->network_type_
+                     , event_main->GetOpaque()
+                     , event_main->net_evt_.error_.connect_id_
+                     , event_main->net_evt_.error_.net_err_code
+                     , event_main->net_evt_.error_.sys_err_code);
         }
     }
 
@@ -431,16 +443,18 @@ namespace ToolBox
         {
             return;
         }
-        OnReceived(event_main->network_type_,
-                   event_main->net_evt_.recv_.connect_id_,
-                   event_main->net_evt_.recv_.data_,
-                   event_main->net_evt_.recv_.size_);
+        OnReceived(event_main->network_type_
+                   , event_main->GetOpaque()
+                   , event_main->net_evt_.recv_.connect_id_
+                   , event_main->net_evt_.recv_.data_
+                   , event_main->net_evt_.recv_.size_);
         if (received_)
         {
-            received_(event_main->network_type_,
-                      event_main->net_evt_.recv_.connect_id_,
-                      event_main->net_evt_.recv_.data_,
-                      event_main->net_evt_.recv_.size_);
+            received_(event_main->network_type_
+                      , event_main->GetOpaque()
+                      , event_main->net_evt_.recv_.connect_id_
+                      , event_main->net_evt_.recv_.data_
+                      , event_main->net_evt_.recv_.size_);
         }
     }
 
@@ -453,7 +467,7 @@ namespace ToolBox
             NetEventMain* event = event2main_.Pop();
             if (nullptr == event)
             {
-                OnErrored(NT_UNKNOWN, 0, ENetErrCode::NET_INVALID_EVENT, 0);
+                OnErrored(NT_UNKNOWN, 0, 0, ENetErrCode::NET_INVALID_EVENT, 0);
                 continue;
             }
             event_dispatcher_ ->HandleEvent(event);
@@ -515,9 +529,9 @@ namespace ToolBox
         return (conn_id >> 16) & 0x00FF;
     }
 
-    void NetworkChannel::JoinIOMultiplexing(NetworkType type, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    void NetworkChannel::JoinIOMultiplexing(NetworkType type, uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerJoinIOMultiplexing);
+        auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerJoinIOMultiplexing, opaque);
         event->SetFd(fd);
         event->SetIP(ip);
         event->SetAddressPort(port);
@@ -591,14 +605,14 @@ namespace ToolBox
         return network_channel_->Send(conn_id, data, size);
     }
 
-    void Network::Accept(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size /*= 0*/, int32_t recv_buff_size /*= 0*/)
+    void Network::Accept(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size /*= 0*/, int32_t recv_buff_size /*= 0*/)
     {
-        network_channel_->Accept(type, ip, port, send_buff_size, recv_buff_size);
+        network_channel_->Accept(type, opaque, ip, port, send_buff_size, recv_buff_size);
     }
 
-    void Network::Connect(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size /*= 0*/, int32_t recv_buff_size /*= 0*/)
+    void Network::Connect(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size /*= 0*/, int32_t recv_buff_size /*= 0*/)
     {
-        network_channel_->Connect(type, ip, port, send_buff_size, recv_buff_size);
+        network_channel_->Connect(type, opaque, ip, port, send_buff_size, recv_buff_size);
     }
 
     void Network::SetSimulateNagle(uint32_t packets_num /*= 10*/, uint32_t timeout /*= 2*/)

@@ -9,29 +9,29 @@
 class TestNetworkEcho : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
+    void OnAccepted(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id) override
     {
         Print("接到客户端连接,连接ID:%llu\n", conn_id);
     };
-    void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
+    void OnConnected(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id) override
     {
         Print("主动连接成功:%llu\n", conn_id);
     };
-    void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnConnectedFailed(ToolBox::NetworkType type, uint64_t opaque, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
-    void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnErrored(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
-    void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
+    void OnReceived(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) override
     {
         Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
         PrintData(data, 16);
         Send(conn_id, data, size);
     };
-    void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
@@ -41,24 +41,24 @@ public:
 class TestNetworkForward : public ToolBox::NetworkChannel, public ToolBox::DebugPrint
 {
 public:
-    void OnAccepted(ToolBox::NetworkType type, uint64_t conn_id) override
+    void OnAccepted(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id) override
     {
         Print("接到客户端连接,连接ID:%llu\n", conn_id);
     };
-    void OnConnected(ToolBox::NetworkType type, uint64_t conn_id) override
+    void OnConnected(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id) override
     {
         Print("主动连接成功:%llu\n", conn_id);
         echo_conn_id_ = conn_id;
     };
-    void OnConnectedFailed(ToolBox::NetworkType type, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnConnectedFailed(ToolBox::NetworkType type, uint64_t opaque, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("连接失败 错误码:%d, 系统错误码:%d\n",  err_code, err_no);
     };
-    void OnErrored(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
+    void OnErrored(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) override
     {
         Print("发生错误, connect_id:%lu 错误码:%d, 系统错误码:%d\n", conn_id,  err_code, err_no);
     }
-    void OnReceived(ToolBox::NetworkType type, uint64_t conn_id, const char* data, size_t size) override
+    void OnReceived(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) override
     {
         //Print("收到客户端数据长度为%d\n", size);
         //PrintData(data, 32);
@@ -104,7 +104,7 @@ public:
         }
 
     };
-    void OnClose(ToolBox::NetworkType type, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
+    void OnClose(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
     {
         Print("断开与客户端之间的连接,连接ID:%llu 错误码:%d, 系统错误码:%d\n", conn_id, net_err, sys_err);
     }
@@ -125,7 +125,7 @@ CASE(test_kcp_echo)
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_kcp_echo \n");
     ToolBox::Singleton<TestNetworkEcho>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept(ToolBox::NT_KCP, "127.0.0.1", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestNetworkEcho>::Instance()->Accept(ToolBox::NT_KCP, 9600, "127.0.0.1", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestNetworkEcho>::Instance()->Start();
     bool run = true;
     std::thread t([&]()
@@ -176,8 +176,8 @@ CASE(test_kcp_forward)
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_forward \n");
     ToolBox::Singleton<TestNetworkForward>::Instance()->SetDebugPrint(true);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept(ToolBox::NT_KCP, "127.0.0.1", 9500);
-    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect( ToolBox::NT_KCP, "127.0.0.1", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Accept(ToolBox::NT_KCP, 9500, "127.0.0.1", 9500);
+    ToolBox::Singleton<TestNetworkForward>::Instance()->Connect( ToolBox::NT_KCP, 9600, "127.0.0.1", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestNetworkForward>::Instance()->Start();
     bool run = true;
     std::thread t([&]()

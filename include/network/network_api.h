@@ -9,14 +9,14 @@
 namespace ToolBox
 {
 
-    using BindedMethod = std::function<void(NetworkType type, uint64_t conn_id, const std::string& ip, uint16_t port)>;
-    using AcceptingMethod = std::function<void(NetworkType type, int32_t fd)>;
-    using AcceptedMethod = std::function<void(NetworkType type, uint64_t conn_id)>;
-    using ConnectedMethod = std::function<void(NetworkType type, uint64_t conn_id)>;
-    using ConnectFailedMethod = std::function<void(NetworkType type, ENetErrCode err_code, int32_t err_no)>;
-    using ErroredMethod = std::function<void(NetworkType type, uint64_t conn_id, ENetErrCode err_code, int32_t err_no)>;
-    using CloseMethod = std::function<void(NetworkType type, uint64_t conn_id, ENetErrCode net_err, int32_t sys_err)>;
-    using ReceivedMethod = std::function<void(NetworkType type, uint64_t conn_id, const char* data, size_t size)>;
+    using BindedMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id, const std::string& ip, uint16_t port)>;
+    using AcceptingMethod = std::function<void(NetworkType type, uint64_t opaque, int32_t fd)>;
+    using AcceptedMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id)>;
+    using ConnectedMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id)>;
+    using ConnectFailedMethod = std::function<void(NetworkType type, uint64_t opaque, ENetErrCode err_code, int32_t err_no)>;
+    using ErroredMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode err_code, int32_t err_no)>;
+    using CloseMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode net_err, int32_t sys_err)>;
+    using ReceivedMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size)>;
 
     class NetworkChannel;
     class Network
@@ -60,21 +60,23 @@ namespace ToolBox
         /*
         * 通知网络线程建立一个监听器
         * @param type 网络类型
+        * @param opaque 信道标记,通过此监听器建立的"连接"都携带此标记
         * @param ip 监听ip
         * @param port 监听端口
         * @param send_buff_size 发送缓冲区大小
         * @param recv_buff_size 接收缓冲区大小
         */
-        void Accept(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
+        void Accept(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
         /*
         * 通知网络线程建立一个主动连接
         * @param type 网络类型
+        * @param opaque 信道标记,主动建立的连接会携带此标记
         * @param ip 连接ip
         * @param port 连接端口
         * @param send_buff_size 发送缓冲区大小
         * @param recv_buff_size 接收缓冲区大小
         */
-        void Connect(NetworkType type, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
+        void Connect(NetworkType type, uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size = 0, int32_t recv_buff_size = 0);
     public:
         /*
         * @brief 网络库特性:网络线程模拟 Nagle 算法,减少系统调用,代价是在通信不够频繁的情况下可能会增加延迟.

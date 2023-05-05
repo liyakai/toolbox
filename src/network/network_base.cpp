@@ -56,16 +56,16 @@ namespace ToolBox
     {
         if (event2worker_.Full())
         {
-            NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", event->GetNetworkType());
+            NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", GetNetworkType());
             GIVE_BACK_OBJECT(event);
             return;
         }
         event2worker_.Push(std::move(event));
     }
 
-    void INetwork::OnAccepting(int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
+    void INetwork::OnAccepting(uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        auto* accept_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAccepting);
+        auto* accept_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAccepting, opaque);
         accept_event->network_type_ = network_type_;
         accept_event->net_evt_.accepting_.fd_ = fd;
         accept_event->SetAcceptingIP(ip);
@@ -74,33 +74,33 @@ namespace ToolBox
         accept_event->net_evt_.accepting_.recv_buff_size_ = recv_buff_size;
         master_->NotifyMain(accept_event);
     }
-    void INetwork::OnAccepted(uint64_t connect_id)
+    void INetwork::OnAccepted(uint64_t opaque, uint64_t connect_id)
     {
-        auto* accept_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAccepted);
+        auto* accept_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainAccepted, opaque);
         accept_event->network_type_ = network_type_;
         accept_event->net_evt_.accept_.connect_id_ = connect_id;
         master_->NotifyMain(accept_event);
     }
-    void INetwork::OnConnected(uint64_t connect_id)
+    void INetwork::OnConnected(uint64_t opaque, uint64_t connect_id)
     {
-        auto* connected_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainConnected);
+        auto* connected_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainConnected, opaque);
         connected_event->network_type_ = network_type_;
         connected_event->net_evt_.connect_sucessed_.connect_id_ = connect_id;
         master_->NotifyMain(connected_event);
     }
 
-    void INetwork::OnConnectedFailed(ENetErrCode err_code, int32_t err_no)
+    void INetwork::OnConnectedFailed(uint64_t opaque, ENetErrCode err_code, int32_t err_no)
     {
-        auto* connected_failed_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainConnectFailed);
+        auto* connected_failed_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainConnectFailed, opaque);
         connected_failed_event->network_type_ = network_type_;
         connected_failed_event->net_evt_.connect_failed_.net_err_code = err_code;
         connected_failed_event->net_evt_.connect_failed_.sys_err_code = err_no;
         master_->NotifyMain(connected_failed_event);
     }
 
-    void INetwork::OnErrored(uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
+    void INetwork::OnErrored(uint64_t opaque, uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
     {
-        auto* errored_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainErrored);
+        auto* errored_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainErrored, opaque);
         errored_event->network_type_ = network_type_;
         errored_event->net_evt_.error_.connect_id_ = connect_id;
         errored_event->net_evt_.error_.net_err_code = err_code;
@@ -108,9 +108,9 @@ namespace ToolBox
         master_->NotifyMain(errored_event);
     }
 
-    void INetwork::OnClosed(uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
+    void INetwork::OnClosed(uint64_t opaque, uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
     {
-        auto* close_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainClose);
+        auto* close_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainClose, opaque);
         close_event->network_type_ = network_type_;
         close_event->net_evt_.close_.connect_id_ = connect_id;
         close_event->net_evt_.close_.net_err_ = err_code;
@@ -118,9 +118,9 @@ namespace ToolBox
         master_->NotifyMain(close_event);
     }
 
-    void INetwork::OnReceived(uint64_t connect_id, const char* data, uint32_t size)
+    void INetwork::OnReceived(uint64_t opaque, uint64_t connect_id, const char* data, uint32_t size)
     {
-        auto* receive_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainRecv);
+        auto* receive_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainRecv, opaque);
         receive_event->network_type_ = network_type_;
         receive_event->net_evt_.recv_.connect_id_ = connect_id;
         receive_event->net_evt_.recv_.data_ = data;
@@ -139,14 +139,14 @@ namespace ToolBox
 
     void INetwork::OnMainToWorkerNewAccepter_(Event* event)
     {
-        auto accepter_event = dynamic_cast<NetEventWorker*>(event);
+        auto* accepter_event = dynamic_cast<NetEventWorker*>(event);
         if (nullptr == accepter_event)
         {
             NetworkLogError("[Network] event is null.");
             return;
         }
-        auto conn_id = OnNewAccepter(accepter_event->GetIP(), accepter_event->GetPort(), accepter_event->GetSendBuffSize(), accepter_event->GetRecvBuffSize());
-        auto bind_tcp = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainBinded);
+        auto conn_id = OnNewAccepter(accepter_event->GetOpaque(), accepter_event->GetIP(), accepter_event->GetPort(), accepter_event->GetSendBuffSize(), accepter_event->GetRecvBuffSize());
+        auto bind_tcp = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainBinded, accepter_event->GetOpaque());
         bind_tcp->network_type_ = network_type_;
         bind_tcp->net_evt_.bind_.connect_id_ = conn_id;
         bind_tcp->SetBindIP(accepter_event->GetIP());
@@ -156,14 +156,14 @@ namespace ToolBox
 
     void INetwork::OnMainToWorkerJoinIOMultiplexing_(Event* event)
     {
-        auto accepting_event = dynamic_cast<NetEventWorker*>(event);
+        auto* accepting_event = dynamic_cast<NetEventWorker*>(event);
         if (nullptr == accepting_event)
         {
             NetworkLogError("[Network] event is null.");
             return;
         }
-        NetworkLogTrace("[Network] OnMainToWorkerJoinIOMultiplexing_  fd:%d", accepting_event->GetFd());
-        OnJoinIOMultiplexing(accepting_event->GetFd(), accepting_event->GetIP(), accepting_event->GetPort(), accepting_event->GetSendBuffSize(), accepting_event->GetRecvBuffSize());
+        NetworkLogTrace("[Network] OnMainToWorkerJoinIOMultiplexing_,opaque:%d,  fd:%d", accepting_event->GetOpaque(), accepting_event->GetFd());
+        OnJoinIOMultiplexing(accepting_event->GetOpaque(), accepting_event->GetFd(), accepting_event->GetIP(), accepting_event->GetPort(), accepting_event->GetSendBuffSize(), accepting_event->GetRecvBuffSize());
     }
 
     void INetwork::OnMainToWorkerNewConnecter_(Event* event)
@@ -174,7 +174,7 @@ namespace ToolBox
             NetworkLogError("[Network] event is null.");
             return;
         }
-        OnNewConnecter(connecter_tcp->GetIP(), connecter_tcp->GetPort(), connecter_tcp->GetSendBuffSize(), connecter_tcp->GetRecvBuffSize());
+        OnNewConnecter(connecter_tcp->GetOpaque(), connecter_tcp->GetIP(), connecter_tcp->GetPort(), connecter_tcp->GetSendBuffSize(), connecter_tcp->GetRecvBuffSize());
     }
 
     void INetwork::OnMainToWorkerClose_(Event* event)
@@ -225,7 +225,7 @@ namespace ToolBox
             }
             else
             {
-                OnErrored(0, ENetErrCode::NET_INVALID_EVENT, 0);
+                OnErrored(0, 0, ENetErrCode::NET_INVALID_EVENT, 0);
             }
         }
     }

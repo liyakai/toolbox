@@ -7,8 +7,8 @@
 namespace ToolBox
 {
 
-    Event::Event(EventID id)
-        : id_(id)
+    Event::Event(EventID id, uint64_t opaque/* = 0 */)
+        : id_(id), opaque_(opaque)
     {
 
     }
@@ -20,11 +20,14 @@ namespace ToolBox
     {
         return id_;
     }
+    uint64_t Event::GetOpaque()
+    {
+        return opaque_;
+    }
 
 
-
-    NetEventWorker::NetEventWorker(EventID event_id)
-        : Event(event_id)
+    NetEventWorker::NetEventWorker(EventID event_id, uint64_t opaque/* = 0 */)
+        : Event(event_id, opaque)
     {
     }
 
@@ -113,15 +116,6 @@ namespace ToolBox
     {
         return net_req_.address_.fd_;
     }
-    void NetEventWorker::SetNetworkType(NetworkType network_type)
-    {
-        network_type_ = network_type;
-    }
-
-    NetworkType NetEventWorker::GetNetworkType() const
-    {
-        return network_type_;
-    }
 
     void NetEventWorker::SetFeatureParam(int32_t param1, int32_t param2)
     {
@@ -134,8 +128,8 @@ namespace ToolBox
         return std::tuple<int32_t, int32_t> {net_req_.net_feature_.param1_, net_req_.net_feature_.param2_};
     }
 
-    NetEventMain::NetEventMain(EventID event_id)
-        : Event(event_id)
+    NetEventMain::NetEventMain(EventID event_id, uint64_t opaque/* = 0 */)
+        : Event(event_id, opaque)
     {
     }
     NetEventMain::~NetEventMain()

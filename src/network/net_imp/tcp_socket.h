@@ -147,19 +147,19 @@ namespace ToolBox
         * @param port 监听端口
         * @retval 初始化是否成功
         */
-        bool InitNewAccepter(const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        bool InitNewAccepter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
 
         /*
         *  初始化从accpet函数接收得来的socket
         */
-        bool InitAccpetSocket(int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        bool InitAccpetSocket(uint64_t opaque, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * 初始化新的连接器
         * @param ip 连接IP
         * @param port 连接端口
         * @retval 初始化是否成功
         */
-        bool InitNewConnecter(const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
+        bool InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size) override;
         /*
         * 发送数据
         * @param data 发送数据指针
