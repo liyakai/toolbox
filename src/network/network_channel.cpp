@@ -281,6 +281,7 @@ namespace ToolBox
             }
             NetworkLogInfo("[Network] Cache event for net thread. network_thread_index:%zu", net_thread_index);
             cached_event_to_worker_.emplace_back(std::make_tuple(net_thread_index, type, event));
+            return;
         }
 
         if (net_thread_index >= networks_.size())
