@@ -142,8 +142,10 @@ namespace ToolBox
         {
             return ENetErrCode::NET_INVALID_CONNID;
         }
+        size = size + sizeof(uint32_t);
         auto* data_to_worker = GET_NET_MEMORY(size);
-        memmove(data_to_worker, data, size);
+        memmove(data_to_worker, (char*)&size, sizeof(uint32_t));
+        memmove(data_to_worker + sizeof(uint32_t), data, size);
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerSend);
         event->SetConnectID(conn_id);
         event->SetData(data_to_worker, size);
@@ -469,15 +471,15 @@ namespace ToolBox
         OnReceived(event_main->network_type_
                    , event_main->GetOpaque()
                    , event_main->net_evt_.recv_.connect_id_
-                   , event_main->net_evt_.recv_.data_
-                   , event_main->net_evt_.recv_.size_);
+                   , event_main->net_evt_.recv_.data_ + sizeof(uint32_t)
+                   , event_main->net_evt_.recv_.size_ - sizeof(uint32_t));
         if (received_)
         {
             received_(event_main->network_type_
                       , event_main->GetOpaque()
                       , event_main->net_evt_.recv_.connect_id_
-                      , event_main->net_evt_.recv_.data_
-                      , event_main->net_evt_.recv_.size_);
+                      , event_main->net_evt_.recv_.data_ + sizeof(uint32_t)
+                      , event_main->net_evt_.recv_.size_ - sizeof(uint32_t));
         }
     }
 
