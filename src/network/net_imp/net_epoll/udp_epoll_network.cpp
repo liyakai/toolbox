@@ -115,7 +115,7 @@ namespace ToolBox
         address_to_connect_.erase(iter);
     }
 
-    void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, std::size_t size)
+    void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, uint32_t size)
     {
         auto iter = address_to_connect_.find(address_id);
         if (iter == address_to_connect_.end())

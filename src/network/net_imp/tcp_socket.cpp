@@ -224,7 +224,7 @@ namespace ToolBox
             ErrCode err_code = ProcessRecvData();
             if (ErrCode::ERR_SUCCESS != err_code)
             {
-                NetworkLogWarn("[Network] ProcessRecvData.err_code:$d", err_code);
+                NetworkLogWarn("[Network] ProcessRecvData.err_code:%d", err_code);
                 return;
             }
 
@@ -288,6 +288,7 @@ namespace ToolBox
             recv_ring_buffer_.Copy((char*)&len, sizeof(uint32_t));
             if (len > static_cast<uint32_t>(recv_buff_len_))
             {
+                NetworkLogError("[Network][TcpSocket] Packet size is invaliable. socket id:%d, conn_id:%llu, len.%u", GetSocketID(), GetConnID(), len);
                 Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
                 return ErrCode::ERR_INVALID_PACKET_SIZE;
             }
@@ -423,10 +424,12 @@ namespace ToolBox
     {
         if (SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
         {
+            NetworkLogError("[Network][TcpSocket] socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d", GetSocketID(), GetConnID(), GetSocketError());
             Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
         }
         else
         {
+            NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d", GetSocketID(), GetConnID(), GetSocketError());
             p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
         }
     }
@@ -457,7 +460,7 @@ namespace ToolBox
     {
         if (IsSocketValid())
         {
-            NetworkLogDebug("[Network] socket id:%d Ready to be free.", GetSocketID());
+            NetworkLogDebug("[Network] socket id:%d, conn_id:%llu, Ready to be free.net_err:%d, sys_err:%d", GetSocketID(), GetConnID(), net_err, sys_err);
             BaseSocket::Close(net_err, sys_err);
             p_network_->CloseListenInMultiplexing(GetSocketID());
             // 通知主线程 socket 关闭
@@ -783,6 +786,7 @@ namespace ToolBox
         if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
 #endif
         {
+            NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d", GetSocketID(), GetConnID(), GetSocketError());
             // 通知 主线程连接失败
             p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
             Close(ENetErrCode::NET_SYS_ERROR, errno);
@@ -811,9 +815,13 @@ namespace ToolBox
             return;
         }
 
+        uint32_t packet_size = 0;
+        memcpy((char*)&packet_size, data, sizeof(uint32_t));
+        // NetworkLogTrace("[Network][TcpSocket] Send data size:%u. socket id:%d, conn_id:%llu", packet_size, GetSocketID(), GetConnID());
+
         if (debug_statistic_save_ + debug_statistic_send_ >= 6000)
         {
-            NetworkLogDebug("[Network] #### debug #### socket_id:%d debug_statistic_save_:%d, debug_statistic_send_:%d, config packet num:%d", GetSocketID(), debug_statistic_save_, debug_statistic_send_, p_network_->GetSimulateNaglePacketsNum());
+            //NetworkLogDebug("[Network] #### debug #### socket_id:%d debug_statistic_save_:%d, debug_statistic_send_:%d, config packet num:%d", GetSocketID(), debug_statistic_save_, debug_statistic_send_, p_network_->GetSimulateNaglePacketsNum());
             debug_statistic_save_ = 0;
             debug_statistic_send_ = 0;
         }
@@ -852,6 +860,7 @@ namespace ToolBox
             int32_t sended = SocketSend(GetSocketID(), data, len);
             if (-1 == sended)
             {
+                NetworkLogError("[Network][TcpSocket] SocketSend failed. socket id:%d, conn_id:%llu, errno.%d", GetSocketID(), GetConnID(), errno);
                 Close(ENetErrCode::NET_SYS_ERROR, errno);
                 return;
             }

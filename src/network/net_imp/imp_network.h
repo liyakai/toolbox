@@ -80,7 +80,7 @@ namespace ToolBox
         /*
         * 工作线程内工作线程内发送
         */
-        virtual void OnSend(uint64_t connect_id, const char* data, std::size_t size) override;
+        virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) override;
     protected:
         SocketPool<SocketType> sock_mgr_;       // socket 池
         IOMultiplexingInterface* base_ctrl_;    // io多路复用接口
@@ -244,7 +244,7 @@ namespace ToolBox
         socket->Close(ENetErrCode::NET_SUCCESS);
     }
     template<typename SocketType>
-    void ImpNetwork<SocketType>::OnSend(uint64_t connect_id, const char* data, std::size_t size)
+    void ImpNetwork<SocketType>::OnSend(uint64_t connect_id, const char* data, uint32_t size)
     {
         auto socket = sock_mgr_.GetSocket(connect_id);
         if (nullptr == socket)

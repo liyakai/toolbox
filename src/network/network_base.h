@@ -6,6 +6,7 @@
 #include "network_def_internal.h"
 #include <cstdint>
 #include <functional>
+#include <stdint.h>
 
 namespace ToolBox
 {
@@ -116,7 +117,7 @@ namespace ToolBox
         /*
         * 主线程通知,工作线程内工作线程内发送
         */
-        virtual void OnSend(uint64_t connect_id, const char* data, std::size_t size) = 0;
+        virtual void OnSend(uint64_t connect_id, const char* data, uint32_t size) = 0;
 
     protected:
         /*

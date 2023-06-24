@@ -75,7 +75,7 @@ namespace ToolBox
         /*
         * 工作线程内工作线程内发送
         */
-        virtual void OnSend(uint64_t address_id, const char* data, std::size_t size) override;
+        virtual void OnSend(uint64_t address_id, const char* data, uint32_t size) override;
 
     private:
         std::unordered_map<uint64_t, uint32_t> address_to_connect_;      // 地址转换的ID 到 SocketPool管理的连接ID的映射
