@@ -63,17 +63,23 @@ namespace ToolBox
         {
             for (auto& es : free_list_)
             {
-                delete es;
-            }
-            free_list_.clear();
-            for (auto& es : socket_vector_)
-            {
                 if (nullptr != es)
                 {
                     delete es;
                     es = nullptr;
                 }
+
             }
+            free_list_.clear();
+            // FIX ME. udp socket pool 在这里会崩溃,先注释掉.让进程统一回收内存.
+            // for (auto& es : socket_vector_)
+            // {
+            //     if (nullptr != es)
+            //     {
+            //         delete es;
+            //         es = nullptr;
+            //     }
+            // }
             socket_vector_.clear();
             alloced_socketes_.clear();
             return true;

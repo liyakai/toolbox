@@ -63,6 +63,8 @@ namespace ToolBox
 
     void UdpSocket::Reset()
     {
+
+        BaseSocket::Reset();
         for (const auto& buffer : send_list_)
         {
             GiveBackObjectLockFree(buffer);
@@ -77,12 +79,8 @@ namespace ToolBox
             ikcp_release(kcp_);
             kcp_ = nullptr;
         }
-
-
         p_network_ = nullptr;
         p_sock_pool_ = nullptr;
-
-        BaseSocket::Reset();
     }
 
 
@@ -127,6 +125,7 @@ namespace ToolBox
         {
             return;
         }
+        NetworkLogTrace("[Network][UdpSocket] Send udp data. socket id:%d, conn_id:%llu, len.%zu", GetSocketID(), GetConnID(), length);
         if (false == send_list_.empty())
         {
             send_list_.emplace_back(GET_NET_OBJECT(Buffer, buffer, length));
@@ -163,21 +162,25 @@ namespace ToolBox
         if (IsSocketValid())
         {
             BaseSocket::Close(net_err, sys_err);
-            // 通知主线程 socket 关闭
-            if (UdpType::ACCEPTOR == type_)
+            if (p_network_)
             {
-                p_network_->OnClosed(GetOpaque(), GetLocalAddressID(), net_err, sys_err);
-                p_network_->CloseListenInMultiplexing(GetSocketID());
-            }
-            else
-            {
-                if (UdpType::CONNECTOR == type_)
+                // 通知主线程 socket 关闭
+                if (UdpType::ACCEPTOR == type_)
                 {
+                    p_network_->OnClosed(GetOpaque(), GetLocalAddressID(), net_err, sys_err);
                     p_network_->CloseListenInMultiplexing(GetSocketID());
                 }
-                p_network_->OnClosed(GetOpaque(), GetRemoteAddressID(), net_err, sys_err);
+                else
+                {
+                    if (UdpType::CONNECTOR == type_)
+                    {
+                        p_network_->CloseListenInMultiplexing(GetSocketID());
+                    }
+                    p_network_->OnClosed(GetOpaque(), GetRemoteAddressID(), net_err, sys_err);
+                }
+                p_sock_pool_->Free(this);
             }
-            p_sock_pool_->Free(this);
+
         }
     }
 
@@ -290,12 +293,14 @@ namespace ToolBox
                 {
                     char* buff_block = GET_NET_MEMORY(size);
                     memcpy(buff_block, array.data(), size);
+                    NetworkLogTrace("[Network][UdpSocket] Receive udp data. socket id:%d, conn_id:%llu, len.%zu", GetSocketID(), GetConnID(), size);
                     p_network_->OnReceived(GetOpaque(), UdpAddress(address).GetID(), buff_block, size);
                 }
                 else                    // 开启了kcp
                 {
                     if (nullptr != udp_socket)
                     {
+                        NetworkLogTrace("[Network][UdpSocket] Receive kcp data. socket id:%d, conn_id:%llu, len.%zu", GetSocketID(), GetConnID(), size);
                         udp_socket->KcpRecv(array.data(), size, UdpAddress(address));
                     }
 
@@ -352,6 +357,7 @@ namespace ToolBox
         {
             new_socket->OpenKcpMode();
         }
+        NetworkLogDebug("[Network][UdpEpollNetwork] on new client.address_ip:%s, address_port:%u remote_address_id:%llu, conn_id:%llu", inet_ntoa(address.sin_addr), address.sin_port, new_socket->GetRemoteAddressID(), new_socket->GetConnID());
         // 通知主线程有新的客户端连接进来
         p_udp_epoll_network->OnAccepted(GetOpaque(), new_socket->GetRemoteAddressID());
         p_udp_epoll_network->AddUdpAddress(address, new_socket->GetConnID());

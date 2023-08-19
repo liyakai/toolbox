@@ -110,7 +110,15 @@ namespace ToolBox
 
     void INetwork::OnClosed(uint64_t opaque, uint64_t connect_id, ENetErrCode err_code, int32_t err_no)
     {
+        if (!master_)
+        {
+            return;
+        }
         auto* close_event = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainClose, opaque);
+        if (!close_event)
+        {
+            return;
+        }
         close_event->network_type_ = network_type_;
         close_event->net_evt_.close_.connect_id_ = connect_id;
         close_event->net_evt_.close_.net_err_ = err_code;

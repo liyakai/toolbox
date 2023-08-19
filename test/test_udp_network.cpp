@@ -33,8 +33,8 @@ public:
     }
     void OnReceived(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) override
     {
-        // Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
-        // PrintData(data, 16);
+        Print("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
+        PrintData(data, 16);
         Send(conn_id, data, size);
     };
     void OnClose(ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err) override
@@ -92,29 +92,30 @@ public:
             memmove(&client_conn_id, data + sizeof(uint32_t), sizeof(uint64_t));
             memmove(send_data + sizeof(uint32_t), data + sizeof(uint32_t) + sizeof(uint64_t), size - sizeof(uint32_t) - sizeof(uint64_t)); // data
 
-            // Print("转发给 client 的数据长度为%d,conn_id:%lu\n", send_data_size, client_conn_id);
-            // PrintData(send_data, 32);
-            // Print("\n\n");
+            Print("转发给 client 的数据长度为%d,conn_id:%lu\n", send_data_size, client_conn_id);
+            PrintData(send_data, 32);
+            Print("\n\n");
             Send(client_conn_id, send_data, send_data_size);
-
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data1");
         }
         else
         {
             // 客户端发来的消息
             // 换头后发送给 echo
-            //  Print("收到 client 数据长度为%d\n", size);
-            //  PrintData(data, 32);
+            Print("收到 client 数据长度为%d\n", size);
+            PrintData(data, 32);
 
             char* send_data = ToolBox::MemPoolLockFreeMgr->GetMemory(size + sizeof(uint64_t));
             uint32_t send_data_size = size + sizeof(uint64_t);
             memmove(send_data, &send_data_size, sizeof(uint32_t));  // buff len
             memmove(send_data + sizeof(uint32_t), &conn_id, sizeof(uint64_t));  // conn_id
             memmove(send_data + sizeof(uint32_t) + sizeof(uint64_t), data + sizeof(uint32_t), size - sizeof(uint32_t)); // data
-            // Print("转发给 echo 的数据长度为%d,conn_id:%lu\n", send_data_size, echo_conn_id_);
-            //PrintData(send_data, 16);
+            Print("转发给 echo 的数据长度为%d,conn_id:%llu,echo_conn_id_:%llu\n", send_data_size, conn_id, echo_conn_id_);
+            PrintData(send_data, 16);
             Send(echo_conn_id_, send_data, send_data_size);
             ToolBox::MemPoolLockFreeMgr->GiveBack(send_data, "test_send_data2");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
 
     };
@@ -139,8 +140,8 @@ CASE(test_udp_echo)
     fprintf(stderr, "网络库测试用例: test_udp_echo \n");
     ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->SetDebugPrint(true);
     LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
-    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Start(4);
     ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Accept(ToolBox::NT_UDP, 9600, "0.0.0.0", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
+    ToolBox::Singleton<TestUdpNetworkEcho>::Instance()->Start(4);
     bool run = true;
     std::thread t([&]()
     {
@@ -184,12 +185,13 @@ CASE(test_udp_echo)
 
 CASE(test_udp_forward)
 {
-    return;
+    // return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_udp_forward.prof");
 #endif // USE_GPERF_TOOLS
     fprintf(stderr, "网络库测试用例: test_udp_forward \n");
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->SetDebugPrint(true);
+    LogMgr->SetLogLevel(ToolBox::LogLevel::LOG_TRACE);
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Accept(ToolBox::NT_UDP, 9500, "0.0.0.0", 9500);
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Connect(ToolBox::NT_UDP, 9600, "0.0.0.0", 9600, 10 * 1024 * 1024, 10 * 1024 * 1024);
     ToolBox::Singleton<TestUdpNetworkForward>::Instance()->Start();
