@@ -96,6 +96,7 @@ namespace ToolBox
             }
             uint64_t remote_address_id = new_socket->GetRemoteAddressID();
             address_to_connect_[remote_address_id] = new_socket->GetConnID();
+            NetworkLogDebug("[Network][UdpEpollNetwork] OnConnected. remote_address_id:%llu, conn_id:%llu", remote_address_id, new_socket->GetConnID());
             if (remote_address_id > 0)
             {
                 OnConnected(opaque, remote_address_id);

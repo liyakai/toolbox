@@ -171,6 +171,10 @@ namespace ToolBox
     template<typename SocketType>
     void ImpNetwork<SocketType>::CloseListenInMultiplexing(int32_t socket_id)
     {
+        if (!base_ctrl_)
+        {
+            return;
+        }
         base_ctrl_->DelEvent(socket_id);
     }
 
