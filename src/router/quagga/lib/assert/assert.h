@@ -41,16 +41,17 @@ extern "C" {
 #define static_assert _Static_assert
 #endif
 
-struct xref_assert {
-	struct xref xref;
+struct xref_assert
+{
+    struct xref xref;
 
-	const char *expr;
-	const char *extra, *args;
+    const char* expr;
+    const char* extra, *args;
 };
 
-extern void _zlog_assert_failed(const struct xref_assert *xref,
-				const char *extra, ...) PRINTFRR(2, 3)
-	__attribute__((noreturn));
+extern void _zlog_assert_failed(const struct xref_assert* xref,
+                                const char* extra, ...) PRINTFRR(2, 3)
+__attribute__((noreturn));
 
 /* the "do { } while (expr_)" is there to get a warning for assignments inside
  * the assert expression aka "assert(x = 1)".  The (necessary) braces around
@@ -58,36 +59,37 @@ extern void _zlog_assert_failed(const struct xref_assert *xref,
  * _zlog_assert_failed() is noreturn, the while condition will never be
  * checked.
  */
+#undef assert
 #define assert(expr_)                                                          \
-	({                                                                     \
-		static const struct xref_assert _xref __attribute__(           \
-			(used)) = {                                            \
-			.xref = XREF_INIT(XREFT_ASSERT, NULL, __func__),       \
-			.expr = #expr_,                                        \
-		};                                                             \
-		XREF_LINK(_xref.xref);                                         \
-		if (__builtin_expect((expr_) ? 0 : 1, 0))                      \
-			do {                                                   \
-				_zlog_assert_failed(&_xref, NULL);             \
-			} while (expr_);                                       \
-	})
+    ({                                                                     \
+        static const struct xref_assert _xref __attribute__(           \
+            (used)) = {                                            \
+            .xref = XREF_INIT(XREFT_ASSERT, NULL, __func__),       \
+            .expr = #expr_,                                        \
+        };                                                             \
+        XREF_LINK(_xref.xref);                                         \
+        if (__builtin_expect((expr_) ? 0 : 1, 0))                      \
+            do {                                                   \
+                _zlog_assert_failed(&_xref, NULL);             \
+            } while (expr_);                                       \
+    })
 
 #define assertf(expr_, extra_, ...)                                            \
-	({                                                                     \
-		static const struct xref_assert _xref __attribute__(           \
-			(used)) = {                                            \
-			.xref = XREF_INIT(XREFT_ASSERT, NULL, __func__),       \
-			.expr = #expr_,                                        \
-			.extra = extra_,                                       \
-			.args = #__VA_ARGS__,                                  \
-		};                                                             \
-		XREF_LINK(_xref.xref);                                         \
-		if (__builtin_expect((expr_) ? 0 : 1, 0))                      \
-			do {                                                   \
-				_zlog_assert_failed(&_xref, extra_,            \
-						    ##__VA_ARGS__);            \
-			} while (expr_);                                       \
-	})
+    ({                                                                     \
+        static const struct xref_assert _xref __attribute__(           \
+            (used)) = {                                            \
+            .xref = XREF_INIT(XREFT_ASSERT, NULL, __func__),       \
+            .expr = #expr_,                                        \
+            .extra = extra_,                                       \
+            .args = #__VA_ARGS__,                                  \
+        };                                                             \
+        XREF_LINK(_xref.xref);                                         \
+        if (__builtin_expect((expr_) ? 0 : 1, 0))                      \
+            do {                                                   \
+                _zlog_assert_failed(&_xref, extra_,            \
+                            ##__VA_ARGS__);            \
+            } while (expr_);                                       \
+    })
 
 #define zassert assert
 

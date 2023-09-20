@@ -2,7 +2,6 @@
 /version.h
 /gitversion.h
 /gitversion.h.tmp
-/route_types.h
 /memtypes.h
 /command_lex.c
 /command_lex.h

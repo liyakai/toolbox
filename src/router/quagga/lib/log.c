@@ -19,7 +19,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#define FRR_DEFINE_DESC_TABLE 1
 
 #include <zebra.h>
 

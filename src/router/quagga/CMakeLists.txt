@@ -4,7 +4,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 # 设置编译选项
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-attributes")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall  -Wno-attributes -Wno-unused-variable") #-Wfatal-errors
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall  -Wno-attributes -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable -Wno-int-conversion") #-Wfatal-errors
 
 # 指定库的路径
 link_directories(
