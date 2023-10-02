@@ -4,6 +4,7 @@
 #include <mutex>
 #include <cstdlib>
 #include <algorithm>
+#include <memory>
 #include "tools/singleton.h"
 #include "debug_print.h"
 
