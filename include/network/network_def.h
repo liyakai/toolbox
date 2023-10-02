@@ -31,10 +31,10 @@ namespace ToolBox
         NET_ENCODE_BUFF_OVERFLOW, // 打包缓冲区满
         NET_DECODE_BUFF_OVERFLOW, // 解包缓冲区满
         NET_INVALID_EVENT,        // event 无效
-
         NET_SEND_PIPE_OVERFLOW,   // 发送ringbuffer满
         NET_RECV_PIPE_OVERFLOW,   // 接收ringbuffer满
         NET_INVALID_CONNID,       // 无效的连接ID
+        NET_CACHED_EVENT_OVERFLOW,// 逻辑线程缓存的EVENT数量溢出
     };
 
     // 主线程与网络线程之间的队列的最大数量
