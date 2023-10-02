@@ -1,5 +1,6 @@
 #pragma once
 #include <stdarg.h>
+#include <functional>
 // 实现日志模块
 namespace ToolBox
 {
@@ -10,6 +11,7 @@ namespace ToolBox
 #define LogWarn(LogFormat, ...)  !LogMgr->IsEnabled(LogLevel::LOG_WARN)  ? false : LogMgr->Warn("[WARN] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
 #define LogError(LogFormat, ...) !LogMgr->IsEnabled(LogLevel::LOG_ERROR) ? false : LogMgr->Error("[ERROR] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
 #define LogFatal(LogFormat, ...) !LogMgr->IsEnabled(LogLevel::LOG_FATAL) ? false : LogMgr->Fatal("[FATAL] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
+
     /*
     * 定义日志等级枚举
     */
@@ -25,6 +27,8 @@ namespace ToolBox
 
         LOG_MAX,
     };
+
+    using LogCallback = std::function<void(LogLevel level, const char* fmt)>;
 
     /*
     * 定义日志管理器,初步管理日志等级,具体写日志可用原生或者第三方日志库[目前只实现了打印到屏幕]
@@ -46,6 +50,13 @@ namespace ToolBox
         {
             return log_level >= log_level_;
         }
+        /*
+        * @brief 设置日志回调
+        */
+        void SetLogCallback(const ToolBox::LogCallback& log_callback)
+        {
+            log_callback_ = log_callback;
+        }
     public:
         bool Trace(const char* fmt, ...)
         {
@@ -56,6 +67,10 @@ namespace ToolBox
             va_list ap;
             va_start(ap, fmt);
             vsprintf(log_buffer_, fmt, ap);
+            if (log_callback_)
+            {
+                log_callback_(ToolBox::LogLevel::LOG_TRACE, log_buffer_);
+            }
             fprintf(stderr, log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
@@ -71,6 +86,10 @@ namespace ToolBox
             va_list ap;
             va_start(ap, fmt);
             vsprintf(log_buffer_, fmt, ap);
+            if (log_callback_)
+            {
+                log_callback_(ToolBox::LogLevel::LOG_DEBUG, log_buffer_);
+            }
             fprintf(stderr, log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
@@ -87,6 +106,10 @@ namespace ToolBox
             va_list ap;
             va_start(ap, fmt);
             vsprintf(log_buffer_, fmt, ap);
+            if (log_callback_)
+            {
+                log_callback_(ToolBox::LogLevel::LOG_INFO, log_buffer_);
+            }
             fprintf(stderr, log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
@@ -103,6 +126,10 @@ namespace ToolBox
             va_list ap;
             va_start(ap, fmt);
             vsprintf(log_buffer_, fmt, ap);
+            if (log_callback_)
+            {
+                log_callback_(ToolBox::LogLevel::LOG_WARN, log_buffer_);
+            }
             fprintf(stderr, log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
@@ -119,6 +146,10 @@ namespace ToolBox
             va_list ap;
             va_start(ap, fmt);
             vsprintf(log_buffer_, fmt, ap);
+            if (log_callback_)
+            {
+                log_callback_(ToolBox::LogLevel::LOG_ERROR, log_buffer_);
+            }
             fprintf(stderr, log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
@@ -136,6 +167,10 @@ namespace ToolBox
             va_list ap;
             va_start(ap, fmt);
             vsprintf(log_buffer_, fmt, ap);
+            if (log_callback_)
+            {
+                log_callback_(ToolBox::LogLevel::LOG_FATAL, log_buffer_);
+            }
             fprintf(stderr, log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
@@ -145,6 +180,7 @@ namespace ToolBox
         LogLevel log_level_ = LogLevel::LOG_DEBUG;    // 全局日志等级
         const static int log_buffer_size_ = 5 * 1024 * 1024;
         char log_buffer_[log_buffer_size_];
+        LogCallback log_callback_;
     };
 
 #define LogMgr ToolBox::Singleton<ToolBox::LogManager>::Instance()

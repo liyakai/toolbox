@@ -1,6 +1,7 @@
 #include "tools/cpu_mem_info.h"
 #include "tools/singleton.h"
 #include "unit_test_frame/unittest.h"
+#include <thread>
 
 #ifdef __linux__
 
