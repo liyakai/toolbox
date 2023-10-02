@@ -64,6 +64,8 @@ namespace ToolBox
 #define NetworkLogFatal(LogFormat, ...)     LogFatal(LogFormat, ## __VA_ARGS__)
 #endif  // NetworkLogFatal
 
+#define NUM_OF_CACHED_EVENT_TO_WORKER 1024  // 逻辑线程缓存的即将发向网络线程的事件个数
+
     /************************************************************
     **********     网络库获取对象的三种方法       ****************
     ************************************************************/

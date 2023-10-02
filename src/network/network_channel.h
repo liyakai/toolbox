@@ -249,6 +249,7 @@ namespace ToolBox
         using NetworkArray = std::vector<std::array<std::unique_ptr<INetwork>, NetworkType::NT_MAX>>;
         NetworkArray networks_;     // 网络实现
         std::unordered_map<uint64_t, NetworkType> conn_type_;   // conn_id 到 NetworkType的映射
+        std::vector<std::tuple<uint32_t, NetworkType, NetEventWorker*>> cached_event_to_worker_; // 当网络线程没有建立时,缓存发往网络线程的事件.以消除 Start 与 Connect/Accept 之间的先后依赖性
     private:    // 回调函数
         BindedMethod binded_;           // 绑定的回调
         AcceptingMethod accepting_;    // 新连接事件[尚未加入监听]

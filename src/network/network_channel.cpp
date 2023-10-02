@@ -1,10 +1,12 @@
 #include "network_channel.h"
+#include "network/network_def.h"
 #include "network_def_internal.h"
 #include "tools/time_util.h"
 #include "event.h"
 #include <cstddef>
 #include <cstdint>
 #include <random>
+#include <utility>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #include "network/net_imp/net_iocp/tcp_iocp_network.h"
 #elif defined(__linux__)
@@ -78,8 +80,12 @@ namespace ToolBox
                 NetworkLogWarn("[Network] network has stoped. networks_ size :%zu", networks_.size());
             }));
         }
-
-
+        // 将缓存的事件应用到对应的网络线程
+        for (const auto& iter : cached_event_to_worker_)
+        {
+            NotifyWorker(std::get<2>(iter), std::get<1>(iter), std::get<0>(iter));
+        }
+        cached_event_to_worker_.clear();
         return true;
     }
     void NetworkChannel::Update()
@@ -259,6 +265,18 @@ namespace ToolBox
         {
             OnErrored(type, 0, 0, ENetErrCode::NET_INVALID_NETWORK_TYPE, 0);
             return;
+        }
+
+        if (0 == networks_.size())
+        {
+            if (cached_event_to_worker_.size() > NUM_OF_CACHED_EVENT_TO_WORKER)
+            {
+                NetworkLogError("[Network] Vector of cache event to net thread is overflow. network_thread_index:%zu", net_thread_index);
+                OnErrored(type, 0, 0, ENetErrCode::NET_CACHED_EVENT_OVERFLOW, 0);
+                return;
+            }
+            NetworkLogInfo("[Network] Cache event for net thread. network_thread_index:%zu", net_thread_index);
+            cached_event_to_worker_.emplace_back(std::make_tuple(net_thread_index, type, event));
         }
 
         if (net_thread_index >= networks_.size())

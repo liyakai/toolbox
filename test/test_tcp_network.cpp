@@ -234,9 +234,9 @@ CASE(test_tcp_echo)
     {
         printf("[TestNetworkEcho] 断开与客户端之间的连接,网络类型:%d,连接标记:%llu,连接ID:%llu 错误码:%d, 系统错误码:%d\n", type, opaque, conn_id, net_err, sys_err);
     });
+    network_echo.Accept(ToolBox::NT_TCP, 9600, "0.0.0.0", 9600,  10 * 1024 * 1024, 10 * 1024 * 1024);
     network_echo.Start(1);
     network_echo.SetSimulateNagle(256, 1);
-    network_echo.Accept(ToolBox::NT_TCP, 9600, "0.0.0.0", 9600,  10 * 1024 * 1024, 10 * 1024 * 1024);
     bool run = true;
     std::thread t([&]()
     {
@@ -387,9 +387,9 @@ CASE(test_tcp_forward)
     {
         printf("[TestNetworkForward] 断开与客户端之间的连接, 网络类型:%d, 连接标记:%llu, 连接ID:%llu 错误码:%d, 系统错误码:%d\n", type, opaque, conn_id, net_err, sys_err);
     });
-    network_forward.Start(2);
     network_forward.Accept(ToolBox::NT_TCP, 9500, "0.0.0.0", 9500);
     network_forward.Connect(ToolBox::NT_TCP, 9600, "0.0.0.0", 9600,  10 * 1024 * 1024, 10 * 1024 * 1024);
+    network_forward.Start(2);
     bool run = true;
     std::thread t([&]()
     {
