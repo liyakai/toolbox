@@ -34,7 +34,7 @@ add_definitions(-DFRR_DEFINE_DESC_TABLE=On)
 add_definitions(-DIOV_MAX=16) # 	/* IOV_MAX are normally defined in <sys/uio.h> , Posix.1g. example: Solaris2.6 are defined IOV_MAX size at 16.     */
 add_definitions(-DSYSCONFDIR="/etc/frr/")
 #add_definitions(-DSYSCONFDIR=${PROJECT_SOURCE_DIR}/bin/)
-add_definitions(-DTRACE_MATCHER=On) # vtysh 命令匹配详细日志
+#add_definitions(-DTRACE_MATCHER=On) # vtysh 命令匹配详细日志
 
 
 # 链接库
