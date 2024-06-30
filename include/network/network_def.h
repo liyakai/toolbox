@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 namespace ToolBox
 {
 
@@ -13,7 +14,7 @@ namespace ToolBox
         NT_MAX,
     };
 
-    enum class ENetErrCode
+    enum class ENetErrCode : int32_t
     {
         NET_SUCCESS = 0,
         NET_SYS_ERROR,            // 系统错误，同时会返回errno
