@@ -194,22 +194,22 @@ CASE(test_tcp_echo)
     ToolBox::Network network_echo;
     network_echo.SetOnBinded([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const std::string & ip, uint16_t port)
     {
-        printf("[TestNetworkEcho] 服务器已建立监听端口,网络类型:%d,连接标记:%llu, 连接ID:%llu, ip:%s, port:%d\n", type, opaque, conn_id, ip.c_str(), port);
+        printf("[TestNetworkEcho] 服务器已建立监听端口,网络类型:%d,连接标记:%lu, 连接ID:%lu, ip:%s, port:%d\n", type, opaque, conn_id, ip.c_str(), port);
     }).SetOnAccepting([](ToolBox::NetworkType type, uint64_t opaque, int32_t fd)
     {
-        printf("[TestNetworkEcho] 正准备将新连接加入io多路复用,网络类型:%d,连接标记:%llu, fd:%d\n", type, opaque, fd);
+        printf("[TestNetworkEcho] 正准备将新连接加入io多路复用,网络类型:%d,连接标记:%lu, fd:%d\n", type, opaque, fd);
     }).SetOnAccepted([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id)
     {
-        printf("[TestNetworkEcho] 接到客户端连接,网络类型:%d,连接标记:%llu,连接ID:%llu\n", type, opaque, conn_id);
+        printf("[TestNetworkEcho] 接到客户端连接,网络类型:%d,连接标记:%lu,连接ID:%lu\n", type, opaque, conn_id);
     }).SetOnConnected([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id)
     {
-        printf("[TestNetworkEcho] 主动连接成功:网络类型:%d,连接标记:%llu,连接ID:%llu\n", type, opaque, conn_id);
+        printf("[TestNetworkEcho] 主动连接成功:网络类型:%d,连接标记:%lu,连接ID:%lu\n", type, opaque, conn_id);
     }).SetOnConnectFailed([](ToolBox::NetworkType type, uint64_t opaque, ToolBox::ENetErrCode err_code, int32_t err_no)
     {
-        printf("[TestNetworkEcho] 连接失败.网络类型:%d,连接标记:%llu, 错误码:%d, 系统错误码:%d\n", type, opaque, err_code, err_no);
+        printf("[TestNetworkEcho] 连接失败.网络类型:%d,连接标记:%lu, 错误码:%d, 系统错误码:%d\n", type, opaque, static_cast<int32_t>(err_code), err_no);
     }).SetOnErrored([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no)
     {
-        printf("[TestNetworkEcho] 发生错误, 网络类型:%d,连接标记:%llu, connect_id: %lu 错误码:%d, 系统错误码:%d.\n", type, opaque, conn_id,  err_code, err_no);
+        printf("[TestNetworkEcho] 发生错误, 网络类型:%d,连接标记:%lu, connect_id: %lu 错误码:%d, 系统错误码:%d.\n", type, opaque, conn_id,  static_cast<int32_t>(err_code), err_no);
     }).SetOnReceived([&](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size)
     {
         // printf("收到客户端数据长度为%d,conn_id:%lu\n", size, conn_id);
@@ -220,7 +220,7 @@ CASE(test_tcp_echo)
         std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
         if (now_time > last_update_time_ + 1000)
         {
-            printf("[TestNetworkEcho] 连接ID:%llu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
+            printf("[TestNetworkEcho] 连接ID:%lu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
             last_update_time_ = now_time;
             recv_packets_ = 0;
         }
@@ -232,7 +232,7 @@ CASE(test_tcp_echo)
         }
     }).SetOnClose([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err)
     {
-        printf("[TestNetworkEcho] 断开与客户端之间的连接,网络类型:%d,连接标记:%llu,连接ID:%llu 错误码:%d, 系统错误码:%d\n", type, opaque, conn_id, net_err, sys_err);
+        printf("[TestNetworkEcho] 断开与客户端之间的连接,网络类型:%d,连接标记:%lu,连接ID:%lu 错误码:%d, 系统错误码:%d\n", type, opaque, conn_id, static_cast<int32_t>(net_err), sys_err);
     });
     network_echo.Accept(ToolBox::NT_TCP, 9600, "0.0.0.0", 9600,  10 * 1024 * 1024, 10 * 1024 * 1024);
     network_echo.Start(1);
@@ -295,23 +295,23 @@ CASE(test_tcp_forward)
     ToolBox::Network network_forward;
     network_forward.SetOnBinded([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const std::string & ip, uint16_t port)
     {
-        printf("[TestNetworkForward] 服务器已建立监听端口, 网络类型:%d,连接标记:%llu, 连接ID:%llu, ip:%s, port:%d\n", type, opaque, conn_id, ip.c_str(), port);
+        printf("[TestNetworkForward] 服务器已建立监听端口, 网络类型:%d,连接标记:%lu, 连接ID:%lu, ip:%s, port:%d\n", type, opaque, conn_id, ip.c_str(), port);
     }).SetOnAccepting([](ToolBox::NetworkType type, uint64_t opaque, int32_t fd)
     {
-        printf("[TestNetworkForward] 正准备将新连接加入io多路复用, 网络类型:%d, 连接标记:%llu, fd:%d\n", type, opaque, fd);
+        printf("[TestNetworkForward] 正准备将新连接加入io多路复用, 网络类型:%d, 连接标记:%lu, fd:%d\n", type, opaque, fd);
     }).SetOnAccepted([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id)
     {
-        printf("[TestNetworkForward] 接到客户端连接, 网络类型:%d, 连接标记:%llu, 连接ID:%llu\n", type, opaque, conn_id);
+        printf("[TestNetworkForward] 接到客户端连接, 网络类型:%d, 连接标记:%lu, 连接ID:%lu\n", type, opaque, conn_id);
     }).SetOnConnected([&](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id)
     {
         echo_conn_id_ = conn_id;
-        printf("[TestNetworkForward] 主动连接成功.网络类型:%d, 连接标记:%llu, 连接ID:%llu\n", type, opaque, conn_id);
+        printf("[TestNetworkForward] 主动连接成功.网络类型:%d, 连接标记:%lu, 连接ID:%lu\n", type, opaque, conn_id);
     }).SetOnConnectFailed([](ToolBox::NetworkType type, uint64_t opaque, ToolBox::ENetErrCode err_code, int32_t err_no)
     {
-        printf("[TestNetworkForward] 连接失败.网络类型:%d, 连接标记:%llu, 错误码:%d, 系统错误码:%d\n", type, opaque, err_code, err_no);
+        printf("[TestNetworkForward] 连接失败.网络类型:%d, 连接标记:%lu, 错误码:%d, 系统错误码:%d\n", type, opaque, static_cast<int32_t>(err_code), err_no);
     }).SetOnErrored([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no)
     {
-        printf("[TestNetworkForward] 发生错误, 网络类型:%d, 连接标记:%llu, connect_id: %lu 错误码:%d, 系统错误码:%d.\n", type, opaque, conn_id,  err_code, err_no);
+        printf("[TestNetworkForward] 发生错误, 网络类型:%d, 连接标记:%lu, connect_id: %lu 错误码:%d, 系统错误码:%d.\n", type, opaque, conn_id,  static_cast<int32_t>(err_code), err_no);
     }).SetOnReceived([&](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size)
     {
         //Print("收到客户端数据长度为%d\n", size);
@@ -344,7 +344,7 @@ CASE(test_tcp_forward)
             recv_packets_++;
             if (now_time > last_update_time_ + 1000)
             {
-                printf("[TestNetworkForward] 连接ID:%llu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
+                printf("[TestNetworkForward] 连接ID:%lu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
                 last_update_time_ = now_time;
                 recv_packets_ = 0;
             }
@@ -374,7 +374,7 @@ CASE(test_tcp_forward)
             std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
             if (now_time > client_last_update_time_ + 1000)
             {
-                printf("[TestNetworkForward] 客户端:%llu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
+                printf("[TestNetworkForward] 客户端:%lu 每秒收到了 %d 个数据包\n", conn_id, recv_packets_);
                 client_last_update_time_ = now_time;
                 client_recv_packets_ = 0;
             }
@@ -385,7 +385,7 @@ CASE(test_tcp_forward)
         }
     }).SetOnClose([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode net_err, int32_t sys_err)
     {
-        printf("[TestNetworkForward] 断开与客户端之间的连接, 网络类型:%d, 连接标记:%llu, 连接ID:%llu 错误码:%d, 系统错误码:%d\n", type, opaque, conn_id, net_err, sys_err);
+        printf("[TestNetworkForward] 断开与客户端之间的连接, 网络类型:%d, 连接标记:%lu, 连接ID:%lu 错误码:%d, 系统错误码:%d\n", type, opaque, conn_id, static_cast<int32_t>(net_err), sys_err);
     });
     network_forward.Accept(ToolBox::NT_TCP, 9500, "0.0.0.0", 9500);
     network_forward.Connect(ToolBox::NT_TCP, 9600, "0.0.0.0", 9600,  10 * 1024 * 1024, 10 * 1024 * 1024);
