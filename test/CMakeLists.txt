@@ -1,4 +1,8 @@
 
+# 设置编译选项
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++20")
+message(STATUS "CMAKE_CXX_FLAGS -> ${CMAKE_CXX_FLAGS}")
+
 # output 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 

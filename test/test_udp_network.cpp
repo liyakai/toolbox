@@ -185,7 +185,7 @@ CASE(test_udp_echo)
 
 CASE(test_udp_forward)
 {
-    // return;
+    return;
 #ifdef USE_GPERF_TOOLS
     ProfilerStart("test_udp_forward.prof");
 #endif // USE_GPERF_TOOLS

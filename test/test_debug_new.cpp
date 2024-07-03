@@ -37,7 +37,7 @@ CASE(TestNewNormal)
 
     int* array = new int[5];
     CHECK_LEAKS
-    delete array;
+    delete []array;
     CHECK_LEAKS
     // 对于基本数据类型的回收,delete 和 delete[] 是一样的.  // blog: https://www.cnblogs.com/whwywzhj/p/7905176.html
 
