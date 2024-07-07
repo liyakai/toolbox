@@ -174,8 +174,7 @@ CASE(TestCoroutineFibonacci)
     }
 }
 
-
-Task<int32_t> simple_task2()
+Task<int32_t, NewThreadExecutor> simple_task2()
 {
     fprintf(stderr, "cpp20 coroutine. simple_task2 start...\n");
 
@@ -183,8 +182,7 @@ Task<int32_t> simple_task2()
     fprintf(stderr, "cpp20 coroutine. simple_task2 return after 1s.\n");
     co_return 2;
 }
-
-Task<int32_t> simple_task3()
+Task<int32_t, NewThreadExecutor> simple_task3()
 {
     fprintf(stderr, "cpp20 coroutine. simple_task3 start...\n");
 
@@ -193,7 +191,7 @@ Task<int32_t> simple_task3()
     co_return 3;
 }
 
-Task<int32_t> simple_task()
+Task<int32_t, NewThreadExecutor> simple_task()
 {
     fprintf(stderr, "cpp20 coroutine. simple_task start...\n");
     auto result2 = co_await simple_task2();
@@ -224,7 +222,7 @@ CASE(TestCoroutineTask)
         fprintf(stderr, "cpp20 coroutine. error occurred.%s\n", e.what());
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100*1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100 * 1000));
 }
 
 
