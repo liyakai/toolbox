@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <thread>
 
 
 FIXTURE_BEGIN(LRUCacheTest)
