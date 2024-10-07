@@ -1,5 +1,6 @@
 #include "tools/timer.h"
 #include "unit_test_frame/unittest.h"
+#include <thread>
 
 FIXTURE_BEGIN(Timer)
 

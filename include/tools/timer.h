@@ -368,16 +368,16 @@ private:
     int64_t last_update_time_ = 0;      // 上次更新时间
 };
 
-TimerWheel::TimerWheel()
+inline TimerWheel::TimerWheel()
 {
     Init();
 }
-TimerWheel:: ~TimerWheel()
+inline TimerWheel::~TimerWheel()
 {
     UnInit();
 }
 
-HTIMER TimerWheel::AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string &file, int32_t line)
+inline HTIMER TimerWheel::AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string &file, int32_t line)
 {
     std::shared_ptr<ITimer> sp_timer = timer.lock();
     if(nullptr == sp_timer)
@@ -407,7 +407,7 @@ HTIMER TimerWheel::AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t int
     return node->guid;
 }
 
-HTIMER TimerWheel::AddTimer(const TMethod& callback, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string file, int32_t line)
+inline HTIMER TimerWheel::AddTimer(const TMethod& callback, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string file, int32_t line)
 {
     if(nullptr == callback)
     {
@@ -416,7 +416,7 @@ HTIMER TimerWheel::AddTimer(const TMethod& callback, std::weak_ptr<IArgs> delega
     return AddTimer(XDelegate::RegisterMethod(callback), delegate_args, args, interval, count, file, line);
 }
 
-HTIMER TimerWheel::AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file, int32_t line)
+inline HTIMER TimerWheel::AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file, int32_t line)
 {
     auto* node = GetFreeNode();
     if(nullptr == node)
@@ -442,7 +442,7 @@ HTIMER TimerWheel::AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> dele
     return node->guid;
 }
 
-int32_t TimerWheel::GetTimeLeft(HTIMER timer)
+inline int32_t TimerWheel::GetTimeLeft(HTIMER timer)
 {
     auto iter = all_timers_.find(timer);
     if(iter == all_timers_.end())
@@ -452,7 +452,7 @@ int32_t TimerWheel::GetTimeLeft(HTIMER timer)
     return static_cast<uint32_t>(iter->second->expire_time - cur_time_);
 }
 
-void TimerWheel::KillTimer(HTIMER timer)
+inline void TimerWheel::KillTimer(HTIMER timer)
 {
     auto iter = all_timers_.find(timer);
     if(iter == all_timers_.end())
@@ -469,12 +469,12 @@ void TimerWheel::KillTimer(HTIMER timer)
     AddFreeNode(node);
 }
 
-void TimerWheel::Release()
+inline void TimerWheel::Release()
 {
     UnInit();
 }
 
-void TimerWheel::Update()
+inline void TimerWheel::Update()
 {
     // 获取现在的毫秒数
     int64_t now_time = GetMilliSecond();
@@ -526,7 +526,7 @@ void TimerWheel::Update()
     }
 }
 
-void TimerWheel::Init()
+inline void TimerWheel::Init()
 {
     for(auto &iter : timer_nodes_)
     {
@@ -536,7 +536,7 @@ void TimerWheel::Init()
     }
 }
 
-void TimerWheel::UnInit()
+inline void TimerWheel::UnInit()
 {
     for(auto& iter : timer_nodes_)
     {
@@ -557,7 +557,7 @@ void TimerWheel::UnInit()
     free_nodes_.clear();
 }
 
-TimerNode* TimerWheel::GetFreeNode()
+inline TimerNode* TimerWheel::GetFreeNode()
 {
     if(free_nodes_.empty())
     {
@@ -568,7 +568,7 @@ TimerNode* TimerWheel::GetFreeNode()
     return node;
 }
 
-void TimerWheel::AddFreeNode(TimerNode* node)
+inline void TimerWheel::AddFreeNode(TimerNode* node)
 {
     if(nullptr == node)
     {
@@ -578,7 +578,7 @@ void TimerWheel::AddFreeNode(TimerNode* node)
     free_nodes_.emplace_back(node);
 }
 
-void TimerWheel::OnNodeTrigger(TimerNode* node)
+inline void TimerWheel::OnNodeTrigger(TimerNode* node)
 {
     if(nullptr == node)
     {
@@ -605,7 +605,7 @@ void TimerWheel::OnNodeTrigger(TimerNode* node)
     }     
 }
 
-void TimerWheel::AddTimer(TimerNode* node)
+inline void TimerWheel::AddTimer(TimerNode* node)
 {
     if(nullptr == node)
     {
@@ -644,7 +644,7 @@ void TimerWheel::AddTimer(TimerNode* node)
     TimerNode::ListAdd(head, node);
 }
 
-int32_t TimerWheel::CascadeTime(int32_t off, int32_t index)
+inline int32_t TimerWheel::CascadeTime(int32_t off, int32_t index)
 {
     int32_t slot_idx = off + index;
     auto* node = &timer_nodes_[slot_idx];
@@ -657,7 +657,7 @@ int32_t TimerWheel::CascadeTime(int32_t off, int32_t index)
     return index;
 }
 
-uint64_t TimerWheel::GetMilliSecond()
+inline uint64_t TimerWheel::GetMilliSecond()
 {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch());
