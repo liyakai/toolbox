@@ -22,7 +22,7 @@ namespace ToolBox
         LOG_MAX,
     };
 
-        // 定义日志宏
+    // 定义日志宏   
 #define LogTrace(LogFormat, ...) !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_TRACE) ? false : LogMgr->Trace("[TRACE] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
 #define LogDebug(LogFormat, ...) !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_DEBUG) ? false : LogMgr->Debug("[DEBUG] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
 #define LogInfo(LogFormat, ...)  !LogMgr->IsEnabled(ToolBox::LogLevel::LOG_INFO)  ? false : LogMgr->Info("[INFO] " LogFormat " FUNC[%s] FILE[%s:%d]", ## __VA_ARGS__, __FUNCTION__, __FILE__, __LINE__)
@@ -73,7 +73,7 @@ namespace ToolBox
             {
                 log_callback_(ToolBox::LogLevel::LOG_TRACE, log_buffer_);
             }
-            fprintf(stderr, log_buffer_);
+            fprintf(stderr, "%s", log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
             return true;
@@ -92,7 +92,7 @@ namespace ToolBox
             {
                 log_callback_(ToolBox::LogLevel::LOG_DEBUG, log_buffer_);
             }
-            fprintf(stderr, log_buffer_);
+            fprintf(stderr, "%s", log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
             return true;
@@ -112,7 +112,7 @@ namespace ToolBox
             {
                 log_callback_(ToolBox::LogLevel::LOG_INFO, log_buffer_);
             }
-            fprintf(stderr, log_buffer_);
+            fprintf(stderr, "%s", log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
             return true;
@@ -132,7 +132,7 @@ namespace ToolBox
             {
                 log_callback_(ToolBox::LogLevel::LOG_WARN, log_buffer_);
             }
-            fprintf(stderr, log_buffer_);
+            fprintf(stderr, "%s", log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
             return true;
@@ -152,7 +152,7 @@ namespace ToolBox
             {
                 log_callback_(ToolBox::LogLevel::LOG_ERROR, log_buffer_);
             }
-            fprintf(stderr, log_buffer_);
+            fprintf(stderr, "%s", log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
             return true;
@@ -173,7 +173,7 @@ namespace ToolBox
             {
                 log_callback_(ToolBox::LogLevel::LOG_FATAL, log_buffer_);
             }
-            fprintf(stderr, log_buffer_);
+            fprintf(stderr, "%s", log_buffer_);
             fprintf(stderr, "\n");
             va_end(ap);
             return true;
