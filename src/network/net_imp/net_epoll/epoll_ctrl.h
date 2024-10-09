@@ -32,7 +32,7 @@ namespace ToolBox
         * 删除事件
         * @param socket_fd 文件描述符
         */
-        bool DelEvent(int socket_fd);
+        bool DelEvent(int socket_fd) override;
         /*
         * 处理事件
         */

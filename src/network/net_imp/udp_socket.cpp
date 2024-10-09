@@ -315,10 +315,8 @@ namespace ToolBox
 
     void UdpSocket::UpdateSend()
     {
-        int32_t times = 0;
         for (auto iter = send_list_.begin(); iter != send_list_.end();)
         {
-            times++;
             auto buffer = *iter;
             size_t size = buffer->size_;
             auto success = SocketSend(socket_id_, buffer->data_, size);
