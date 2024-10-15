@@ -204,6 +204,13 @@ template <typename ResultType, typename Executor> struct TaskPromise {
     return TaskAwaiter<_ResultType, _Executor>(executor_, std::move(task));
   }
 
+    // 添加一个通用的 await_transform 方法
+  template <typename T>
+  auto await_transform(T&& awaitable) {
+    return std::forward<T>(awaitable);
+  }
+
+
   void on_completed(std::function<void(Result<ResultType>)> &&func) {
     std::unique_lock lock(completion_lock);
     // 加锁判断 result
@@ -350,6 +357,79 @@ public:
     shared_looper.execute(std::move(func));
   }
 };
+
+// ----------------------------------------------------------------------------
+// 将回调式的异步操作转换为写成可等待的形式
+
+template <typename Arg, typename Derived>
+class CallbackAwaitroBase{
+private:
+    template <typename Op>
+    class CallbackAwaitorImpl {
+        public:
+            CallbackAwaitorImpl(Derived &awaitor, Op &op):awaitor_(awaitor), op_(op){}
+            constexpr bool await_ready() const noexcept{ return false;}
+            void await_suspend(std::coroutine_handle<> handle) noexcept{
+                awaitor_.core_handle_ = handle;
+                op_(AwaitorHandler{&awaitor_});
+            }
+            auto coAwait(IExecutor* executor) const noexcept{
+                return *this;
+            }
+            decltype(auto) await_resume() const noexcept{
+                if constexpr(std::is_void_v<Arg>){
+                    return;
+                } else {
+                    return std::move(awaitor_.arg_);
+                }
+            }
+
+        private:
+            Derived &awaitor_;
+            Op &op_;
+    };
+public:
+    class AwaitorHandler{
+    public:
+        AwaitorHandler(Derived *obj):obj_(obj){}
+        AwaitorHandler(AwaitorHandler &&) = default;
+        AwaitorHandler(const AwaitorHandler &) = default;
+        AwaitorHandler &operator=(AwaitorHandler &&) = default;
+        AwaitorHandler &operator=(const AwaitorHandler &) = default;
+        template<typename... Args>
+        void set_value_then_resume(Args &&...args) const{
+            set_value(std::forward<Args>(args)...);
+            resume();
+        }
+        template<typename... Args>
+        void set_value(Args &&...args) const{
+            if constexpr(!std::is_void_v<Arg>){
+                obj_->arg_ = {std::forward<Args>(args)...};
+            }
+        }
+        void resume() const{ obj_->core_handle_.resume();}
+    private:
+        Derived *obj_;
+    };
+    template<typename Op>
+    CallbackAwaitorImpl<Op> coAwait(Op &&op) noexcept{
+        return CallbackAwaitorImpl<Op>{static_cast<Derived&>(*this), op};
+    }
+
+private:
+    std::coroutine_handle<> core_handle_;
+  
+};
+
+template <typename Arg>
+class CallBackAwaitor: public CallbackAwaitroBase<Arg, CallBackAwaitor<Arg>>{
+    friend class CallbackAwaitroBase<Arg, CallBackAwaitor<Arg>>;
+private:
+    Arg arg_;
+};
+template <>
+class CallbackAwaitroBase<void, CallBackAwaitor<void>>{};
+
 
 } // namespace coro
 } // namespace ToolBox
