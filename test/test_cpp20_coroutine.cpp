@@ -174,8 +174,31 @@ CASE(TestCoroutineTask) {
   } catch (std::exception &e) {
     fprintf(stderr, "cpp20 coroutine. error occurred.%s\n", e.what());
   }
+}
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100 * 1000));
+void simpleCallback(std::function<void(int32_t x, int32_t y)> callback) {
+    fprintf(stderr, "cpp20 coroutine. callback awaitor start...\n");
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    fprintf(stderr, "cpp20 coroutine. callback awaitor end...\n");
+    callback(1,2);
+}
+
+ToolBox::coro::Task<std::pair<int32_t, int32_t>, ToolBox::coro::NewThreadExecutor> test_callback_awaitor() noexcept {
+    ToolBox::coro::CallBackAwaitor<std::pair<int32_t,int32_t>> awaitor;
+    co_return co_await awaitor.coAwait([](auto handler){
+        simpleCallback([handler](int32_t x, int32_t y){
+            handler.set_value_then_resume(std::make_pair(x,y));
+        });
+    }); 
+}
+
+CASE(TestCallbackAwaitor){
+    fprintf(stderr, "cpp20 coroutine. test callback awaitor start...\n");
+    auto task = test_callback_awaitor();
+    auto result = task.get_result();
+    fprintf(stderr, "cpp20 coroutine. callback awaitor end:(%d,%d)\n", result.first, result.second);
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(100 * 1000));
 }
 
 FIXTURE_END(TestCpp20Coroutine)
