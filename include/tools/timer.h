@@ -29,65 +29,6 @@ constexpr uint32_t TVR_MASK = TVR_SIZE - 1;                             // 255--
 constexpr uint32_t MAX_SLOT = 256 + 4 * 64;                             // 数组大小
 constexpr uint32_t INVALID_HTIMER = 0;
 
-// /*
-// * 定义定时器任务接口
-// */
-// class ITimer
-// {
-// public:
-//     /*
-//     * 虚析构
-//     */
-//     virtual ~ITimer(){}
-//     /*
-//     * @brief 触发函数
-//     * @param id 定时器ID
-//     * @param count 当前触发次数
-//     */
-//     virtual void OnTimer(uint32_t id, uint32_t count) = 0;
-// };
-
-// /*
-// * 定义参数接口
-// */
-// class IArgs
-// {
-// public:
-//     virtual ~IArgs(){}
-// };
-
-// using TMethod = std::function<bool(std::weak_ptr<IArgs>, std::weak_ptr<void>)>;
-// #define DelegateCombination(T_, Func_, Instance_) (ToolBox::XDelegate::RegisterMethod(std::bind(&T_::Func_, Instance_, std::placeholders::_1, std::placeholders::_2)))
-
-// /*
-// * 定义委托
-// */
-// class XDelegate
-// {
-// public:
-//     XDelegate()
-//     : stub_ptr_(nullptr)
-//     {}
-    
-//     static XDelegate RegisterMethod(const TMethod& method)
-//     {
-//         XDelegate xd;
-//         xd.stub_ptr_ = method;
-//         return xd;
-//     }
-
-//     bool operator()(std::weak_ptr<IArgs> pargs, std::weak_ptr<void> arg) const
-//     {
-//         if(nullptr == stub_ptr_)
-//         {
-//             return false;
-//         }
-//         return stub_ptr_(pargs, arg);
-//     }
-// private:
-//     TMethod stub_ptr_;
-// };
-
 using TMethod = std::function<void(int times)>;
 /*
 * 定义定时器接口
@@ -101,8 +42,7 @@ public:
     virtual ~ITimerWheel(){}
     /*
     * @brief 增加定时器
-    * @param timer 定时器回调接口
-    * @param id 定时器ID
+    * @param callback 定时器回调接口
     * @param interval 定时间隔,毫秒为单位
     * @param count 触发次数, -1为永远触发
     * @param file 文件名
@@ -110,17 +50,6 @@ public:
     * @return 成功返回 Timer的句柄,失败返回 INVALID_HTIMER
     */
     virtual HTIMER AddTimer(const TMethod& callback, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
-    // virtual HTIMER AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
-    // /*
-    //* @brief 增加定时器
-    // * @param delegate 定时器委托
-    // * @param args 定时任务执行对象参数
-    // * @param arg 定时任务参数
-    // * @param interval 定时间隔,毫秒为单位
-    // * @param count 触发次数, -1为永远触发
-    // * @return 成功返回 Timer的句柄,失败返回 INVALID_HTIMER
-    // */
-    // virtual HTIMER AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> args, std::weak_ptr<void> arg, int32_t interval, int32_t count, const std::string& filename = "", int32_t lineno = 0) = 0;
 
     /*
     * @brief Timer过多长时间后会触发
@@ -141,17 +70,6 @@ public:
     virtual void Release() = 0;
 };
 
-// /*
-// * @brief 定义触发类型.内部类型
-// *        根据外部使用接口的不同,内部赋予不同的触发类型
-// */
-// enum class ETriggerType
-// {
-//     ETRIGGER_INVALID = 0,   // 定义无效类型,用于初始状态
-//     ETRIGGER_ONTIMER = 1,   // 定义 ITIMER 类型, 此种类型对象需要继承ITimer
-//     ETRIGGER_DELEGATE = 2,  // 定义委托类型
-// };
-
 
 /*
 * 定义定时器节点
@@ -160,13 +78,7 @@ struct TimerNode
 {
     TimerNode* prev = nullptr;      // 前置节点
     TimerNode* next = nullptr;      // 后置节点
-    // uint32_t identifier = 0;        // 透传定时器ID
     TMethod callback;               // 回调函数
-    // ETriggerType trigger_type = ETriggerType::ETRIGGER_INVALID; // 定义触发类型
-    // std::weak_ptr<ITimer> timer;    // 定时器接口
-    // XDelegate delegate;             // 委托事件
-    // std::weak_ptr<IArgs> delegate_args;  // 委托事件参数
-    // std::weak_ptr<void> args;           // 透传参数
     int64_t expire_time = 0;        // 超时时间
     HTIMER guid = 0;                // 唯一标识
     int32_t interval = 0;           // 间隔
@@ -188,13 +100,9 @@ struct TimerNode
     */
     void Reset()
     {
-        // trigger_type = ETriggerType::ETRIGGER_INVALID;
         prev = nullptr;
         next = nullptr;
         callback = nullptr;
-        // timer.reset();
-        // delegate_args.reset();
-        // args.reset();
         guid = 0;
         interval = 0;
         total_count = 0;
@@ -266,37 +174,13 @@ public:
     virtual ~TimerWheel();
     /*
     * @brief 添加定时器任务
-    * @param timer 定时器接口
-    * @param id identifier
+    * @param callback 定时器接口
     * @param interval 间隔时间
     * @param count 触发次数
     * @param file 文件名
     * @param line 文件号
     */
     HTIMER AddTimer(const TMethod& callback, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override;
-    // HTIMER AddTimer(std::weak_ptr<ITimer> timer, int32_t id, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override;
-    // /*
-    // * @brief 添加定时器任务 
-    // * @param callback 定时器回调
-    // * @param delegate_args 委托参数
-    // * @param args 透传参数
-    // * @param interval 间隔时间
-    // * @param count 触发次数
-    // * @param file 文件名
-    // * @param line 文件号
-    // */
-    // HTIMER AddTimer(const TMethod& callback, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0);
-    // /*
-    // * @brief 添加定时器任务 
-    // * @param delegate 类函数接口委托
-    // * @param delegate_args 委托参数
-    // * @param args 透传参数
-    // * @param interval 间隔时间
-    // * @param count 触发次数
-    // * @param file 文件名
-    // * @param line 文件号
-    // */
-    // HTIMER AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file = "", int32_t line = 0) override;
     /*
     * @brief Timer过多长时间后会触发
     * @param timer 句柄
@@ -385,21 +269,12 @@ inline TimerWheel::~TimerWheel()
 
 inline HTIMER TimerWheel::AddTimer(const TMethod& callback, int32_t interval, int32_t count, const std::string &file, int32_t line)
 {
-    // std::shared_ptr<ITimer> sp_timer = timer.lock();
-    // if(nullptr == sp_timer)
-    // {
-    //     return INVALID_HTIMER;
-    // }
-
     auto* node = GetFreeNode();
     if(nullptr == node)
     {
         return INVALID_HTIMER;
     }
-    // node->trigger_type = ETriggerType::ETRIGGER_ONTIMER;
-    // node->timer = timer;
     node->callback = callback;
-    // node->identifier = id;
     node->interval = interval;
     node->total_count = count;
     node->file = file;
@@ -413,41 +288,6 @@ inline HTIMER TimerWheel::AddTimer(const TMethod& callback, int32_t interval, in
     AddTimerNode(node);
     return node->guid;
 }
-
-// inline HTIMER TimerWheel::AddTimer(const TMethod& callback, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file, int32_t line)
-// {
-//     if(nullptr == callback)
-//     {
-//         return INVALID_HTIMER;
-//     }
-//     return AddTimer(XDelegate::RegisterMethod(callback), delegate_args, args, interval, count, file, line);
-// }
-
-// inline HTIMER TimerWheel::AddTimer(const XDelegate& delegate, std::weak_ptr<IArgs> delegate_args, std::weak_ptr<void> args, int32_t interval, int32_t count, const std::string &file, int32_t line)
-// {
-//     auto* node = GetFreeNode();
-//     if(nullptr == node)
-//     {
-//         return INVALID_HTIMER;
-//     }
-//     node->trigger_type = ETriggerType::ETRIGGER_DELEGATE;
-//     node->timer.reset();
-//     node->delegate = delegate;
-//     node->delegate_args = delegate_args;
-//     node->args = args;
-//     node->interval = interval;
-//     node->total_count = count;
-//     node->file = file;
-//     node->line = line;
-//     if(node->interval >= INT32_MAX)
-//     {
-//         node->interval = INT32_MAX;
-//     }
-//     node->expire_time = cur_time_ + node->interval;
-//     node->guid = GetNewTimerID();
-//     AddTimer(node);
-//     return node->guid;
-// }
 
 inline int32_t TimerWheel::GetTimeLeft(HTIMER timer)
 {
@@ -594,26 +434,7 @@ inline void TimerWheel::OnNodeTrigger(TimerNode* node)
     if (nullptr != node->callback)
     {
         node->callback(node->curr_count);
-    }
-    // switch (node->trigger_type)
-    // {
-    // case ETriggerType::ETRIGGER_ONTIMER:
-    //     {
-    //         auto sp_timer = node->timer.lock();
-    //         if(nullptr != sp_timer)
-    //         {
-    //             sp_timer->OnTimer(node->identifier, node->curr_count);
-    //         } 
-    //         break;
-    //     }
-    // case ETriggerType::ETRIGGER_DELEGATE:
-    // {
-    //     node->delegate(node -> delegate_args, node -> args);
-    //     break;
-    // }
-    // default:
-    //     break;
-    // }     
+    }    
 }
 
 inline void TimerWheel::AddTimerNode(TimerNode* node)
@@ -682,16 +503,6 @@ inline uint64_t TimerWheel::GetMilliSecond()
 #define TimerMgr Singleton<ToolBox::TimerWheel>::Instance()
 
 };  // ToolBox
-
-
-
-
-
-
-
-
-
-
 
 
 // Kafka 中 TimingWheel 源码关于时间轮的讲解
