@@ -15,6 +15,12 @@ if(GCC_TOOLCHAIN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --gcc-toolchain=${GCC_TOOLCHAIN}")
 endif()
 
+set(CMAKE_CXX_STANDARD 20)
+
+# 设置编译器为clang
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_CXX_COMPILER clang++)
+
 # 编译库
 add_subdirectory(src)
 # 编译单元测试

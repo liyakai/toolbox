@@ -197,8 +197,6 @@ CASE(TestCallbackAwaitor){
     auto task = test_callback_awaitor();
     auto result = task.get_result();
     fprintf(stderr, "cpp20 coroutine. callback awaitor end:(%d,%d)\n", result.first, result.second);
-
-      std::this_thread::sleep_for(std::chrono::milliseconds(100 * 1000));
 }
 
 FIXTURE_END(TestCpp20Coroutine)

@@ -3,7 +3,9 @@
 #include "tools/timer.h"
 #include <future>
 #include "tools/cpp20_coroutine.h"
-#include "coro_rpc_def_interenal.h"
+#include "tools/timer.h"
+#include "protocol/coro_rpc_protocol.h"
+
 namespace ToolBox {
 namespace coro_rpc {
 
@@ -31,6 +33,7 @@ struct resp_body{
 template<typename T>
 struct async_rpc_result_value_t{
 public:
+    async_rpc_result_value_t() = default;
     async_rpc_result_value_t(T &&result, resp_body &&buffer)
     : result_(std::move(result)), buffer_(std::move(buffer)) {}
     async_rpc_result_value_t(T &&result)
@@ -44,28 +47,77 @@ private:
     T result_;
     resp_body buffer_;
 };
+
 template<>
 struct async_rpc_result_value_t<void>{
+    async_rpc_result_value_t() = default;
     resp_body buffer_;
 
     std::string_view get_attachment() const noexcept { return buffer_.resp_attachment_buf_; }
     resp_body release_buffer() noexcept { return std::move(buffer_); }
 
 };
-
 template<typename T>
-using async_rpc_result = async_rpc_result_value_t<T>;
+using async_rpc_result = std::variant<async_rpc_result_value_t<T>, coro_rpc::errc>;
 
 template<typename T>
 using async_rpc_type_t = typename rpc_return_type<T>::type;
+
+template<typename T>
+using rpc_result = std::tuple<T, coro_rpc::errc>;
+
 class CoroRpcClient {
-public:
+private:
+    struct handler_t;
     struct Config {
         uint64_t client_id = get_global_client_id();
         std::chrono::milliseconds timeout = std::chrono::seconds(10);
     };
+    struct control_t
+    {
+      bool is_timeout_ = false;
+      std::unordered_map<uint32_t, handler_t> response_handler_table_;
+      control_t(bool is_timeout) : is_timeout_(is_timeout) {}
+      std::atomic<uint32_t> recving_cnt_ = 0;
 
-    CoroRpcClient(uint64_t client_id = get_global_client_id()) {
+    };
+    struct async_rpc_raw_result_value_type{
+        resp_body buffer_;
+        uint8_t errc_;
+    };
+    using async_rpc_raw_result = std::variant<async_rpc_raw_result_value_type, std::error_code>;
+    struct handler_t
+    {
+        ToolBox::HTIMER timer_;
+        std::promise<async_rpc_raw_result> promise_;
+        handler_t(ToolBox::HTIMER && timer,
+                    std::promise<async_rpc_raw_result> && promise)
+            : timer_(std::move(timer)), promise_(std::move(promise)) {}
+        void operator()(resp_body &&buffer, uint8_t rpc_errc) {
+                ToolBox::TimerMgr->KillTimer(timer_);
+                promise_.set_value(async_rpc_raw_result{async_rpc_raw_result_value_type{std::move(buffer), rpc_errc}});
+        }
+        void local_error(std::error_code ec) {
+                ToolBox::TimerMgr->KillTimer(timer_);
+                promise_.set_value(async_rpc_raw_result{std::error_code{ec}});
+        }
+    };
+
+    uint64_t client_id_;
+    bool should_reset_ = false;
+    std::atomic<uint32_t> request_id_ = 0;
+    ToolBox::HTIMER timer_;
+    std::shared_ptr<control_t> control_;
+    std::string_view req_attachment_;
+    Config config_;
+public:
+    struct recving_guard;
+public:
+
+
+    CoroRpcClient(uint64_t client_id = get_global_client_id())
+    : control_(std::make_shared<control_t>(false))
+     {
         config_.client_id = client_id;
     }
     ~CoroRpcClient() = default;
@@ -77,7 +129,7 @@ public:
 
     // call RPC with default timeout(5s)
     template <auto func, typename... Args>
-    auto call(Args &&...args) -> std::invoke_result_t<decltype(func), Args...> {
+    auto call(Args &&...args) -> ToolBox::coro::Task<std::invoke_result_t<decltype(func), Args...>> {
         return call_for<func>(std::chrono::seconds(5), std::forward<Args>(args)...);
     }
 
@@ -90,14 +142,14 @@ public:
             co_await co_await send_request_for_with_attachment<func, Args...>(
                 duration, req_attachment_, std::forward<Args>(args)...);
         req_attachment_ = {};
-        if (async_result) {
-        if constexpr (std::is_void_v<return_type>) {
+        if (async_result.index() == 0) {
+            if constexpr (std::is_void_v<return_type>) {
+                co_return {};
+            } else {
+                co_return std::move(std::get<0>(async_result).result());
+            }
+        } else {
             co_return {};
-        } else {
-            co_return std::move(async_result->result());
-        }
-        } else {
-        co_return {};
         }
     }
 
@@ -113,55 +165,217 @@ public:
 
     template <auto func, typename... Args>
     auto send_request_for_with_attachment(
-        auto duration, std::string_view attachment,
-        Args &&...args) -> std::invoke_result_t<decltype(func), Args...> {
+        auto time_out_duration, std::string_view request_attachment,
+        Args &&...args) -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<std::invoke_result_t<decltype(func), Args...>>>>
+    {
         using return_type = std::invoke_result_t<decltype(func), Args...>;
+        recving_guard guard(control_.get());
         uint32_t id;
-                auto timer = std::make_unique<ToolBox::TimerWheel>(duration, [this, id]() {
-            });
+        auto timer = ToolBox::TimerMgr->AddTimer([this](int times) {
+            control_->is_timeout_ = true;
+        }, (int32_t)time_out_duration.count(), 1, __FILE__, __LINE__);
+        auto result = co_await send_request_for_impl<func>(time_out_duration, id, std::move(timer), request_attachment, std::forward<Args>(args)...);
+        auto& control = *control_;
+        if (result == coro_rpc::errc::SUCCESS) 
+        {
+            std::promise<async_rpc_raw_result> promise;
+            auto future = promise.get_future();
+            // bool is_empty = control.response_handler_table_.empty();
+            auto &&[_, is_ok] = control.response_handler_table_.try_emplace(id, std::move(timer), std::move(promise));
+            if (!is_ok) [[unlikely]]
+            {
+                RpcLogError("[rpc][client] response handler table insert failed, id: {}", id);
+                co_return build_failed_rpc_result<return_type>(coro_rpc::errc::ERR_SERIAL_NUMBER_CONFLICT);
+            }else{
+                guard.release();
+                co_return deserialize_rpc_result<return_type>(std::move(future), std::weak_ptr<control_t>{control_});
+            }
+        }else {
+            co_return build_failed_rpc_result<return_type>(std::move(result));
         }
+
+    }
+    
+    struct recving_guard 
+    {
+        recving_guard(control_t *ctrl):ctrl_(ctrl) { ctrl_->recving_cnt_++; }
+        ~recving_guard() { ctrl_->recving_cnt_--; }
+        void release() { ctrl_ = nullptr; }
+    private:
+        control_t *ctrl_;
+    };
 
 private:
     auto timeout(auto duration, std::string error_msg)
     {
-      co_return false;
+        co_return false;
     }
 
-private:
-    struct async_rpc_raw_result_value_type{
-        resp_body buffer_;
-        uint8_t errc_;
-    };
-    using async_rpc_raw_result = std::variant<async_rpc_raw_result_value_type, std::error_code>;
-    struct handler_t
+    template<typename T>
+    auto handle_response_buffer(std::string_view buffer, uint8_t errc, bool &has_error) -> rpc_result<T>
     {
-      std::unique_ptr<ToolBox::TimerWheel> timer_;
-      std::promise<async_rpc_raw_result> promise_;
-      handler_t(std::unique_ptr<ToolBox::TimerWheel> && timer,
-                std::promise<async_rpc_raw_result> && promise)
-          : timer_(std::move(timer)), promise_(std::move(promise)) {}
-      void operator()(resp_body &&buffer, uint8_t rpc_errc) {
-        // TODO
-      }
-      void local_error(std::error_code ec) {
-        // TODO
-      }
-    };
-    struct control_t
-    {
-      bool is_timeout_ = false;
-      std::unordered_map<uint32_t, handler_t> response_handler_table_;
-      control_t(bool is_timeout) : is_timeout_(is_timeout) {}
+        // rpc_return_type<T> ret;
+        // coro_rpc::errc rpc_errc;
+        if(errc == static_cast<uint8_t>(coro_rpc::errc::SUCCESS))
+        {
+            if constexpr (std::is_void_v<T>)
+            {
+                return rpc_result<T>{{}, coro_rpc::errc::SUCCESS};
+            } else {
+                T value = buffer;   // TODO: 反序列化
+                return rpc_result<T>{std::move(value), coro_rpc::errc::SUCCESS};
+            }
+        }else {
+            return rpc_result<T>{{}, coro_rpc::errc(errc)};
+        }
+        
+    }
 
-    };
+    template<typename T>
+    auto deserialize_rpc_result(std::future<async_rpc_raw_result> &&future, std::weak_ptr<control_t> &&ctrl) -> ToolBox::coro::Task<async_rpc_result<T>>
+    {
+        auto result = co_await coro::FutureAwaiter<async_rpc_raw_result>(std::move(future));
+        if(result.index() == 1) [[unlikely]]
+        {
+            auto &ret = std::get<1>(result);
+            if(ret.value() == static_cast<uint8_t>(coro_rpc::errc::ERR_TIMEOUT) 
+                || ret.value() == static_cast<uint8_t>(coro_rpc::errc::ERR_OPERATION_CANCELED))
+            {
+                co_return coro_rpc::errc::ERR_TIMEOUT;
+            } else {
+                co_return coro_rpc::errc(ret.value());
+            }
+        }
+        bool has_error = false;
+        auto &ret = std::get<0>(result);
+        auto resp_result = handle_response_buffer<T>(ret.buffer_.read_buffer_, ret.errc_, has_error);
+        if(has_error)
+        {
+            // TODO: close socket
+        }
+        if(std::get<1>(resp_result) == coro_rpc::errc::SUCCESS)
+        {
+            if constexpr (std::is_void_v<T>)
+            {
+                co_return {};
+            } else {
+                co_return async_rpc_result<T>{async_rpc_result_value_t<T>{std::move(std::get<0>(resp_result)), std::move(ret.buffer_)}};
+            }
+        }
+        else {
+            co_return async_rpc_result<T>{async_rpc_result_value_t<T>{std::move(std::get<0>(resp_result))}};
+        }
+    }
+
+    template<typename T>
+    auto build_failed_rpc_result(coro_rpc::errc errc) -> ToolBox::coro::Task<async_rpc_result<T>>
+    {
+        co_return async_rpc_result<T>{errc};
+    }
+
+    template<auto func, typename... Args>
+    ToolBox::coro::Task<coro_rpc::errc> send_request_for_impl(auto duration, uint32_t &id, ToolBox::HTIMER &&timer, std::string_view attachment, Args &&...args)
+    {
+        using return_type = std::invoke_result_t<decltype(func), Args...>;
+
+        // 检查定时器
+        int32_t time_left = ToolBox::TimerMgr->GetTimeLeft(timer);
+        if(time_left <= 0)
+        {
+            co_return coro_rpc::errc::ERR_TIMEOUT;
+        }
+
+        co_return co_await send_impl<func>(id, attachment, std::forward<Args>(args)...);
+    }
+
+    template<auto func, typename... Args>
+    ToolBox::coro::Task<coro_rpc::errc> send_impl(uint32_t &id, std::string_view attachment, Args &&...args)
+    {
+        auto buffer = prepare_buffer<func>(id, std::forward<Args>(args)...);
+        if (buffer.empty()) {
+            co_return coro_rpc::errc::ERR_MESSAGE_TOO_LARGE;
+        }
+        std::pair<std::error_code, std::size_t> send_result;
+        if (attachment.empty()) 
+        {
+        }
+
+        printf("send buffer......######.......,buffer size: %zu\n", buffer.size());
+        printf("buffer content: ");
+        for (size_t i = 0; i < buffer.size(); i++) {
+            printf("%02X ", static_cast<unsigned char>(buffer[i]));
+        }
+        printf("\n");
+
+        // send buffer
+        co_return coro_rpc::errc{};
+    }
+
+    template<auto func, typename... Args>
+    std::vector<std::byte> prepare_buffer(uint32_t &id, Args &&...args)
+    {
+        std::vector<std::byte> buffer;
+        std::size_t offset = CoroRpcProtocol::REQ_HEAD_LEN;
+        if constexpr(sizeof...(Args) > 0) {
+            // 计算所有参数序列化后需要的总大小
+            std::size_t total_size = (sizeof(Args) + ...);
+            buffer.resize(offset + total_size);
+
+            // 使用折叠表达式一次序列化每个参数
+            std::size_t current_offset = offset;
+            ((serialize_arg(buffer, current_offset, std::forward<Args>(args))), ...);
+        } else {
+            buffer.resize(offset);
+        }
+        auto& req_head = *(CoroRpcProtocol::ReqHeader*)(buffer.data());
+        req_head = {};
+        req_head.magic = CoroRpcProtocol::magic_number;
+        req_head.func_id = 1; // 协议ID与函数之间的映射需要考虑方案. //coro_rpc::get_func_id<func>();
+        req_head.attach_length = req_attachment_.size();
+        req_head.seq_num = ++request_id_;
+        req_head.attach_length = 0;
+        auto sz = buffer.size() - CoroRpcProtocol::REQ_HEAD_LEN;
+        if(sz > UINT32_MAX) [[unlikely]]
+        {
+            RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
+            return {};
+        }
+        return buffer;
+    }
+    // 基础类型的序列化
+    template<typename T>
+    void serialize_arg(std::vector<std::byte> &buffer, std::size_t &offset, T &&arg)
+    {
+        const T& value = arg;
+        const std::byte*  p_bytes = reinterpret_cast<const std::byte*>(&value);
+        std::copy(p_bytes, p_bytes + sizeof(T), buffer.begin() + offset);
+        offset += sizeof(T);
+    }
+
+    // 字符串类型的特化版本
+    void serialize_arg(std::vector<std::byte> &buffer, std::size_t &offset, std::string str)
+    {
+        // 先序列化字符串长度
+        uint32_t length = str.size();
+        serialize_arg(buffer, offset, length);
+
+        // 确保 buffer 有足够的空间
+        if(offset + length > buffer.size())
+        {
+            buffer.resize(offset + str.size());
+        }
+        // 再序列化字符串内容
+        const std::byte* bytes = reinterpret_cast<const std::byte*>(str.data());
+        std::copy(bytes, bytes + length, buffer.begin() + offset);
+        offset += str.size();
+    }
+
+
 private:
-    uint64_t client_id_;
-    bool should_reset_ = false;
-    std::unique_ptr<ToolBox::TimerWheel> timer_;
-    std::unique_ptr<control_t> control_;
-    std::string_view req_attachment_;
-    Config config_;
-};
+    
+
+
+};  // class CoroRpcClient
 
 }; // namespace coro_rpc
 }; // namespace ToolBox
