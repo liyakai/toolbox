@@ -1,6 +1,8 @@
 #pragma once
 
-#ifdef __linux__
+#if defined(__x86_64__) || defined(_M_X64)
+    // x86_64 架构的代码
+
 
 // 简单版本
 // #include <stdio.h>
@@ -83,7 +85,9 @@ inline void print_callstack()
     // }
 }
 
-#endif // __linux__
+#else
+    #warning "This code only supports x86_64 architecture"
+#endif
 
 
 
