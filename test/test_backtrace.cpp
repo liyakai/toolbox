@@ -5,37 +5,37 @@
 
 FIXTURE_BEGIN(Ftrace)
 
-int TestFunction1()
+int TestFunction1(int i)
 {
     print_callstack();
-    return 0;
+    return i;
 }
 
-int TestFunction2()
+int TestFunction2(int i)
 {
     print_callstack();
-    return 0;
+    return i;
 }
 
-int TestFunction3()
+int TestFunction3(int i)
 {
     print_callstack();
-    return 0;
+    return i;
 }
 
-CASE(TestFtraceCase1)
+CASE(TestBacktraceCase1)
 {
     auto start = std::chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < 1*1000; i++)
+    for (int i = 0; i < 1*1; i++)
     {
-        TestFunction1();
-        TestFunction2();
-        TestFunction3();
+        TestFunction1(i);
+        TestFunction2(i);
+        TestFunction3(i);
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    fprintf(stderr, "TestFtraceCase1 cost: %lld ms\n", duration);
+    fprintf(stderr, "TestBacktraceCase1 cost: %lld ms\n", duration);
     
 }
 
@@ -58,11 +58,11 @@ int TestBacktrace3()
 }
 
 
-CASE(TestFtraceCase2)
+CASE(TestBacktraceCase2)
 {
     auto start = std::chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < 1*1000; i++)
+    for (int i = 0; i < 1*1; i++)
     {
         TestBacktrace1();
         TestBacktrace2();
@@ -70,7 +70,7 @@ CASE(TestFtraceCase2)
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    fprintf(stderr, "TestFtraceCase2 cost: %lld ms\n", duration);
+    fprintf(stderr, "TestBacktraceCase2 cost: %lld ms\n", duration);
 }
 
 FIXTURE_END(Ftrace)

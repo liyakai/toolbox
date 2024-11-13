@@ -7,7 +7,7 @@
 
 #include "tools/coro_rpc/impl/coro_rpc_def_interenal.h"
 
-namespace ToolBox::coro_rpc
+namespace ToolBox::CoroRpc
 {
 
 struct CoroRpcProtocol
@@ -62,7 +62,7 @@ static std::optional<supported_serialize_protocols> get_serialize_protocol(ReqHe
     }
 }
 
-static std::string prepare_response(std::string& rpc_result, const RespHeader& req_header, std::size_t attachment_len, coro_rpc::errc err_code = {}, std::string_view err_msg = {})
+static std::string prepare_response(std::string& rpc_result, const RespHeader& req_header, std::size_t attachment_len, CoroRpc::errc err_code = {}, std::string_view err_msg = {})
 {
     std::string err_msg_buf;
     std::string header_buf;
@@ -76,10 +76,10 @@ static std::string prepare_response(std::string& rpc_result, const RespHeader& r
 
     if (attachment_len > UINT32_MAX) 
     [[unlikely]] {
-        err_code = coro_rpc::errc::ERR_MESSAGE_TOO_LARGE;
+        err_code = CoroRpc::errc::ERR_MESSAGE_TOO_LARGE;
     }else if (rpc_result.size() > UINT32_MAX) 
     [[unlikely]] {
-        err_code = coro_rpc::errc::ERR_MESSAGE_TOO_LARGE;
+        err_code = CoroRpc::errc::ERR_MESSAGE_TOO_LARGE;
     }
     resp_head.err_code = static_cast<uint8_t>(err_code);
     resp_head.length = rpc_result.size();
@@ -93,7 +93,7 @@ static_assert(REQ_HEAD_LEN == 20);
 static constexpr inline auto RESP_HEAD_LEN = sizeof(RespHeader);
 static_assert(RESP_HEAD_LEN == 16);
 
-}; // namespace ToolBox::coro_rpc::CoroRpcProtocol
+}; // namespace ToolBox::CoroRpc::CoroRpcProtocol
 
 template<typename rpc_protocol = CoroRpcProtocol>
 uint64_t get_request_id(const typename rpc_protocol::ReqHeader& header)
@@ -106,4 +106,4 @@ uint64_t get_request_id(const typename rpc_protocol::ReqHeader& header)
     }
 }
 
-} // namespace ToolBox::coro_rpc
+} // namespace ToolBox::CoroRpc

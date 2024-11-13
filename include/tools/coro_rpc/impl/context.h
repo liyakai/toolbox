@@ -1,6 +1,6 @@
 #pragma once
 
-namespace coro_rpc {
+namespace CoroRpc {
 
 template<typename T>
 struct GetTypeTraits{
@@ -22,4 +22,4 @@ public:
     
 };
 
-} // namespace coro_rpc
+} // namespace CoroRpc

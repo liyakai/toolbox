@@ -149,7 +149,7 @@ struct TimerNode
    */
    static void ListRemove(TimerNode* node)
    {
-       if(nullptr == node)
+       if(nullptr == node || (node ->next == nullptr && node -> prev == nullptr))
        {
            return;
        }

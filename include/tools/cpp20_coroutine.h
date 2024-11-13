@@ -147,11 +147,10 @@ struct Task {
     Task(Task &) = delete;
     Task &operator=(Task &) = delete;
     ~Task() {
-
         if (handle) {
-        handle.destroy();
+            handle.destroy();
         }
-  }
+    }
 
 private:
     std::coroutine_handle<promise_type> handle;
@@ -218,8 +217,8 @@ struct TaskPromise {
 
     // 添加一个通用的 await_transform 方法
     template <typename T>
-    auto await_transform(T&& awaitable) {
-        return std::forward<T>(awaitable);
+    decltype(auto) await_transform(T&& awaitable) {
+        return std::move(awaitable);
     }
 
 
@@ -303,9 +302,9 @@ private:
             queue_condition.wait(lock);
             // 如果队列为空,那么说明收到的是关闭的通知
             if (executable_queue.empty()) {
-            // 现有逻辑下此处用 break 也可
-            // 使用 continue 可以再次检查状态和队列,方便将来扩展
-            continue;
+                // 现有逻辑下此处用 break 也可
+                // 使用 continue 可以再次检查状态和队列,方便将来扩展
+                continue;
             }
         }
 
@@ -333,22 +332,22 @@ public:
     void execute(std::function<void()> &&func) override {
         std::unique_lock lock(queue_lock);
         if (is_active.load(std::memory_order_relaxed)) {
-        executable_queue.push(func);
-        lock.unlock();
-        // 通知队列,主要用于队列之前为空时调用 wait 等待的情况
-        // 通知不需要加锁,否则锁会交给 wait 方导致当前线程阻塞
-        queue_condition.notify_one();
+            executable_queue.push(func);
+            lock.unlock();
+            // 通知队列,主要用于队列之前为空时调用 wait 等待的情况
+            // 通知不需要加锁,否则锁会交给 wait 方导致当前线程阻塞
+            queue_condition.notify_one();
         }
     }
     void shutdown(bool wait_for_complete = true) {
         // 修改后立即生效,在 run_loop 当中就能尽早(加锁前)就检测到 is_active 的变化
         is_active.store(false, std::memory_order_relaxed);
         if (!wait_for_complete) {
-        std::unique_lock lock(queue_lock);
-        // 清空任务队列
-        decltype(executable_queue) empty_queue;
-        executable_queue.swap(empty_queue);
-        lock.unlock();
+            std::unique_lock lock(queue_lock);
+            // 清空任务队列
+            decltype(executable_queue) empty_queue;
+            executable_queue.swap(empty_queue);
+            lock.unlock();
         }
         // 通知 wait 函数, 避免 Looper 线程不退出
         // 不需要加锁, 否则锁会交给 wait 放导致当前线程阻塞.
@@ -357,7 +356,7 @@ public:
 
     void join() {
         if (work_thread.joinable()) {
-        work_thread.join();
+            work_thread.join();
         }
     }
 };
@@ -448,14 +447,22 @@ class CallbackAwaitroBase<void, CallBackAwaitor<void>>{};
 template <typename T>
 class FutureAwaiter{
 public:
+    using FutureCallBack = std::function<void(std::function<void()>)>;
     FutureAwaiter(std::future<T> &&future):future_(std::move(future)){}
     constexpr bool await_ready() const noexcept{ 
         return future_.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
     }
     void await_suspend(std::coroutine_handle<> handle) noexcept{
         future_.wait_for(std::chrono::milliseconds(0));
-        if(executor_){  
-            executor_->execute([handle]() { handle.resume(); });
+
+        auto resume_func = [handle]() { 
+                handle.resume(); 
+            };
+
+        if(resume_callback_){
+            resume_callback_(resume_func);
+        } else if(executor_){  
+            executor_->execute(resume_func);
         } else {
             handle.resume();
         }
@@ -464,7 +471,16 @@ public:
         return *this;
     }
     decltype(auto) await_resume() noexcept{
-        return future_.get();
+        if(future_.valid()){
+            return future_.get();
+        } else {
+            throw std::future_error(std::future_errc::no_state);
+        }
+    }
+
+    FutureAwaiter& with_future_callback(FutureCallBack &&callback) noexcept{
+        resume_callback_ = std::move(callback);
+        return *this;
     }
 
     // 实现 with_executor 函数
@@ -475,6 +491,7 @@ public:
 private:
     std::future<T> future_;
     IExecutor *executor_ = nullptr;
+    FutureCallBack resume_callback_;
 };
 
 template <typename T>

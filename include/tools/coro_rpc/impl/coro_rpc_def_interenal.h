@@ -11,7 +11,7 @@
 #define RpcLogFatal(LogFormat, ...)     LogFatal(LogFormat, ## __VA_ARGS__)
 
 
-namespace ToolBox::coro_rpc
+namespace ToolBox::CoroRpc
 {
     enum class errc: uint16_t
     {

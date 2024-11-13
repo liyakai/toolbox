@@ -80,9 +80,9 @@ inline void print_callstack()
 {
     CallStack cs;
     get_callstack(&cs);
-    // for (int i = 0; i < cs.count; i++) {
-    //     printf("Frame %d: %p\n", i, cs.frames[i]);
-    // }
+    for (int i = 0; i < cs.count; i++) {
+        printf("Frame %d: %p\n", i, cs.frames[i]);
+    }
 }
 
 #else
@@ -106,10 +106,14 @@ public:
         const int max_frames = 32;
         void* frames[max_frames];
         backtrace(frames, max_frames);
-        int num_frames = backtrace(frames, max_frames);
+        // int num_frames = backtrace(frames, max_frames);
+
+        // for (int i = 0; i < num_frames; i++) {
+        //     printf("Frame %d: %p\n", i, frames[i]);
+        // }
         
         // // 使用 abi::__cxa_demangle 进行符号解析
-        backtrace_symbols(frames, num_frames);
+        // backtrace_symbols(frames, num_frames);
         // char** symbols = backtrace_symbols(frames, num_frames);
         std::string result;
         
