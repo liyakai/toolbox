@@ -22,8 +22,10 @@ if(CMAKE_BUILD_TYPE STREQUAL Debug)
     add_definitions(-DDEBUG -g -O0)
 else()
     add_definitions(-O2)
+    add_definitions(-DNDEBUG)
+    message(STATUS "definitions -> -O2 -DNDEBUG")
 endif()
-
+message(STATUS "CMAKE_BUILD_TYPE -> ${CMAKE_BUILD_TYPE}")
 # 头文件
 INCLUDE_DIRECTORIES(
     .
