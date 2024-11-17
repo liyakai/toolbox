@@ -30,7 +30,7 @@ CASE(CoroRpcClientCase1)
     auto result = task.get_result();
     fprintf(stderr, "[CoroRpcClientCase1] result: %s\n", result.data());
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100000));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100000));
 }
 
 FIXTURE_END()

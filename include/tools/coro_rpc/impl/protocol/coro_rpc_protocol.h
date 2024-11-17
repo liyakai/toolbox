@@ -9,7 +9,8 @@
 
 namespace ToolBox::CoroRpc
 {
-
+    template <typename rpc_protocol, template<typename...> typename map_t = std::unordered_map>
+    class CoroRpcServer;
 struct CoroRpcProtocol
 {
 public:
@@ -52,6 +53,17 @@ struct RespHeader
 };
 
 using supported_serialize_protocols = std::variant<std::nullopt_t>;
+using rpc_server_key_t = uint32_t;
+using rpc_server = CoroRpcServer<CoroRpcProtocol>;
+
+template <auto func>
+struct has_gen_register_key {
+    template <typename T>
+    static constexpr bool check(T*) {
+        return requires { T::template gen_register_key<func>(); };
+    }
+};
+
 static std::optional<supported_serialize_protocols> get_serialize_protocol(ReqHeader &header)
 {
     if(header.serialize_type == 0)
@@ -62,7 +74,7 @@ static std::optional<supported_serialize_protocols> get_serialize_protocol(ReqHe
     }
 }
 
-static std::string prepare_response(std::string& rpc_result, const RespHeader& req_header, std::size_t attachment_len, CoroRpc::errc err_code = {}, std::string_view err_msg = {})
+static std::string prepare_response(std::string& rpc_result, const RespHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
 {
     std::string err_msg_buf;
     std::string header_buf;
@@ -76,10 +88,10 @@ static std::string prepare_response(std::string& rpc_result, const RespHeader& r
 
     if (attachment_len > UINT32_MAX) 
     [[unlikely]] {
-        err_code = CoroRpc::errc::ERR_MESSAGE_TOO_LARGE;
+        err_code = CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
     }else if (rpc_result.size() > UINT32_MAX) 
     [[unlikely]] {
-        err_code = CoroRpc::errc::ERR_MESSAGE_TOO_LARGE;
+        err_code = CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
     }
     resp_head.err_code = static_cast<uint8_t>(err_code);
     resp_head.length = rpc_result.size();

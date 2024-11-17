@@ -2,7 +2,11 @@
 
 #include "tools/log.h"
 #include <cstdint>
+#include <string>
 #include <string_view>
+
+
+
 #define RpcLogTrace(LogFormat, ...)     LogTrace(LogFormat, ## __VA_ARGS__)
 #define RpcLogDebug(LogFormat, ...)     LogDebug(LogFormat, ## __VA_ARGS__)
 #define RpcLogInfo(LogFormat, ...)      LogInfo(LogFormat, ## __VA_ARGS__)
@@ -13,7 +17,7 @@
 
 namespace ToolBox::CoroRpc
 {
-    enum class errc: uint16_t
+    enum class Errc: uint16_t
     {
         SUCCESS = 0,
         ERR_TIMEOUT = 1,
@@ -25,3 +29,58 @@ namespace ToolBox::CoroRpc
         ERR_MESSAGE_TOO_LARGE = 7,
     };
 }
+
+class CoroRpcTools
+{
+public:
+    // 基础类型的序列化
+    template<typename T>
+    static void SerializeArg(std::vector<std::byte> &buffer, std::size_t &offset, T &&arg)
+    {
+        const T& value = arg;
+        const std::byte*  p_bytes = reinterpret_cast<const std::byte*>(&value);
+        std::copy(p_bytes, p_bytes + sizeof(T), buffer.begin() + offset);
+        offset += sizeof(T);
+    }
+
+    // 字符串类型的特化版本
+    static void SerializeArg(std::vector<std::byte> &buffer, std::size_t &offset, std::string str)
+    {
+        // 先序列化字符串长度
+        uint32_t length = str.size();
+        SerializeArg(buffer, offset, length);
+
+        // 确保 buffer 有足够的空间
+        if(offset + length > buffer.size())
+        {
+            buffer.resize(offset + str.size());
+        }
+        // 再序列化字符串内容
+        const std::byte* bytes = reinterpret_cast<const std::byte*>(str.data());
+        std::copy(bytes, bytes + length, buffer.begin() + offset);
+        offset += str.size();
+    }
+
+    // 基础类型的反序列化
+    template<typename T>
+    static T DeserializeArg(const std::vector<std::byte> &buffer, std::size_t &offset)
+    {
+        T value;
+        std::byte* p_bytes = reinterpret_cast<std::byte*>(&value);
+        std::copy(buffer.begin() + offset, buffer.begin() + offset + sizeof(T), p_bytes);
+        offset += sizeof(T);
+        return value;
+    }
+
+    // 字符串类型的反序列化特化版本
+    static std::string DeserializeString(const std::vector<std::byte> &buffer, std::size_t &offset)
+    {
+        // 先反序列化字符串长度
+        uint32_t length = DeserializeArg<uint32_t>(buffer, offset);
+
+        // 反序列化字符串内容
+        std::string result(reinterpret_cast<const char*>(buffer.data() + offset), length);
+        offset += length;
+        return result;
+    }
+};
