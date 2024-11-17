@@ -13,7 +13,7 @@ void NormalFunction()
 // 获取普通函数名字
 CASE(TestFunctionNameCase1)
 {
-    auto name = GetFuncName<NormalFunction>();
+    auto name = ToolBox::GetFuncName<NormalFunction>();
     fprintf(stderr, "Get normal function name: %s\n", name.data());
 }
 
@@ -26,7 +26,7 @@ public:
 // 获取类成员函数名字
 CASE(TestClassFunctionNameCase2)
 {
-    auto name = GetFuncName<&TestClass::TestClassMethod>();
+    auto name = ToolBox::GetFuncName<&TestClass::TestClassMethod>();
     fprintf(stderr, "Get class method name: %s\n", name.data());
 
 }
@@ -35,7 +35,7 @@ CASE(TestClassFunctionNameCase2)
 CASE(TestLambdaFunctionNameCase3)
 {
     auto lambda = []() { return 1; };
-    auto name = GetFuncName<lambda>();
+    auto name = ToolBox::GetFuncName<lambda>();
     fprintf(stderr, "Get lambda function name: %s\n", name.data());
 }
 

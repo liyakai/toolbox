@@ -4,6 +4,9 @@
 
 // 获取函数名
 
+namespace ToolBox
+{
+
 template<auto func>
 constexpr const std::string_view GetFuncName()
 {
@@ -25,3 +28,5 @@ constexpr const std::string_view GetFuncName()
     #error "Unsupported compiler"
 #endif
 }
+
+} // namespace ToolBox
