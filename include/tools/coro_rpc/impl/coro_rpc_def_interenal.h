@@ -28,8 +28,8 @@ namespace ToolBox::CoroRpc
         ERR_SERIAL_NUMBER_CONFLICT = 6,
         ERR_MESSAGE_TOO_LARGE = 7,
     };
-}
 
+    
 class CoroRpcTools
 {
 public:
@@ -84,3 +84,18 @@ public:
         return result;
     }
 };
+
+//----- 类型萃取. 这段代码实现了一个类型萃取（type traits）工具，用于检查一个类型是否是某个模板类的特化版本
+// 这是主模板，默认继承自 std::false_type，表示默认情况下返回 false
+template<typename T, template<typename...> typename Primary>
+struct is_specialization_of : std::false_type {};
+
+// 这是一个偏特化版本. 当 T 确实是 Primary 的特化版本时，继承自 std::true_type，表示匹配成功
+template<template<typename...> typename Primary, typename... Args>
+struct is_specialization_of<Primary<Args...>, Primary> : std::true_type {};
+// 辅助变量模板.这是一个变量模板，提供了更方便的使用方式_v 后缀是 C++ 标准库的常见命名约定
+template <typename T, template <typename...> typename Primary>
+inline constexpr bool is_specialization_of_v = is_specialization_of<T, Primary>::value;
+
+
+}   // namespace ToolBox::CoroRpc

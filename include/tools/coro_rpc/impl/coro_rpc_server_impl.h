@@ -100,19 +100,93 @@ private:
             return;
         }
         using ReturnType = std::invoke_result_t<decltype(func)>;
+        constexpr auto name = ToolBox::GetFuncName<func>();
 
-       auto iter = rpc_server_handler_map_.emplace(key, [self](std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
-            return (self->*func)(data, protocols);
-       });
-       if (!iter.second) [[unlikely]]
-       {
-            RpcLogError("[CoroRpcServer] RegistOneHandlerImpl: key already exists");
-            return;
-       }
+        if constexpr(ToolBox::CoroRpc::is_specialization_of_v<ReturnType, ToolBox::coro::Task>)
+        {
+            auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
+                return ExecuteCore_<rpc_protocol, rpc_protocol::supported_serialize_protocols, func>(data, self);
+            });
+            if (!iter.second) [[unlikely]]
+            {
+                RpcLogError("[CoroRpcServer] RegistOneHandlerImpl: key already exists");
+                return;
+            }
+        } else {
+            auto iter = rpc_server_handler_map_.emplace(key, [&](std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
+                return Execute_<rpc_protocol, protocols, func>(data, self);
+            });
+            if (!iter.second) [[unlikely]]
+            {
+                RpcLogError("[CoroRpcServer] RegistOneHandlerImpl: key already exists");
+                return;
+            }
+        }
     }
 
-    template<typename sericalize_proto, auto func, typename Self = void>
-    inline coro::Task<std::pair<Errc, std::string>> ExecuteCore(std::string_view data, Self *self = nullptr)
+    template<typename exe_rpc_protocol, typename serialize_proto, auto func, typename Self = void>
+    inline std::pair<Errc, std::string> Execute_(std::string_view data, Self *self = nullptr)
+    {
+        using namespace std::string_literals;
+        using func_type = decltype(func);
+        using param_type = std::conditional_t<
+            std::is_member_function_pointer_v<func_type>,
+            typename ToolBox::function_traits<func_type>::template args_tuple<1>,  // 成员函数：跳过第一个this参数
+            typename ToolBox::function_traits<func_type>::args_tuple              // 普通函数：使用全部参数
+        >;
+        using ReturnType = std::invoke_result_t<decltype(func)>;
+        if constexpr(!std::is_void_v<param_type>)
+        {
+            using First = std::tuple_element_t<0, param_type>;
+            param_type args;
+            bool is_ok = true;
+            constexpr size_t size = std::tuple_size_v<param_type>;
+            if constexpr(size > 0)
+            {
+                is_ok = serialize_proto::DeserializeArg(data, args);
+            }
+            if (!is_ok)[[unlikely]]
+            {
+                return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "deserialize arguments failed"s);
+            }
+            if constexpr (std::is_void_v<ReturnType>)
+            {
+                if constexpr (std::is_void_v<Self>)
+                {
+                    std::apply(func, std::move(args));
+                } else {
+                    std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)));
+                }
+            } else {
+                if constexpr (std::is_void_v<Self>)
+                {
+                    return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(std::apply(func, std::move(args))));
+                } else {
+                    return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)))));
+                }
+            }
+        }else {
+            if constexpr(std::is_void_v<ReturnType>)
+            {
+                if constexpr(std::is_void_v<Self>)
+                {
+                    func();
+                } else {
+                    std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)));
+                }
+            } else {
+                if constexpr(std::is_void_v<Self>)
+                {
+                    return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(func()));
+                }else {
+                    return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)))));
+                }
+            }
+        }
+    }
+
+    template<typename exe_rpc_protocol, typename serialize_proto, auto func, typename Self = void>
+    inline coro::Task<std::pair<Errc, std::string>> ExecuteCore_(std::string_view data, Self *self = nullptr)
     {
         using namespace std::string_literals;
         using func_type = decltype(func);
@@ -122,25 +196,62 @@ private:
             typename ToolBox::function_traits<func_type>::template args_tuple<1>,  // 成员函数：跳过第一个this参数
             typename ToolBox::function_traits<func_type>::args_tuple              // 普通函数：使用全部参数
         >;
+        using ReturnType = std::invoke_result_t<decltype(func)>;
         if constexpr(!std::is_void_v<param_type>){
             using First = std::tuple_element_t<0, param_type>;
-            constexpr bool is_conn = requires {typename First::return_type;};
-            static_assert(!is_conn, "context<T> is not allowed as parameter in coroutine function");
             bool is_ok = true;
             constexpr size_t size = std::tuple_size_v<param_type>;
             param_type args;
             if constexpr(size > 0)
             {
-                is_ok = CoroRpcTools::DeserializeArg(data, args);
+                is_ok = serialize_proto::DeserializeArg(data, args);
             }
-            if (!is_ok)
+            if (!is_ok)[[unlikely]]
             {
-                
+                co_return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "deserialize arguments failed"s);
+            }
+            if constexpr (std::is_void_v<ReturnType>)
+            {
+                if constexpr(std::is_void_v<Self>)
+                {
+                    // call void func(args...)
+                    co_await std::apply(func, std::move(args));
+                } else {
+                    // call void self->func(self, args...)
+                    co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)));
+                }
+                co_return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(std::monostate{}));
+            } else {
+                if constexpr (std::is_void_v<Self>)
+                {
+                    // call return_type func(args...)
+                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(co_await std::apply(func, std::move(args))));
+                } else {
+                    // call return_type self->func(self, args...)
+                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)))));
+                }
+            }
+        } else {
+            if constexpr (std::is_void_v<ReturnType>)
+            {
+                if constexpr(std::is_void_v<Self>)
+                {
+                    co_await func();
+                } else {
+                    co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)));
+                }
+                co_return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(std::monostate{}));
+            } else {
+                if constexpr(std::is_void_v<Self>)
+                {
+                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(co_await func()));
+                } else {
+                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::serialize(co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)))));
+                }
             }
         }
-    }
-};
-
+    }   // ExecuteCore_
+};  // class CoroRpcServer
 
 }   // namespace ToolBox::CoroRpc
 }   // namespace ToolBox

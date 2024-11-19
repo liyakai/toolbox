@@ -3,6 +3,7 @@
 #include "unit_test_frame/unittest.h"
 #include "tools/coro_rpc/coro_rpc_server.h"
 #include "tools/timer.h"
+#include <thread>
 FIXTURE_BEGIN(CoroRpcServer)
 
 inline std::string_view echo(std::string_view str)
