@@ -1,388 +1,227 @@
 #pragma once
-#include <string>
-#include <cstring>
 
-// 32位MD5
+#include <array>
+#include <cstdint>
+#include <string_view>
 
-namespace ToolBox{
+// 实现来自于 https://chromium.googlesource.com/chromium/src/base/+/refs/heads/main/hash/md5_constexpr_internal.h
 
-/* Parameters of MD5. */
-#define s11 7
-#define s12 12
-#define s13 17
-#define s14 22
-#define s21 5
-#define s22 9
-#define s23 14
-#define s24 20
-#define s31 4
-#define s32 11
-#define s33 16
-#define s34 23
-#define s41 6
-#define s42 10
-#define s43 15
-#define s44 21
-
-/**
- * @Basic MD5 functions.
- *
- * @param there bit32.
- *
- * @return one bit32.
- */
-#define F(x, y, z) (((x) & (y)) | ((~x) & (z)))
-#define G(x, y, z) (((x) & (z)) | ((y) & (~z)))
-#define H(x, y, z) ((x) ^ (y) ^ (z))
-#define I(x, y, z) ((y) ^ ((x) | (~z)))
-
-/**
- * @Rotate Left.
- *
- * @param {num} the raw number.
- *
- * @param {n} rotate left n.
- *
- * @return the number after rotated left.
- */
-#define ROTATELEFT(num, n) (((num) << (n)) | ((num) >> (32-(n))))
-
-/**
- * @Transformations for rounds 1, 2, 3, and 4.
- */
-#define FF(a, b, c, d, x, s, ac) { \
-  (a) += F ((b), (c), (d)) + (x) + ac; \
-  (a) = ROTATELEFT ((a), (s)); \
-  (a) += (b); \
-}
-#define GG(a, b, c, d, x, s, ac) { \
-  (a) += G ((b), (c), (d)) + (x) + ac; \
-  (a) = ROTATELEFT ((a), (s)); \
-  (a) += (b); \
-}
-#define HH(a, b, c, d, x, s, ac) { \
-  (a) += H ((b), (c), (d)) + (x) + ac; \
-  (a) = ROTATELEFT ((a), (s)); \
-  (a) += (b); \
-}
-#define II(a, b, c, d, x, s, ac) { \
-  (a) += I ((b), (c), (d)) + (x) + ac; \
-  (a) = ROTATELEFT ((a), (s)); \
-  (a) += (b); \
-}
-
-/* Define of btye.*/
-typedef unsigned char byte;
-/* Define of byte. */
-typedef unsigned int bit32;
-
-class MD5 {
-public:
-  /* Construct a MD5 object with a string. */
-  MD5(const std::string& message);
-
-  /* Generate md5 digest. */
-  const byte* getDigest();
-
-  /* Convert digest to string value */
-  std::string toStr();
-
-private:
-  /* Initialization the md5 object, processing another message block,
-   * and updating the context.*/
-  void init(const byte* input, size_t len);
-
-  /* MD5 basic transformation. Transforms state based on block. */
-  void transform(const byte block[64]);
-
-  /* Encodes input (usigned long) into output (byte). */
-  void encode(const bit32* input, byte* output, size_t length);
-
-  /* Decodes input (byte) into output (usigned long). */
-  void decode(const byte* input, bit32* output, size_t length);
-
-private:
-  /* Flag for mark whether calculate finished. */
-  bool finished;
-
-	/* state (ABCD). */
-  bit32 state[4];
-
-  /* number of bits, low-order word first. */
-  bit32 count[2];
-
-  /* input buffer. */
-  byte buffer[64];
-
-  /* message digest. */
-  byte digest[16];
-
-	/* padding for calculate. */
-  static const byte PADDING[64];
-
-  /* Hex numbers. */
-  static const char HEX_NUMBERS[16];
-};
-
-/* Define the static member of MD5. */
-inline const byte MD5::PADDING[64] = { 0x80 };
-inline const char MD5::HEX_NUMBERS[16] = {
-  '0', '1', '2', '3',
-  '4', '5', '6', '7',
-  '8', '9', 'a', 'b',
-  'c', 'd', 'e', 'f'
-};
-
-/**
- * @Construct a MD5 object with a string.
- *
- * @param {message} the message will be transformed.
- *
- */
-inline MD5::MD5(const std::string& message) {
-  finished = false;
-  /* Reset number of bits. */
-  count[0] = count[1] = 0;
-  /* Initialization constants. */
-  state[0] = 0x67452301;
-  state[1] = 0xefcdab89;
-  state[2] = 0x98badcfe;
-  state[3] = 0x10325476;
-
-  /* Initialization the object according to message. */
-  init((const byte*)message.c_str(), message.length());
-}
-
-/**
- * @Generate md5 digest.
- *
- * @return the message-digest.
- *
- */
-inline const byte* MD5::getDigest() {
-  if (!finished) {
-    finished = true;
-
-    byte bits[8];
-    bit32 oldState[4];
-    bit32 oldCount[2];
-    bit32 index, padLen;
-
-    /* Save current state and count. */
-    std::memcpy(oldState, state, 16);
-    std::memcpy(oldCount, count, 8);
-
-    /* Save number of bits */
-    encode(count, bits, 8);
-
-    /* Pad out to 56 mod 64. */
-    index = (bit32)((count[0] >> 3) & 0x3f);
-    padLen = (index < 56) ? (56 - index) : (120 - index);
-    init(PADDING, padLen);
-
-    /* Append length (before padding) */
-    init(bits, 8);
-
-    /* Store state in digest */
-    encode(state, digest, 16);
-
-    /* Restore current state and count. */
-    memcpy(state, oldState, 16);
-    memcpy(count, oldCount, 8);
+namespace MD5 {
+// The implementation here is based on the pseudocode provided by Wikipedia:
+// https://en.wikipedia.org/wiki/MD5#Pseudocode
+struct MD5CE {
+  //////////////////////////////////////////////////////////////////////////////
+  // DATA STRUCTURES
+  // The data representation at each round is a 4-tuple of uint32_t.
+  struct IntermediateData {
+    uint32_t a;
+    uint32_t b;
+    uint32_t c;
+    uint32_t d;
+  };
+  // The input data for a single round consists of 16 uint32_t (64 bytes).
+  using RoundData = std::array<uint32_t, 16>;
+  //////////////////////////////////////////////////////////////////////////////
+  // CONSTANTS
+  static constexpr std::array<uint32_t, 64> kConstants = {
+      {0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a,
+       0xa8304613, 0xfd469501, 0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
+       0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821, 0xf61e2562, 0xc040b340,
+       0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+       0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8,
+       0x676f02d9, 0x8d2a4c8a, 0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
+       0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70, 0x289b7ec6, 0xeaa127fa,
+       0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+       0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92,
+       0xffeff47d, 0x85845dd1, 0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
+       0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391}};
+  static constexpr std::array<uint32_t, 16> kShifts = {
+      {7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21}};
+  // The initial intermediate data.
+  static constexpr IntermediateData kInitialIntermediateData{
+      0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476};
+  //////////////////////////////////////////////////////////////////////////////
+  // PADDED MESSAGE GENERATION / EXTRACTION
+  // Given the message length, calculates the padded message length. There has
+  // to be room for the 1-byte end-of-message marker, plus 8 bytes for the
+  // uint64_t encoded message length, all rounded up to a multiple of 64 bytes.
+  static constexpr uint32_t GetPaddedMessageLength(const uint32_t n) {
+    return (((n + 1 + 8) + 63) / 64) * 64;
   }
-  return digest;
-}
-
-/**
- * @Initialization the md5 object, processing another message block,
- * and updating the context.
- *
- * @param {input} the input message.
- *
- * @param {len} the number btye of message.
- *
- */
-inline void MD5::init(const byte* input, size_t len) {
-
-  bit32 i, index, partLen;
-
-  finished = false;
-
-  /* Compute number of bytes mod 64 */
-  index = (bit32)((count[0] >> 3) & 0x3f);
-
-  /* update number of bits */
-  if ((count[0] += ((bit32)len << 3)) < ((bit32)len << 3)) {
-    ++count[1];
+  // Extracts the |i|th byte of a uint64_t, where |i == 0| extracts the least
+  // significant byte. It is expected that 0 <= i < 8.
+  static constexpr uint8_t ExtractByte(const uint64_t value, const uint32_t i) {
+    // DCHECK_LT(i, 8u);
+    return static_cast<uint8_t>((value >> (i * 8)) & 0xff);
   }
-  count[1] += ((bit32)len >> 29);
-
-  partLen = 64 - index;
-
-  /* transform as many times as possible. */
-  if (len >= partLen) {
-
-    memcpy(&buffer[index], input, partLen);
-    transform(buffer);
-
-    for (i = partLen; i + 63 < len; i += 64) {
-      transform(&input[i]);
+  // Extracts the |i|th byte of a message of length |n|.
+  static constexpr uint8_t GetPaddedMessageByte(std::string_view data,
+                                                const uint32_t m,
+                                                const uint32_t i) {
+    // DCHECK_LT(i, m);
+    // DCHECK_LT(data.size(), m);
+    // DCHECK_EQ(m % 64, 0u);
+    if (i < data.size()) {
+      // Emit the message itself...
+      return static_cast<uint8_t>(data[i]);
+    } else if (i == data.size()) {
+      // ...followed by the end of message marker.
+      return 0x80;
+    } else if (i >= m - 8) {
+      // The last 8 bytes encode the original message length times 8.
+      return ExtractByte(data.size() * 8, i - (m - 8));
+    } else {
+      // And everything else is just empyt padding.
+      return 0;
     }
-    index = 0;
-
-  } else {
-    i = 0;
   }
-
-  /* Buffer remaining input */
-  std::memcpy(&buffer[index], &input[i], len - i);
-}
-
-/**
- * @MD5 basic transformation. Transforms state based on block.
- *
- * @param {block} the message block.
- */
-inline void MD5::transform(const byte block[64]) {
-
-  bit32 a = state[0], b = state[1], c = state[2], d = state[3], x[16];
-
-  decode(block, x, 64);
-
-  /* Round 1 */
-  FF (a, b, c, d, x[ 0], s11, 0xd76aa478);
-  FF (d, a, b, c, x[ 1], s12, 0xe8c7b756);
-  FF (c, d, a, b, x[ 2], s13, 0x242070db);
-  FF (b, c, d, a, x[ 3], s14, 0xc1bdceee);
-  FF (a, b, c, d, x[ 4], s11, 0xf57c0faf);
-  FF (d, a, b, c, x[ 5], s12, 0x4787c62a);
-  FF (c, d, a, b, x[ 6], s13, 0xa8304613);
-  FF (b, c, d, a, x[ 7], s14, 0xfd469501);
-  FF (a, b, c, d, x[ 8], s11, 0x698098d8);
-  FF (d, a, b, c, x[ 9], s12, 0x8b44f7af);
-  FF (c, d, a, b, x[10], s13, 0xffff5bb1);
-  FF (b, c, d, a, x[11], s14, 0x895cd7be);
-  FF (a, b, c, d, x[12], s11, 0x6b901122);
-  FF (d, a, b, c, x[13], s12, 0xfd987193);
-  FF (c, d, a, b, x[14], s13, 0xa679438e);
-  FF (b, c, d, a, x[15], s14, 0x49b40821);
-
-  /* Round 2 */
-  GG (a, b, c, d, x[ 1], s21, 0xf61e2562);
-  GG (d, a, b, c, x[ 6], s22, 0xc040b340);
-  GG (c, d, a, b, x[11], s23, 0x265e5a51);
-  GG (b, c, d, a, x[ 0], s24, 0xe9b6c7aa);
-  GG (a, b, c, d, x[ 5], s21, 0xd62f105d);
-  GG (d, a, b, c, x[10], s22,  0x2441453);
-  GG (c, d, a, b, x[15], s23, 0xd8a1e681);
-  GG (b, c, d, a, x[ 4], s24, 0xe7d3fbc8);
-  GG (a, b, c, d, x[ 9], s21, 0x21e1cde6);
-  GG (d, a, b, c, x[14], s22, 0xc33707d6);
-  GG (c, d, a, b, x[ 3], s23, 0xf4d50d87);
-  GG (b, c, d, a, x[ 8], s24, 0x455a14ed);
-  GG (a, b, c, d, x[13], s21, 0xa9e3e905);
-  GG (d, a, b, c, x[ 2], s22, 0xfcefa3f8);
-  GG (c, d, a, b, x[ 7], s23, 0x676f02d9);
-  GG (b, c, d, a, x[12], s24, 0x8d2a4c8a);
-
-  /* Round 3 */
-  HH (a, b, c, d, x[ 5], s31, 0xfffa3942);
-  HH (d, a, b, c, x[ 8], s32, 0x8771f681);
-  HH (c, d, a, b, x[11], s33, 0x6d9d6122);
-  HH (b, c, d, a, x[14], s34, 0xfde5380c);
-  HH (a, b, c, d, x[ 1], s31, 0xa4beea44);
-  HH (d, a, b, c, x[ 4], s32, 0x4bdecfa9);
-  HH (c, d, a, b, x[ 7], s33, 0xf6bb4b60);
-  HH (b, c, d, a, x[10], s34, 0xbebfbc70);
-  HH (a, b, c, d, x[13], s31, 0x289b7ec6);
-  HH (d, a, b, c, x[ 0], s32, 0xeaa127fa);
-  HH (c, d, a, b, x[ 3], s33, 0xd4ef3085);
-  HH (b, c, d, a, x[ 6], s34,  0x4881d05);
-  HH (a, b, c, d, x[ 9], s31, 0xd9d4d039);
-  HH (d, a, b, c, x[12], s32, 0xe6db99e5);
-  HH (c, d, a, b, x[15], s33, 0x1fa27cf8);
-  HH (b, c, d, a, x[ 2], s34, 0xc4ac5665);
-
-  /* Round 4 */
-  II (a, b, c, d, x[ 0], s41, 0xf4292244);
-  II (d, a, b, c, x[ 7], s42, 0x432aff97);
-  II (c, d, a, b, x[14], s43, 0xab9423a7);
-  II (b, c, d, a, x[ 5], s44, 0xfc93a039);
-  II (a, b, c, d, x[12], s41, 0x655b59c3);
-  II (d, a, b, c, x[ 3], s42, 0x8f0ccc92);
-  II (c, d, a, b, x[10], s43, 0xffeff47d);
-  II (b, c, d, a, x[ 1], s44, 0x85845dd1);
-  II (a, b, c, d, x[ 8], s41, 0x6fa87e4f);
-  II (d, a, b, c, x[15], s42, 0xfe2ce6e0);
-  II (c, d, a, b, x[ 6], s43, 0xa3014314);
-  II (b, c, d, a, x[13], s44, 0x4e0811a1);
-  II (a, b, c, d, x[ 4], s41, 0xf7537e82);
-  II (d, a, b, c, x[11], s42, 0xbd3af235);
-  II (c, d, a, b, x[ 2], s43, 0x2ad7d2bb);
-  II (b, c, d, a, x[ 9], s44, 0xeb86d391);
-
-  state[0] += a;
-  state[1] += b;
-  state[2] += c;
-  state[3] += d;
-}
-
-/**
-* @Encodes input (unsigned long) into output (byte).
-*
-* @param {input} usigned long.
-*
-* @param {output} byte.
-*
-* @param {length} the length of input.
-*
-*/
-inline void MD5::encode(const bit32* input, byte* output, size_t length) {
-
-  for (size_t i = 0, j = 0; j < length; ++i, j += 4) {
-    output[j]= (byte)(input[i] & 0xff);
-    output[j + 1] = (byte)((input[i] >> 8) & 0xff);
-    output[j + 2] = (byte)((input[i] >> 16) & 0xff);
-    output[j + 3] = (byte)((input[i] >> 24) & 0xff);
+  // Extracts the uint32_t starting at position |i| from the padded message
+  // generate by the provided input |data|. The bytes are treated in little
+  // endian order.
+  static constexpr uint32_t GetPaddedMessageWord(std::string_view data,
+                                                 const uint32_t m,
+                                                 const uint32_t i) {
+    // DCHECK_EQ(i % 4, 0u);
+    // DCHECK_LT(i, m);
+    // DCHECK_LT(data.size(), m);
+    // DCHECK_EQ(m % 64, 0u);
+    return static_cast<uint32_t>(GetPaddedMessageByte(data, m, i)) |
+           static_cast<uint32_t>((GetPaddedMessageByte(data, m, i + 1)) << 8) |
+           static_cast<uint32_t>((GetPaddedMessageByte(data, m, i + 2)) << 16) |
+           static_cast<uint32_t>((GetPaddedMessageByte(data, m, i + 3)) << 24);
   }
-}
-
-/**
- * @Decodes input (byte) into output (usigned long).
- *
- * @param {input} bytes.
- *
- * @param {output} unsigned long.
- *
- * @param {length} the length of input.
- *
- */
-inline void MD5::decode(const byte* input, bit32* output, size_t length) {
-  for (size_t i = 0, j = 0; j < length; ++i, j += 4) {
-    output[i] = ((bit32)input[j]) | (((bit32)input[j + 1]) << 8) |
-    (((bit32)input[j + 2]) << 16) | (((bit32)input[j + 3]) << 24);
+  // Given an input buffer |data|, extracts one round worth of data starting at
+  // offset |i|.
+  static constexpr RoundData GetRoundData(std::string_view data,
+                                          const uint32_t m,
+                                          const uint32_t i) {
+    // DCHECK_EQ(i % 64, 0u);
+    // DCHECK_LT(i, m);
+    // DCHECK_LT(data.size(), m);
+    // DCHECK_EQ(m % 64, 0u);
+    return RoundData{{GetPaddedMessageWord(data, m, i),
+                      GetPaddedMessageWord(data, m, i + 4),
+                      GetPaddedMessageWord(data, m, i + 8),
+                      GetPaddedMessageWord(data, m, i + 12),
+                      GetPaddedMessageWord(data, m, i + 16),
+                      GetPaddedMessageWord(data, m, i + 20),
+                      GetPaddedMessageWord(data, m, i + 24),
+                      GetPaddedMessageWord(data, m, i + 28),
+                      GetPaddedMessageWord(data, m, i + 32),
+                      GetPaddedMessageWord(data, m, i + 36),
+                      GetPaddedMessageWord(data, m, i + 40),
+                      GetPaddedMessageWord(data, m, i + 44),
+                      GetPaddedMessageWord(data, m, i + 48),
+                      GetPaddedMessageWord(data, m, i + 52),
+                      GetPaddedMessageWord(data, m, i + 56),
+                      GetPaddedMessageWord(data, m, i + 60)}};
   }
-}
-
-
-/**
- * @Convert digest to string value.
- *
- * @return the hex string of digest.
- *
- */
-inline std::string MD5::toStr() {
-  const byte* digest_ = getDigest();
-  std::string str;
-  str.reserve(16 << 1);
-  for (size_t i = 0; i < 16; ++i) {
-    int t = digest_[i];
-    int a = t / 16;
-    int b = t % 16;
-    str.append(1, HEX_NUMBERS[a]);
-    str.append(1, HEX_NUMBERS[b]);
+  //////////////////////////////////////////////////////////////////////////////
+  // HASH IMPLEMENTATION
+  // Mixes elements |b|, |c| and |d| at round |i| of the calculation.
+  static constexpr uint32_t CalcF(const uint32_t i,
+                                  const uint32_t b,
+                                  const uint32_t c,
+                                  const uint32_t d) {
+    // DCHECK_LT(i, 64u);
+    if (i < 16) {
+      return d ^ (b & (c ^ d));
+    } else if (i < 32) {
+      return c ^ (d & (b ^ c));
+    } else if (i < 48) {
+      return b ^ c ^ d;
+    } else {
+      return c ^ (b | (~d));
+    }
   }
-  return str;
+  static constexpr uint32_t CalcF(const uint32_t i,
+                                  const IntermediateData& intermediate) {
+    return CalcF(i, intermediate.b, intermediate.c, intermediate.d);
+  }
+  // Calculates the indexing function at round |i|.
+  static constexpr uint32_t CalcG(const uint32_t i) {
+    // DCHECK_LT(i, 64u);
+    if (i < 16) {
+      return i;
+    } else if (i < 32) {
+      return (5 * i + 1) % 16;
+    } else if (i < 48) {
+      return (3 * i + 5) % 16;
+    } else {
+      return (7 * i) % 16;
+    }
+  }
+  // Calculates the rotation to be applied at round |i|.
+  static constexpr uint32_t GetShift(const uint32_t i) {
+    // DCHECK_LT(i, 64u);
+    return kShifts[(i / 16) * 4 + (i % 4)];
+  }
+  // Rotates to the left the given |value| by the given |bits|.
+  static constexpr uint32_t LeftRotate(const uint32_t value,
+                                       const uint32_t bits) {
+    // DCHECK_LT(bits, 32u);
+    return (value << bits) | (value >> (32 - bits));
+  }
+  // Applies the ith step of mixing.
+  static constexpr IntermediateData ApplyStep(
+      const uint32_t i,
+      const RoundData& data,
+      const IntermediateData& intermediate) {
+    // DCHECK_LT(i, 64u);
+    const uint32_t g = CalcG(i);
+    // DCHECK_LT(g, 16u);
+    const uint32_t f =
+        CalcF(i, intermediate) + intermediate.a + kConstants[i] + data[g];
+    const uint32_t s = GetShift(i);
+    return IntermediateData{/* a */ intermediate.d,
+                            /* b */ intermediate.b + LeftRotate(f, s),
+                            /* c */ intermediate.b,
+                            /* d */ intermediate.c};
+  }
+  // Adds two IntermediateData together.
+  static constexpr IntermediateData Add(const IntermediateData& intermediate1,
+                                        const IntermediateData& intermediate2) {
+    return IntermediateData{
+        intermediate1.a + intermediate2.a, intermediate1.b + intermediate2.b,
+        intermediate1.c + intermediate2.c, intermediate1.d + intermediate2.d};
+  }
+  // Processes an entire message.
+  static constexpr IntermediateData ProcessMessage(std::string_view message) {
+    const uint32_t m =
+        GetPaddedMessageLength(static_cast<uint32_t>(message.size()));
+    IntermediateData intermediate0 = kInitialIntermediateData;
+    for (uint32_t offset = 0; offset < m; offset += 64) {
+      RoundData data = GetRoundData(message, m, offset);
+      IntermediateData intermediate1 = intermediate0;
+      for (uint32_t i = 0; i < 64; ++i)
+        intermediate1 = ApplyStep(i, data, intermediate1);
+      intermediate0 = Add(intermediate0, intermediate1);
+    }
+    return intermediate0;
+  }
+  //////////////////////////////////////////////////////////////////////////////
+  // HELPER FUNCTIONS
+  static constexpr uint32_t SwapEndian(uint32_t a) {
+    return ((a & 0xff) << 24) | (((a >> 8) & 0xff) << 16) |
+           (((a >> 16) & 0xff) << 8) | ((a >> 24) & 0xff);
+  }
+  //////////////////////////////////////////////////////////////////////////////
+  // WRAPPER FUNCTIONS
+  static constexpr uint64_t Hash64(std::string_view data) {
+    IntermediateData intermediate = ProcessMessage(data);
+    return (static_cast<uint64_t>(SwapEndian(intermediate.a)) << 32) |
+           static_cast<uint64_t>(SwapEndian(intermediate.b));
+  }
+  static constexpr uint32_t Hash32(std::string_view data) {
+    IntermediateData intermediate = ProcessMessage(data);
+    return SwapEndian(intermediate.a);
+  }
+};
+}  // namespace MD5
+// Implementations of the functions exposed in the public header.
+constexpr uint64_t MD5Hash64Constexpr(std::string_view string) {
+  return MD5::MD5CE::Hash64(string);
 }
-
-} // namespace ToolBox
+constexpr uint32_t MD5Hash32Constexpr(std::string_view string) {
+  return MD5::MD5CE::Hash32(string);
+}
