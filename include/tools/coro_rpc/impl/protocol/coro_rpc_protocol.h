@@ -6,11 +6,13 @@
 #include <string>
 
 #include "tools/coro_rpc/impl/coro_rpc_def_interenal.h"
+#include "struct_pack_protocol.h"
 
 namespace ToolBox::CoroRpc
 {
-    template <typename rpc_protocol, template<typename...> typename map_t = std::unordered_map>
-    class CoroRpcServer;
+    
+template <typename RpcProtocol, template<typename...> typename map_t = std::unordered_map>
+class CoroRpcServer;
 struct CoroRpcProtocol
 {
 public:
@@ -52,29 +54,29 @@ struct RespHeader
     uint32_t attach_length;
 };
 
-using supported_serialize_protocols = std::variant<std::nullopt_t>;
+using supported_serialize_protocols = std::variant<StructPackProtocol>;
 using rpc_server_key_t = uint32_t;
 using rpc_server = CoroRpcServer<CoroRpcProtocol>;
 
-template <auto func>
-struct has_gen_register_key {
-    template <typename T>
-    static constexpr bool check(T*) {
-        return requires { T::template gen_register_key<func>(); };
-    }
-};
-
-static std::optional<supported_serialize_protocols> get_serialize_protocol(ReqHeader &header)
+static std::optional<supported_serialize_protocols> GetSerializeProtocol(ReqHeader &header)
 {
     if(header.serialize_type == 0)
     {
-        return std::nullopt;
+        return StructPackProtocol();
     }else {
         return std::nullopt;
     }
 }
 
-static std::string prepare_response(std::string& rpc_result, const RespHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
+template <auto func>
+struct HasGenRegisterKey {
+    template <typename T>
+    static constexpr bool check(T*) {
+        return requires { T::template HasGenRegisterKey<func>(); };
+    }
+};
+
+static std::string PrepareResponse(std::string& rpc_result, const RespHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
 {
     std::string err_msg_buf;
     std::string header_buf;
@@ -107,10 +109,10 @@ static_assert(RESP_HEAD_LEN == 16);
 
 }; // namespace ToolBox::CoroRpc::CoroRpcProtocol
 
-template<typename rpc_protocol = CoroRpcProtocol>
-uint64_t get_request_id(const typename rpc_protocol::ReqHeader& header)
+template<typename RpcProtocol = CoroRpcProtocol>
+uint64_t GetRequestId(const typename RpcProtocol::ReqHeader& header)
 {
-    if constexpr (std::is_same_v<rpc_protocol, CoroRpcProtocol>)
+    if constexpr (std::is_same_v<RpcProtocol, CoroRpcProtocol>)
     {
         return header.seq_num;
     }else {
