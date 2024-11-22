@@ -18,7 +18,6 @@ constexpr const std::string_view GetFuncName()
     return full_name.substr(start, end - start);
 #elif defined(__clang__) || defined(__GNUC__) // Clang or GCC 
     constexpr std::string_view full_name = __PRETTY_FUNCTION__;
-    fprintf(stderr, "full_name: %s\n", full_name.data());
     // Find the function name between "GetFuncName() [with auto func = " and "]"
     constexpr size_t start = full_name.find('[') + 1;
     constexpr size_t end = full_name.find(']');
