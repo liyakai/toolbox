@@ -104,6 +104,7 @@ namespace ToolBox
                 workder.reset();
             }
         }
+        workers_.clear();
 
         while (!event2main_.Empty())
         {
@@ -120,6 +121,7 @@ namespace ToolBox
                 network.reset();
             }
         }
+        networks_.clear();
         conn_type_.clear();
     }
     ENetErrCode NetworkChannel::Close(uint64_t conn_id)

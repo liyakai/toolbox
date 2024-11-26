@@ -1,13 +1,22 @@
 #pragma once
 
-#include "tools/timer.h"
 #include <future>
+#include <variant>
+#include <unordered_map>
+#include <functional>
+#include <atomic>
+
 #include "tools/cpp20_coroutine.h"
 #include "tools/timer.h"
 #include "protocol/coro_rpc_protocol.h"
 
 namespace ToolBox {
 namespace CoroRpc {
+
+template<typename T, auto func>
+concept HasGenRegisterKey = requires() {
+    T::template GenRegisterKey<func>();
+};
 
 // 获取全局唯一的client_id
 inline uint64_t get_global_client_id() {
@@ -66,9 +75,12 @@ using async_rpc_type_t = typename rpc_return_type<T>::type;
 template<typename T>
 using rpc_result = std::tuple<T, CoroRpc::Errc>;
 
+template <typename rpc_protocol>
 class CoroRpcClient {
 private:
     using PromiseCallback = std::function<void()>;
+    using SendCallback = std::function<void(std::vector<std::byte> &&)>;
+    using rpc_func_key = typename CoroRpcTools::rpc_func_key;
     struct handler_t;
     struct Config {
         uint64_t client_id = get_global_client_id();
@@ -80,6 +92,7 @@ private:
       std::unordered_map<uint32_t, handler_t> response_handler_table_;
       control_t(bool is_timeout) : is_timeout_(is_timeout) {}
       std::atomic<uint32_t> recving_cnt_ = 0;
+      resp_body resp_buffer_;
 
     };
     struct async_rpc_raw_result_value_type{
@@ -117,6 +130,7 @@ private:
     std::shared_ptr<control_t> control_;
     std::string_view req_attachment_;
     Config config_;
+    SendCallback send_callback_ = nullptr;
 public:
     struct recving_guard;
 public:
@@ -169,6 +183,7 @@ public:
         req_attachment_ = attachment;
         return true;
     }
+    std::string_view get_resp_attachment() const noexcept { return control_->resp_buffer_.resp_attachment_buf_; }
 
     template <auto func, typename... Args>
     auto send_request_for_with_attachment(
@@ -179,7 +194,7 @@ public:
         recving_guard guard(control_.get());
         uint32_t id;
         std::function<void()> promise_callback;
-        coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback = [&promise_callback](std::function<void()> &&handle) {
+        typename ToolBox::coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback = [&promise_callback](std::function<void()> &&handle) {
             RpcLogDebug("[rpc][client] future_callback is called");
             promise_callback = std::move(handle);
         };
@@ -205,7 +220,7 @@ public:
                 return;
             }
             RpcLogDebug("[rpc][client] response handler table erase success, id: %d, table size: %zu", id, control_->response_handler_table_.size());
-        }, (int32_t)time_out_duration.count(), 1, __FILE__, __LINE__);
+        }, (int32_t)std::chrono::duration_cast<std::chrono::milliseconds>(time_out_duration).count(), 1, __FILE__, __LINE__);
 
         auto result = co_await send_request_for_impl<func>(time_out_duration, id, std::move(timer), request_attachment, std::forward<Args>(args)...);
         auto& control = *control_;
@@ -241,6 +256,11 @@ public:
     private:
         control_t *ctrl_;
     };
+
+    auto set_send_callback(std::function<void(std::vector<std::byte> &&)> callback)->CoroRpcClient& {
+        send_callback_ = std::move(callback);
+        return *this;
+    }
 
 private:
     auto timeout(auto duration, std::string error_msg)
@@ -338,16 +358,19 @@ private:
             co_return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
         }
         std::pair<std::error_code, std::size_t> send_result;
-        if (attachment.empty()) 
+        if (!attachment.empty()) 
         {
+            // Append attachment data to buffer
+            size_t original_size = buffer.size();
+            buffer.resize(original_size + attachment.size());
+            std::memcpy(buffer.data() + original_size, attachment.data(), attachment.size());
         }
-
-        printf("send buffer......######.......,buffer size: %zu\n", buffer.size());
-        printf("buffer content: ");
-        for (size_t i = 0; i < buffer.size(); i++) {
-            printf("%02X ", static_cast<unsigned char>(buffer[i]));
+        if(!send_callback_)
+        {
+            RpcLogError("[rpc][client] send_impl: send_callback_ not set");
+            co_return CoroRpc::Errc::ERR_SEND_CALLBACK_NOT_SET;
         }
-        printf("\n");
+        send_callback_(std::move(buffer));
 
         // send buffer
         co_return CoroRpc::Errc{};
@@ -357,7 +380,7 @@ private:
     std::vector<std::byte> prepare_buffer(uint32_t &id, Args &&...args)
     {
         std::vector<std::byte> buffer;
-        std::size_t offset = CoroRpcProtocol::REQ_HEAD_LEN;
+        std::size_t offset = rpc_protocol::REQ_HEAD_LEN;
         if constexpr(sizeof...(Args) > 0) {
             // 计算所有参数序列化后需要的总大小
             std::size_t total_size = (sizeof(Args) + ...);
@@ -369,15 +392,23 @@ private:
         } else {
             buffer.resize(offset);
         }
-        auto& req_head = *(CoroRpcProtocol::ReqHeader*)(buffer.data());
+        rpc_func_key key{};
+        if constexpr(HasGenRegisterKey<rpc_protocol, func>)
+        {
+            key = rpc_protocol::template GenRegisterKey<func>();
+        } else {
+            key = CoroRpcTools::AutoGenRegisterKey<func>();
+        }
+
+
+        auto& req_head = *reinterpret_cast<typename rpc_protocol::ReqHeader*>(buffer.data());
         req_head = {};
-        req_head.magic = CoroRpcProtocol::magic_number;
-        req_head.func_id = 1; // 协议ID与函数之间的映射需要考虑方案. //CoroRpc::get_func_id<func>();
+        req_head.magic = rpc_protocol::magic_number;
+        req_head.func_id = key;
         req_head.attach_length = req_attachment_.size();
         id = ++request_id_;
         req_head.seq_num = id;
-        req_head.attach_length = 0;
-        auto sz = buffer.size() - CoroRpcProtocol::REQ_HEAD_LEN;
+        auto sz = buffer.size() - rpc_protocol::REQ_HEAD_LEN;
         if(sz > UINT32_MAX) [[unlikely]]
         {
             RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);

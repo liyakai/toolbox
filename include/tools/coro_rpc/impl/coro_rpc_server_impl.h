@@ -3,8 +3,6 @@
 #include "coro_rpc_def_interenal.h"
 #include "protocol/coro_rpc_protocol.h"
 #include "tools/cpp20_coroutine.h"
-#include "tools/function_name.h"
-#include "tools/md5.h"
 #include "tools/function_traits.h"
 namespace ToolBox {
 namespace CoroRpc {
@@ -17,14 +15,18 @@ concept HasGenRegisterKey = requires() {
 template <typename rpc_protocol, template<typename...> typename map_t>
 class CoroRpcServer {
 public:
-    using handler_t = std::function<std::pair<Errc, std::string>(std::string_view, typename CoroRpcProtocol::supported_serialize_protocols)>;
-    using core_handler_t = std::function<ToolBox::coro::Task<std::pair<Errc, std::string>>(std::string_view, typename CoroRpcProtocol::supported_serialize_protocols protocols)>;
-    using rpc_server_key = typename rpc_protocol::rpc_server_key_t;
+    using handler_t = std::function<std::pair<Errc, std::string>(std::string_view, typename rpc_protocol::supported_serialize_protocols)>;
+    using core_handler_t = std::function<ToolBox::coro::Task<std::pair<Errc, std::string>>(std::string_view, typename rpc_protocol::supported_serialize_protocols protocols)>;
+    using rpc_func_key = typename CoroRpcTools::rpc_func_key_t;
 private:
-    std::unordered_map<rpc_server_key, handler_t> rpc_server_handler_map_;
-    std::unordered_map<rpc_server_key, core_handler_t> rpc_server_core_handler_map_;
-    std::unordered_map<rpc_server_key, std::string> id2name_map_;
-
+    using SendCallback = std::function<void(std::vector<std::byte> &&)>;
+    SendCallback send_callback_ = nullptr;
+    std::unordered_map<rpc_func_key, handler_t> rpc_server_handler_map_;
+    std::unordered_map<rpc_func_key, core_handler_t> rpc_server_core_handler_map_;
+    std::unordered_map<rpc_func_key, std::string> id2name_map_;
+    std::function<std::string_view()> resp_attachment_func_=[]{
+        return std::string_view{};
+    };
 public:
     CoroRpcServer() = default;
     ~CoroRpcServer() = default;
@@ -57,13 +59,21 @@ public:
         RegistOneHandlerImpl<func>(key);
     }
 
-    const std::string& GetName(const rpc_server_key &key) const {
+    const std::string& GetName(const rpc_func_key &key) const {
         static std::string empty_str;
         auto it = id2name_map_.find(key);
         if (it == id2name_map_.end()) {
             return empty_str;
         }
         return it->second;
+    }
+
+    Errc OnRecvData(std::string_view data) {
+        return OnRecvData_(data);
+    }
+    Errc SetSendCallback(std::function<void(std::vector<std::byte> &&)> &&callback) {
+        send_callback_ = std::move(callback);
+        return Errc::SUCCESS;
     }
 private:
     template <auto func, typename Self>
@@ -74,26 +84,20 @@ private:
             RpcLogError("[CoroRpcServer] RegisterOneHandler: self is nullptr");
             return;
         }
-        rpc_server_key key{};
+        rpc_func_key key{};
         if constexpr(HasGenRegisterKey<rpc_protocol, func>)
         {
             key = rpc_protocol::template GenRegisterKey<func>();
         } else {
-            key = AutoGenRegisterKey<func>();
+            key = CoroRpcTools::AutoGenRegisterKey<func>();
         }
 
         RegistOneHandlerImpl<func>(self,key);
     }
 
-    template<auto func>
-    static rpc_server_key AutoGenRegisterKey()
-    {
-        constexpr auto name = ToolBox::GetFuncName<func>();
-        auto id = MD5Hash32Constexpr(name);
-        return static_cast<rpc_server_key>(id);
-    }
+
     template<auto func, typename Self>
-    void RegistOneHandlerImpl(Self *self, const rpc_server_key &key)
+    void RegistOneHandlerImpl(Self *self, const rpc_func_key &key)
     {
         if (self == nullptr) [[unlikely]]
         {
@@ -128,18 +132,18 @@ private:
     template <auto func>
     void RegisterOneHandler()
     {
-        rpc_server_key key{};
+        rpc_func_key key{};
         if constexpr(HasGenRegisterKey<rpc_protocol, func>)
         {
             key = rpc_protocol::template GenRegisterKey<func>();
         } else {
-            key = AutoGenRegisterKey<func>();
+            key = CoroRpcTools::AutoGenRegisterKey<func>();
         }
         RegistOneHandlerImpl<func>(key);
     }
 
     template<auto func>
-    void RegistOneHandlerImpl(const rpc_server_key &key)
+    void RegistOneHandlerImpl(const rpc_func_key &key)
     {
         static_assert(!std::is_member_function_pointer_v<decltype(func)>, "RegistOneHandlerImpl: func is not a valid function");
         using ReturnType = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
@@ -166,6 +170,76 @@ private:
                 RpcLogError("[CoroRpcServer] RegistOneHandlerImpl: key already exists");
                 return;
             }
+        }
+    }
+
+    handler_t GetHandler(const rpc_func_key &key)
+    {
+        auto iter = rpc_server_handler_map_.find(key);
+        if(iter == rpc_server_handler_map_.end())
+        {
+            return nullptr;
+        }
+        return iter->second;
+    }
+
+    core_handler_t GetCoreHandler(const rpc_func_key &key)
+    {
+        auto iter = rpc_server_core_handler_map_.find(key);
+        if(iter == rpc_server_core_handler_map_.end())
+        {
+            return nullptr;
+        }
+        return iter->second;
+    }
+
+    ToolBox::coro::Task<std::pair<Errc, std::string>> HandleCoro(auto handler, std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols, const typename CoroRpcTools::rpc_func_key_t &key)
+    {
+        using namespace std::string_literals;
+        if(handler) [[likely]]
+        {
+            try {
+                co_return co_await handler(data, protocols);
+            } catch(Errc &err)
+            {
+                RpcLogError("[CoroRpcServer] HandleCoro: handler error, err:%d", err);
+                co_return std::make_pair(err, ""); 
+            } catch (const std::exception &e) {
+                RpcLogError("[CoroRpcServer] HandleCoro: exception: %s", e.what());
+                co_return std::make_pair(Errc::ERR_HANDLER_THROW_EXCEPTION, "");
+            } catch(...)
+            {
+                RpcLogError("[CoroRpcServer] HandleCoro: unknown exception");
+                co_return std::make_pair(Errc::ERR_HANDLER_THROW_EXCEPTION, "");
+            }
+        }else {
+            RpcLogError("[CoroRpcServer] HandleCoro: handler not found");
+            co_return std::make_pair(Errc::ERR_FUNC_NOT_REGISTERED, "");
+        }
+    }
+
+    std::pair<Errc, std::string> Handle(auto handler, std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols)
+    {
+        using namespace std::string_literals;
+        if(handler) [[likely]]
+        {
+            try {
+                return handler(data, protocols);
+            } catch(Errc &err)
+            {
+                RpcLogError("[CoroRpcServer] Handle: handler error, err:%d", err);
+                return std::make_pair(err, ""); 
+            } catch (const std::exception &e) {
+                RpcLogError("[CoroRpcServer] Handle: exception: %s", e.what());
+                return std::make_pair(Errc::ERR_HANDLER_THROW_EXCEPTION, "");
+            } catch(...)
+            {
+                RpcLogError("[CoroRpcServer] Handle: unknown exception");
+                return std::make_pair(Errc::ERR_HANDLER_THROW_EXCEPTION, "")    ;
+            }
+        }else {
+            RpcLogError("[CoroRpcServer] Handle: handler not found");
+            return std::make_pair(Errc::ERR_FUNC_NOT_REGISTERED, "");
         }
     }
 
@@ -294,6 +368,108 @@ private:
             }
         }
     }   // ExecuteCore_
+    Errc OnRecvData_(std::string_view data)
+    {
+        typename rpc_protocol::ReqHeader header;
+        auto err = rpc_protocol::ReadHeader(data, header);
+        if(err != Errc::SUCCESS)
+        {
+            RpcLogError("[CoroRpcServer] OnRecvData: read header failed, err: {}", err);
+            return err;
+        }
+        fprintf(stderr, "coro_rpc server recv data, header: %s\n", header.ToString().c_str());
+
+        auto serialize_protocol = rpc_protocol::GetSerializeProtocol(header);
+        if(!serialize_protocol.has_value())
+        {
+            RpcLogError("[CoroRpcServer] OnRecvData: serialize protocol not supported");
+            return Errc::ERR_PROTOCOL;
+        }
+
+        std::string body;
+        std::string attachment;
+        err = rpc_protocol::ReadPayLoad(header, data.substr(rpc_protocol::REQ_HEAD_LEN), body, attachment);
+        if(err != Errc::SUCCESS)
+        {
+            RpcLogError("[CoroRpcServer] OnRecvData: read payload failed, err: {}", err);
+            return err;
+        }
+        std::string_view payload(body);
+
+        Errc resp_err = Errc::SUCCESS;
+        std::string rpc_result;
+        auto key = rpc_protocol::GenRpcFuncKey(header);
+        auto handler = GetHandler(key);
+        if(handler == nullptr)
+        {
+            auto core_handler = GetCoreHandler(key);
+            auto handler_ret = HandleCoro(core_handler, payload, serialize_protocol.value(), key);
+            auto &&[resp_err, rpc_result] = handler_ret.get_result();
+            if(resp_err != Errc::SUCCESS)
+            {
+                RpcLogError("[CoroRpcServer] OnRecvData: handler error, err:%d", resp_err);
+                return resp_err;
+            }
+        }else {
+            auto &&[resp_err, rpc_result] = Handle(handler, payload, serialize_protocol.value());
+            if(resp_err != Errc::SUCCESS)
+            {
+                RpcLogError("[CoroRpcServer] OnRecvData: handler error, err:%d", resp_err);
+                return resp_err;
+            }
+        }
+
+        Errc ret = DirectResponseMsg(resp_err, rpc_result, header, std::move(resp_attachment_func_));
+        if(ret != Errc::SUCCESS)
+        {
+            RpcLogError("[CoroRpcServer] OnRecvData: prepare response header failed");
+            return ret;
+        }
+
+        return Errc::SUCCESS;
+    }
+    Errc DirectResponseMsg(Errc resp_err, std::string & rpc_result, 
+        const typename rpc_protocol::ReqHeader &req_head,
+        std::function<std::string_view()> &&attachment_func)
+    {
+        std::string resp_error_msg;
+        if(resp_err != Errc::SUCCESS)
+        {
+            resp_error_msg = std::move(rpc_result);
+            rpc_result = {};
+            RpcLogWarn("[CoroRpcServer] DirectResPonseMsg: response error, err:%d", resp_err);
+        }
+        std::string_view attachment = attachment_func();
+        std::vector<std::byte> resp_buf_bytes(rpc_protocol::RESP_HEAD_LEN + rpc_result.size() + attachment.length());
+        bool prepare_ret = rpc_protocol::PrepareResponseHeader(resp_buf_bytes, rpc_result, req_head, attachment.length(), resp_err, resp_error_msg);
+        if(!prepare_ret)
+        {
+            RpcLogError("[CoroRpcServer] DirectResPonseMsg: prepare response header failed");
+            return Errc::ERR_SERVER_PREPARE_HEADER_FAILED;
+        }
+        auto response_ret = Response(std::move(resp_buf_bytes), std::move(rpc_result), std::move(attachment));
+        Errc err_code = response_ret.get_result();
+        if(err_code != Errc::SUCCESS)
+        {
+            RpcLogError("[CoroRpcServer] DirectResPonseMsg: response error, err:%d", err_code);
+            return err_code;
+        }
+        return Errc::SUCCESS;
+    }
+    ToolBox::coro::Task<Errc> Response(std::vector<std::byte> &&resp_buf_bytes, std::string &&rpc_result, std::string_view &&attachment)
+    {
+        if(!send_callback_)
+        {
+            co_return Errc::ERR_SEND_CALLBACK_NOT_SET;
+        }
+        std::memcpy(resp_buf_bytes.data() + rpc_protocol::RESP_HEAD_LEN, rpc_result.data(), rpc_result.size());
+        if(attachment.length() > 0)
+        {
+            std::memcpy(resp_buf_bytes.data() + rpc_protocol::RESP_HEAD_LEN + rpc_result.size(), attachment.data(), attachment.size());
+        }
+        send_callback_(std::move(resp_buf_bytes));
+        co_return Errc::SUCCESS;
+    }
 };  // class CoroRpcServer
 
 }   // namespace ToolBox::CoroRpc

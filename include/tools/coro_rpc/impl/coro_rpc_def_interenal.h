@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-
-
+#include "tools/function_name.h"
+#include "tools/md5.h"
 
 #define RpcLogTrace(LogFormat, ...)     LogTrace(LogFormat, ## __VA_ARGS__)
 #define RpcLogDebug(LogFormat, ...)     LogDebug(LogFormat, ## __VA_ARGS__)
@@ -27,12 +27,17 @@ namespace ToolBox::CoroRpc
         ERR_OPERATION_CANCELED = 5,
         ERR_SERIAL_NUMBER_CONFLICT = 6,
         ERR_MESSAGE_TOO_LARGE = 7,
+        ERR_HANDLER_THROW_EXCEPTION = 8,
+        ERR_SEND_CALLBACK_NOT_SET = 9,
+        ERR_SERVER_PREPARE_HEADER_FAILED = 10,
     };
 
     
 class CoroRpcTools
 {
 public:
+    using rpc_func_key_t = uint32_t;
+    using rpc_func_key = rpc_func_key_t;
     // 基础类型的序列化
     template<typename T>
     static void SerializeArg(std::vector<std::byte> &buffer, std::size_t &offset, T &&arg)
@@ -82,6 +87,14 @@ public:
         std::string result(reinterpret_cast<const char*>(buffer.data() + offset), length);
         offset += length;
         return result;
+    }
+
+        template<auto func>
+    static rpc_func_key AutoGenRegisterKey()
+    {
+        constexpr auto name = ToolBox::GetFuncName<func>();
+        auto id = MD5Hash32Constexpr(name);
+        return static_cast<rpc_func_key>(id);
     }
 };
 

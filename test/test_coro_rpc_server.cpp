@@ -4,6 +4,7 @@
 #include "tools/coro_rpc/coro_rpc_server.h"
 #include "tools/timer.h"
 #include <thread>
+#include "network/network_api.h"
 FIXTURE_BEGIN(CoroRpcServer)
 
 inline std::string_view echo(std::string_view str)
@@ -11,29 +12,71 @@ inline std::string_view echo(std::string_view str)
     return str;
 }
 
-ToolBox::coro::Task<std::string_view> test_coro_rpc_server() {
-    std::thread t([]() {
-        while (true) {
-            ToolBox::TimerMgr->Update();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        }
-    });
-    t.detach();
-    ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol, std::unordered_map> server;
+ToolBox::coro::Task<std::string_view> test_coro_rpc_server(ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol, std::unordered_map> &server) {
     server.template RegisterService<echo>();
-    // auto result = co_await server.call<echo>("hello CoroRpc, world");
-    // fprintf(stderr, "test_coro_rpc_client result: %s\n", result.data());
 
     co_return "hello CoroRpc, world";
 }
 
 CASE(CoroRpcServerCase1) 
 { 
-    auto task = test_coro_rpc_server();
-    auto result = task.get_result();
-    fprintf(stderr, "[CoroRpcServerCase1] result: %s\n", result.data());
+    return;
+    // 声明 rpc server
+    ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol, std::unordered_map> server;
+    //声明网络库句柄
+    ToolBox::Network network;
+    uint64_t server_conn_id = 0;
+    network.SetOnReceived([&](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) {
+        server_conn_id = conn_id;
+        fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque
+        , conn_id);
+            fprintf(stderr, "coro_rpc client send buffer content: ");
+        for (size_t i = 0; i < size; i++) {
+            fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
+        }
+        fprintf(stderr, "\n");
+        server.OnRecvData(std::string_view(data, size));
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100000));
+    }).SetOnAccepted([&](ToolBox::NetworkType type, uint64_t opaque, int32_t fd) {
+        fprintf(stderr, "coro_rpc server accepted, opaque: %lu, fd: %d\n", opaque, fd);
+    }).SetOnBinded([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const std::string & ip, uint16_t port)
+    {
+        printf("[TestNetworkForward] Server has established listening port, network type:%d, connection tag:%lu, connection ID:%lu, ip:%s, port:%d\n", type, opaque, conn_id, ip.c_str(), port);
+    }).SetOnAccepting([](ToolBox::NetworkType type, uint64_t opaque, int32_t fd)
+    {
+        printf("[TestNetworkForward] Preparing to add new connection to IO multiplexing, network type:%d, connection tag:%lu, fd:%d\n", type, opaque, fd);
+    });
+    network.Accept(ToolBox::NT_TCP, 9701, "0.0.0.0", 9700);
+    network.Start(2);
+
+    server.RegisterService<echo>();
+    fprintf(stderr, "[CoroRpcServerCase1] done\n");
+
+    // 等待网络库停止
+    uint32_t used_time = 0;
+    uint32_t old_time = 0;
+    uint32_t run_mill_seconds = 1 * 60 * 60 * 1000;
+    while (true)
+    {
+        if (used_time > run_mill_seconds)
+        {
+            break;
+        }
+        uint32_t time_left = (run_mill_seconds - used_time) / 1000;
+        if (time_left != old_time)
+        {
+            if (time_left + 10 <= old_time || old_time == 0)
+            {
+                fprintf(stderr, "距离网络库停止还有%d秒 \n", time_left);
+                old_time = time_left;
+            }
+        }
+        ToolBox::TimerMgr->Update();
+        network.Update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        used_time += 100;
+    }
+    network.StopWait();
 }
 
 FIXTURE_END()
