@@ -82,9 +82,9 @@ struct TaskAwaiter
 {
     explicit TaskAwaiter(IExecutor &executor,
                         Task<Result, Executor> &&task) noexcept
-        : executor_(executor), task(std::move(task)) {}
+        : executor_(executor), task_(std::move(task)) {}
     TaskAwaiter(TaskAwaiter &&completion) noexcept
-        : task(std::exchange(completion.task, {})) {}
+        : task_(std::exchange(completion.task, {})) {}
     TaskAwaiter(TaskAwaiter &) = delete;
     TaskAwaiter &operator=(TaskAwaiter &) = delete;
     // 必要的法定函数.
@@ -94,18 +94,18 @@ struct TaskAwaiter
     // handle.resume()，就可以恢复协程。
     void await_suspend(std::coroutine_handle<> handle) noexcept {
         // 当 task 执行完之后调用 resume
-        task.finally([handle, this]() {
+        task_.finally([handle, this]() {
             // 将 resume 函数的调用交给调度器执行
             executor_.execute([handle]() { handle.resume(); });
         });
     }
     // 协程恢复执行时,被等待的Task 已经执行完,调用 get_result 来获取结果
     // await_resume 的返回值类型也是不限定的，返回值将作为 co_await 表达式的返回值
-    Result await_resume() noexcept { return task.get_result(); }
+    Result await_resume() noexcept { return task_.get_result(); }
 
 private:
     IExecutor &executor_;
-    Task<Result, Executor> task; // 二阶Task,即协程体内部的 co_await 获得的 task.
+    Task<Result, Executor> task_; // 二阶Task,即协程体内部的 co_await 获得的 task.
 };
 
 template <typename ResultType, typename Executor = NewThreadExecutor>
@@ -117,11 +117,11 @@ struct Task {
     Task &then(std::function<void(ResultType)> &&func) {
         // 将回调函数 func 注册到 promise 中.
         handle.promise().on_completed([func](auto result) {
-        try {
-            func(result.get_or_throw());
-        } catch (std::exception &e) {
-            // 忽略异常
-        }
+            try {
+                func(result.get_or_throw());
+            } catch (std::exception &e) {
+                // 忽略异常
+            }
         });
         return *this;
     }
@@ -148,7 +148,11 @@ struct Task {
     Task &operator=(Task &) = delete;
     ~Task() {
         if (handle) {
-            handle.destroy();
+            // 在销毁前添加协程句柄的空值检查
+            auto h = std::exchange(handle, nullptr);
+            if (h && h.done()) {
+                h.destroy();
+            }
         }
     }
 
@@ -188,11 +192,15 @@ struct TaskPromise {
     // 法定函数. co_return 10000; 1000 会作为参数传入, 即 return_value 函数的参数
     // value 的值为 1000 void 版本为 return_void
     void return_value(ResultType value) {
-        std::lock_guard lock(completion_lock);
-        // 将返回值存入 result, 对应于协程内部的 'co_return value'
-        result.emplace(std::move(value));
-        // 通知 get_result 当中的 wait
-        completion.notify_all();
+        // 限制锁的范围
+        {
+            std::lock_guard lock(completion_lock);
+            // 将返回值存入 result, 对应于协程内部的 'co_return value'
+            result.emplace(std::move(value));
+            // 通知 get_result 当中的 wait
+            completion.notify_all();
+        }
+
         // 调用回调
         notify_callbacks();
     }
@@ -201,8 +209,8 @@ struct TaskPromise {
         // 如果 result 没有值, 说明协程还没有运行完,等待值被写入再返回.
         std::unique_lock lock(completion_lock);
         if (!result.has_value()) {
-        // 等待写入值之后调用 notify_all
-        completion.wait(lock);
+            // 等待写入值之后调用 notify_all
+            completion.wait(lock);
         }
         return result->get_or_throw();
     }
@@ -215,10 +223,12 @@ struct TaskPromise {
         return TaskAwaiter<_ResultType, _Executor>(executor_, std::move(task));
     }
 
+
+
     // 添加一个通用的 await_transform 方法
     template <typename T>
     decltype(auto) await_transform(T&& awaitable) {
-        return std::move(awaitable);
+        return std::forward<T>(awaitable);
     }
 
 
@@ -226,9 +236,9 @@ struct TaskPromise {
         std::unique_lock lock(completion_lock);
         // 加锁判断 result
         if (result.has_value()) {
-        // result 已经有值.
-        auto &value = result.value();
-        // 解锁之后再调用 func
+            // result 已经有值.
+            auto &value = result.value();
+            // 解锁之后再调用 func
             lock.unlock();
             func(std::ref(value));
         } else {
@@ -250,7 +260,7 @@ private:
     void notify_callbacks() {
         auto &value = result.value();
         for (auto &callback : completion_callbacks) {
-        callback(std::ref(value));
+            callback(std::ref(value));
         }
         // 调用完成,清空回调
         completion_callbacks.clear();
@@ -454,10 +464,9 @@ public:
     }
     void await_suspend(std::coroutine_handle<> handle) noexcept{
         future_.wait_for(std::chrono::milliseconds(0));
-
         auto resume_func = [handle]() { 
-                handle.resume(); 
-            };
+            handle.resume(); 
+        };
 
         if(resume_callback_){
             resume_callback_(resume_func);
