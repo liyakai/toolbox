@@ -38,7 +38,7 @@ public:
 
     template<typename T, typename... Args, typename View>
     [[nodiscard]]
-    static  bool Deserialize(T&t, View v, Args&... args)
+    static bool Deserialize(T&t, View v, Args&... args)
     {
         // 检查缓冲区大小是否足够 添加 0 作为初始值
         size_t required_size = sizeof(T) + (0 + ... + sizeof(Args));
@@ -49,7 +49,10 @@ public:
         size_t offset = 0;
 
         // 反序列化第一个参数 T
-        if constexpr (std::is_trivially_copyable_v<T>) {
+        if constexpr (std::is_same_v<T, std::string_view>) {
+            t = std::string_view(reinterpret_cast<const char*>(v.data()), v.size());
+            offset += v.size();
+        } else if constexpr (std::is_trivially_copyable_v<T>) {
             std::memcpy(&t, v.data(), sizeof(T));
             offset += sizeof(T);
         } else {
