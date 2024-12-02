@@ -92,6 +92,8 @@ private:
             key = CoroRpcTools::AutoGenRegisterKey<func>();
         }
 
+        RpcLogDebug("[rpc][server] RegisterOneHandler.class: key: %u, func: %s", key, ToolBox::GetFuncName<func>().c_str());
+
         RegistOneHandlerImpl<func>(self,key);
     }
 
@@ -139,6 +141,7 @@ private:
         } else {
             key = CoroRpcTools::AutoGenRegisterKey<func>();
         }
+        RpcLogDebug("[rpc][server] RegisterOneHandler.normal: key: %u, func: %s", key, ToolBox::GetFuncName<func>().data());
         RegistOneHandlerImpl<func>(key);
     }
 
@@ -377,7 +380,7 @@ private:
             RpcLogError("[CoroRpcServer] OnRecvData: read header failed, err: {}", err);
             return err;
         }
-        fprintf(stderr, "coro_rpc server recv data, header: %s\n", header.ToString().c_str());
+        fprintf(stderr, "coro_rpc server recv data[size:%zu], header: %s\n", data.size(), header.ToString().c_str());
 
         auto serialize_protocol = rpc_protocol::GetSerializeProtocol(header);
         if(!serialize_protocol.has_value())
@@ -441,6 +444,7 @@ private:
         }
         std::string_view attachment = attachment_func();
         std::vector<std::byte> resp_buf_bytes(rpc_protocol::RESP_HEAD_LEN + rpc_result.size() + attachment.length());
+        RpcLogDebug("[rpc][server] DirectResPonseMsg.resp_buf_bytes: size: %zu, head_body_size: %zu, attachment_size: %zu", resp_buf_bytes.size(), rpc_result.size(), attachment.length());
         bool prepare_ret = rpc_protocol::PrepareResponseHeader(resp_buf_bytes, rpc_result, req_head, attachment.length(), resp_err, resp_error_msg);
         if(!prepare_ret)
         {

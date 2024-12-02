@@ -26,6 +26,15 @@ CASE(CoroRpcServerCase1)
     //声明网络库句柄
     ToolBox::Network network;
     uint64_t server_conn_id = 0;
+    //设置发送缓冲区回调函数
+    server.SetSendCallback([&](std::vector<std::byte> &&buffer) {        
+        fprintf(stderr, "coro_rpc server send buffer content: ");
+        for (size_t i = 0; i < buffer.size(); i++) {
+            fprintf(stderr, "%02X ", static_cast<unsigned char>(buffer[i]));
+        }
+        fprintf(stderr, "\n");
+        network.Send(server_conn_id, reinterpret_cast<const char*>(buffer.data()), buffer.size());
+    });
     network.SetOnReceived([&](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) {
         server_conn_id = conn_id;
         fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque
@@ -45,6 +54,9 @@ CASE(CoroRpcServerCase1)
     }).SetOnAccepting([](ToolBox::NetworkType type, uint64_t opaque, int32_t fd)
     {
         printf("[TestNetworkForward] Preparing to add new connection to IO multiplexing, network type:%d, connection tag:%lu, fd:%d\n", type, opaque, fd);
+    }).SetOnErrored([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) {
+        fprintf(stderr, "coro_rpc server error, opaque: %lu, conn_id: %lu, err_code: %d, err_no: %d\n", opaque
+        , conn_id, err_code, err_no);
     });
     network.Accept(ToolBox::NT_TCP, 9701, "0.0.0.0", 9700);
     network.Start(2);

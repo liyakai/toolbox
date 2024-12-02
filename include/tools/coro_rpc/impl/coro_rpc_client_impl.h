@@ -150,18 +150,20 @@ public:
 
     // call RPC with default timeout(5s)
     template <auto func, typename... Args>
-    auto call(Args &&...args) -> ToolBox::coro::Task<std::invoke_result_t<decltype(func), Args...>> {
+    auto call(Args &&...args) -> ToolBox::coro::Task<std::invoke_result_t<decltype(func), Args...>, coro::NewThreadExecutor> {
         return call_for<func>(std::chrono::seconds(5), std::forward<Args>(args)...);
     }
 
     // call RPC with timeout
     template <auto func, typename... Args>
     auto call_for(auto duration, Args &&...args)
-        -> ToolBox::coro::Task<std::invoke_result_t<decltype(func), Args...>> {
+        -> ToolBox::coro::Task<std::invoke_result_t<decltype(func), Args...>, coro::NewThreadExecutor> {
         using return_type = std::invoke_result_t<decltype(func), Args...>;
-        auto async_inner_result = co_await send_request_for_with_attachment<func, Args...>(
-                duration, req_attachment_, std::forward<Args>(args)...);;
-        auto async_result = async_inner_result.get_result();
+        auto async_result = co_await co_await send_request_for_with_attachment<func, Args...>(
+                duration, req_attachment_, std::forward<Args>(args)...);
+        fprintf(stderr, "[rpc][client] call_for inner_task is created\n");
+        // auto async_result = co_await inner_task;
+        fprintf(stderr, "[rpc][client] call_for async_result index: %zu\n", async_result.index());
         req_attachment_ = {};
         if (async_result.index() == 0) {
             if constexpr (std::is_void_v<return_type>) {
@@ -188,7 +190,7 @@ public:
     template <auto func, typename... Args>
     auto send_request_for_with_attachment(
         auto time_out_duration, std::string_view request_attachment,
-        Args &&...args) -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<std::invoke_result_t<decltype(func), Args...>>>>
+        Args &&...args) -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<std::invoke_result_t<decltype(func), Args...>>, coro::NewThreadExecutor>, coro::NewThreadExecutor>
     {
         using return_type = std::invoke_result_t<decltype(func), Args...>;
         recving_guard guard(control_.get());
@@ -212,17 +214,20 @@ public:
                 RpcLogError("[rpc][client] response handler table not found, id: %d", id);
                 return;
             }
+            fprintf(stderr, "[rpc][client] response handler table erase before local_error, id: %d, table size: %zu\n", id, control_->response_handler_table_.size());
             iter->second.local_error(CoroRpc::Errc::ERR_TIMEOUT);
+            fprintf(stderr, "[rpc][client] response handler table erase after local_error, id: %d, table size: %zu\n", id, control_->response_handler_table_.size());
             int ret = control_->response_handler_table_.erase(id);
             if(ret == 0)
             {
-                RpcLogError("[rpc][client] response handler table erase failed, id: %d", id);
+                RpcLogError("[rpc][client] response handler table erase failed, id: %d, table size: %zu", id, control_->response_handler_table_.size());
                 return;
             }
             RpcLogDebug("[rpc][client] response handler table erase success, id: %d, table size: %zu", id, control_->response_handler_table_.size());
         }, (int32_t)std::chrono::duration_cast<std::chrono::milliseconds>(time_out_duration).count(), 1, __FILE__, __LINE__);
 
         auto result = co_await send_request_for_impl<func>(time_out_duration, id, std::move(timer), request_attachment, std::forward<Args>(args)...);
+        RpcLogDebug("[rpc][client] send_request_for_with_attachment end, result:%d", result);
         auto& control = *control_;
         if (result == CoroRpc::Errc::SUCCESS) 
         {
@@ -241,6 +246,7 @@ public:
         }else {
             co_return build_failed_rpc_result<return_type>(std::move(result));
         }
+        
     }
     
     struct recving_guard 
@@ -289,7 +295,7 @@ private:
     }
 
     template<typename T>
-    auto deserialize_rpc_result(std::future<async_rpc_raw_result> &&future, coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback, std::weak_ptr<control_t> &&ctrl) -> ToolBox::coro::Task<async_rpc_result<T>>
+    auto deserialize_rpc_result(std::future<async_rpc_raw_result> &&future, coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback, std::weak_ptr<control_t> &&ctrl) -> ToolBox::coro::Task<async_rpc_result<T>, coro::NewThreadExecutor>
     {
         auto result = co_await coro::FutureAwaiter<async_rpc_raw_result>(std::move(future)).with_future_callback(std::move(future_callback));
         fprintf(stderr, "[rpc][client] deserialize_rpc_result result index: %zu\n", result.index());
@@ -330,13 +336,13 @@ private:
     }
 
     template<typename T>
-    auto build_failed_rpc_result(CoroRpc::Errc Errc) -> ToolBox::coro::Task<async_rpc_result<T>>
+    auto build_failed_rpc_result(CoroRpc::Errc Errc) -> ToolBox::coro::Task<async_rpc_result<T>, coro::NewThreadExecutor>
     {
         co_return async_rpc_result<T>{Errc};
     }
 
     template<auto func, typename... Args>
-    ToolBox::coro::Task<CoroRpc::Errc> send_request_for_impl(auto duration, uint32_t &id, ToolBox::HTIMER &&timer, std::string_view attachment, Args &&...args)
+    ToolBox::coro::Task<CoroRpc::Errc, coro::NewThreadExecutor> send_request_for_impl(auto duration, uint32_t &id, ToolBox::HTIMER &&timer, std::string_view attachment, Args &&...args)
     {
         using return_type = std::invoke_result_t<decltype(func), Args...>;
 
@@ -346,18 +352,18 @@ private:
         {
             co_return CoroRpc::Errc::ERR_TIMEOUT;
         }
-
         co_return co_await send_impl<func>(id, attachment, std::forward<Args>(args)...);
     }
 
     template<auto func, typename... Args>
-    ToolBox::coro::Task<CoroRpc::Errc> send_impl(uint32_t &id, std::string_view attachment, Args &&...args)
+    ToolBox::coro::Task<CoroRpc::Errc, coro::NewThreadExecutor> send_impl(uint32_t &id, std::string_view attachment, Args &&...args)
     {
         auto buffer = prepare_buffer<func>(id, std::forward<Args>(args)...);
         if (buffer.empty()) {
             co_return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
         }
         std::pair<std::error_code, std::size_t> send_result;
+        int head_body_size = buffer.size();
         if (!attachment.empty()) 
         {
             // Append attachment data to buffer
@@ -365,15 +371,15 @@ private:
             buffer.resize(original_size + attachment.size());
             std::memcpy(buffer.data() + original_size, attachment.data(), attachment.size());
         }
+        RpcLogTrace("[rpc][client] send_impl buffer size: %zu, head_body_size: %d, attachment_size: %zu", buffer.size(), head_body_size, attachment.size());
         if(!send_callback_)
         {
             RpcLogError("[rpc][client] send_impl: send_callback_ not set");
             co_return CoroRpc::Errc::ERR_SEND_CALLBACK_NOT_SET;
         }
         send_callback_(std::move(buffer));
-
         // send buffer
-        co_return CoroRpc::Errc{};
+        co_return CoroRpc::Errc::SUCCESS;
     }
 
     template<auto func, typename... Args>
@@ -399,7 +405,7 @@ private:
         } else {
             key = CoroRpcTools::AutoGenRegisterKey<func>();
         }
-
+        RpcLogDebug("[rpc][client] RegisterOneHandler.auto_gen_key: key: %u, func: %s", key, ToolBox::GetFuncName<func>().data());
 
         auto& req_head = *reinterpret_cast<typename rpc_protocol::ReqHeader*>(buffer.data());
         req_head = {};
@@ -414,6 +420,7 @@ private:
             RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
             return {};
         }
+        req_head.length = static_cast<uint32_t>(sz);
         return buffer;
     }
 
