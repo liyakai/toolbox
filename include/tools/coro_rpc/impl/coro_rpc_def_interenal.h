@@ -27,9 +27,13 @@ namespace ToolBox::CoroRpc
         ERR_OPERATION_CANCELED = 5,
         ERR_SERIAL_NUMBER_CONFLICT = 6,
         ERR_MESSAGE_TOO_LARGE = 7,
-        ERR_HANDLER_THROW_EXCEPTION = 8,
-        ERR_SEND_CALLBACK_NOT_SET = 9,
-        ERR_SERVER_PREPARE_HEADER_FAILED = 10,
+        ERR_BUFFER_TOO_SMALL = 8,
+        ERR_HANDLER_THROW_EXCEPTION = 9,
+        ERR_SEND_CALLBACK_NOT_SET = 10,
+        ERR_SERVER_PREPARE_HEADER_FAILED = 11,
+        ERR_SERIALIZE_FAILED = 12,
+        ERR_DESERIALIZE_FAILED = 13,
+        ERR_PROTOCOL_NOT_SUPPORTED = 14,
     };
 
     
@@ -89,7 +93,7 @@ public:
         return result;
     }
 
-        template<auto func>
+    template<auto func>
     static rpc_func_key AutoGenRegisterKey()
     {
         constexpr auto name = ToolBox::GetFuncName<func>();
@@ -97,5 +101,19 @@ public:
         return static_cast<rpc_func_key>(id);
     }
 };
+
+
+// --------- 检查是否是 tuple_like 类型 ---------
+template<typename T, typename = void>
+struct is_tuple_like : std::false_type {};
+
+template<typename T>
+struct is_tuple_like<T, std::void_t<decltype(std::tuple_size<T>::value)>> 
+    : std::true_type {};
+
+template<typename T>
+inline constexpr bool is_tuple_like_v = is_tuple_like<T>::value;
+// ---------------------------------------------
+
 
 }   // namespace ToolBox::CoroRpc

@@ -3,19 +3,19 @@
 #include "unit_test_frame/unittest.h"
 #include "tools/coro_rpc/coro_rpc_client.h"
 #include "network/network_api.h"
-
+#include "test/protobuf/test_coro_rpc.pb.h"
 FIXTURE_BEGIN(CoroRpcClient)
 
-inline std::string_view echo(std::string_view str)
-{
-    return str;
-}
+demo::GetUserResponse echo(demo::GetUserRequest request);
 
 ToolBox::coro::Task<std::string_view> test_coro_rpc_client(ToolBox::CoroRpc::CoroRpcClient<ToolBox::CoroRpc::CoroRpcProtocol> &client) {
-    client.set_req_attachment("This is a attachment");
-    auto result = co_await client.call<echo>("hello CoroRpc, world");
-    std::string_view resp_attachment = client.get_resp_attachment();
-    fprintf(stderr, "test_coro_rpc_client result: %s,resp_attachment:%s\n", result.data(), resp_attachment.data());
+    client.SetReqAttachment("This is a attachment");
+    demo::GetUserRequest request;
+    request.set_user_id(1010);
+    auto result = co_await client.Call<echo>(request);
+    std::string_view resp_attachment = client.GetRespAttachment();
+    fprintf(stderr, "test_coro_rpc_client result status: %d, resp_message: %s, user_id: %d, resp_attachment:%s\n"
+                                , result.status(), result.message().data(), result.user().id(), resp_attachment.data());
     co_return "test rpc client done.";
 }
 
@@ -27,8 +27,8 @@ std::string_view test_coro_rpc_client() {
     uint64_t server_conn_id = 0;
     bool is_connected = false;
     //设置发送缓冲区回调函数
-    client.set_send_callback([&](std::vector<std::byte> &&buffer) {        
-        fprintf(stderr, "coro_rpc client send buffer content: ");
+    client.SetSendCallback([&](std::string &&buffer) {        
+        fprintf(stderr, "coro_rpc client send buffer content[size:%zu]: ", buffer.size());
         for (size_t i = 0; i < buffer.size(); i++) {
             fprintf(stderr, "%02X ", static_cast<unsigned char>(buffer[i]));
         }
@@ -48,6 +48,7 @@ std::string_view test_coro_rpc_client() {
             fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
         }
         fprintf(stderr, "\n");
+        client.OnRecvResp(std::string_view(data, size));
     }).SetOnErrored([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) {
         fprintf(stderr, "coro_rpc client error, opaque: %lu, conn_id: %lu, err_code: %d, err_no: %d\n", opaque
         , conn_id, err_code, err_no);

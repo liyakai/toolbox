@@ -24,9 +24,7 @@ private:
     std::unordered_map<rpc_func_key, handler_t> rpc_server_handler_map_;
     std::unordered_map<rpc_func_key, core_handler_t> rpc_server_core_handler_map_;
     std::unordered_map<rpc_func_key, std::string> id2name_map_;
-    std::function<std::string_view()> resp_attachment_func_=[]{
-        return std::string_view{};
-    };
+    std::unordered_map<rpc_func_key, std::function<std::string_view()>> resp_attachment_func_map_;
 public:
     CoroRpcServer() = default;
     ~CoroRpcServer() = default;
@@ -68,12 +66,23 @@ public:
         return it->second;
     }
 
-    Errc OnRecvData(std::string_view data) {
-        return OnRecvData_(data);
+    Errc OnRecvReq(std::string_view data) {
+        return OnRecvReq_(data);
     }
     Errc SetSendCallback(std::function<void(std::vector<std::byte> &&)> &&callback) {
         send_callback_ = std::move(callback);
         return Errc::SUCCESS;
+    }
+    template <auto func>
+    void SetRespAttachmentFunc(std::function<std::string_view()> &&resp_attachment_func) {
+        rpc_func_key key{};
+        if constexpr(HasGenRegisterKey<rpc_protocol, func>)
+        {
+            key = rpc_protocol::template GenRegisterKey<func>();
+        } else {
+            key = CoroRpcTools::AutoGenRegisterKey<func>();
+        }
+        resp_attachment_func_map_[key] = std::move(resp_attachment_func);
     }
 private:
     template <auto func, typename Self>
@@ -121,7 +130,7 @@ private:
             }
         } else {
             auto iter = rpc_server_handler_map_.emplace(key, [&](std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
-                return Execute_<rpc_protocol, typename rpc_protocol::supported_serialize_protocols, func>(data, self);
+                return Execute_<typename rpc_protocol::supported_serialize_protocols, func>(data, self);
             });
             if (!iter.second) [[unlikely]]
             {
@@ -165,7 +174,7 @@ private:
         } else {
             auto iter = rpc_server_handler_map_.emplace(key, [&](std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> std::pair<Errc, std::string> {
-                    return Execute_<rpc_protocol, serialize_protocol, func>(data);
+                    return Execute_<serialize_protocol, func>(data);
                 }, protocols);
             });
             if (!iter.second) [[unlikely]]
@@ -221,13 +230,13 @@ private:
         }
     }
 
-    std::pair<Errc, std::string> Handle(auto handler, std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols)
+    std::pair<Errc, std::string> Handle(auto handler, std::string_view payload, typename rpc_protocol::supported_serialize_protocols protocols)
     {
         using namespace std::string_literals;
         if(handler) [[likely]]
         {
             try {
-                return handler(data, protocols);
+                return handler(payload, protocols);
             } catch(Errc &err)
             {
                 RpcLogError("[CoroRpcServer] Handle: handler error, err:%d", err);
@@ -246,7 +255,7 @@ private:
         }
     }
 
-    template<typename exe_rpc_protocol, typename serialize_proto, auto func, typename Self = void>
+    template<typename serialize_proto, auto func, typename Self = void>
     inline std::pair<Errc, std::string> Execute_(std::string_view data, Self *self = nullptr)
     {
         using namespace std::string_literals;
@@ -254,6 +263,7 @@ private:
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
         using ReturnType = typename traits_type::return_type;
+        fprintf(stderr, "coro_rpc server Execute_, func type: %s, data size: %zu, data: %s\n", ToolBox::GetFuncName<func>().data(), data.size(), data.data());
         if constexpr(!std::is_void_v<param_type>)
         {
             using First = std::tuple_element_t<0, param_type>;
@@ -266,6 +276,7 @@ private:
             }
             if (!is_ok)[[unlikely]]
             {
+                RpcLogError("[CoroRpcServer] Execute_: deserialize arguments failed");
                 return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "deserialize arguments failed"s);
             }
             if constexpr (std::is_void_v<ReturnType>)
@@ -280,6 +291,7 @@ private:
             } else {
                 if constexpr (std::is_void_v<Self>)
                 {
+                    fprintf(stderr, "coro_rpc server Execute_, result: %s\n",  serialize_proto::Serialize(std::apply(func, std::move(args))).c_str());
                     return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::apply(func, std::move(args))));
                 } else {
                     return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)))));
@@ -305,7 +317,7 @@ private:
         }
     }
 
-    template<typename exe_rpc_protocol, typename serialize_proto, auto func, typename Self = void>
+    template<typename serialize_proto, auto func, typename Self = void>
     inline coro::Task<std::pair<Errc, std::string>> ExecuteCore_(std::string_view data, Self *self = nullptr)
     {
         using namespace std::string_literals;
@@ -317,6 +329,7 @@ private:
             typename ToolBox::FunctionTraits<func_type>::args_tuple              // 普通函数：使用全部参数
         >;
         using ReturnType = std::invoke_result_t<decltype(func)>;
+        fprintf(stderr, "coro_rpc server ExecuteCore_, func type: %s\n", ToolBox::GetFuncName<func>().data());
         if constexpr(!std::is_void_v<param_type>){
             using First = std::tuple_element_t<0, param_type>;
             bool is_ok = true;
@@ -371,13 +384,13 @@ private:
             }
         }
     }   // ExecuteCore_
-    Errc OnRecvData_(std::string_view data)
+    Errc OnRecvReq_(std::string_view data)
     {
         typename rpc_protocol::ReqHeader header;
         auto err = rpc_protocol::ReadHeader(data, header);
         if(err != Errc::SUCCESS)
         {
-            RpcLogError("[CoroRpcServer] OnRecvData: read header failed, err: {}", err);
+            RpcLogError("[CoroRpcServer] OnRecvReq: read header failed, err:%d", err);
             return err;
         }
         fprintf(stderr, "coro_rpc server recv data[size:%zu], header: %s\n", data.size(), header.ToString().c_str());
@@ -385,7 +398,7 @@ private:
         auto serialize_protocol = rpc_protocol::GetSerializeProtocol(header);
         if(!serialize_protocol.has_value())
         {
-            RpcLogError("[CoroRpcServer] OnRecvData: serialize protocol not supported");
+            RpcLogError("[CoroRpcServer] OnRecvReq: serialize protocol not supported");
             return Errc::ERR_PROTOCOL;
         }
 
@@ -394,7 +407,7 @@ private:
         err = rpc_protocol::ReadPayLoad(header, data.substr(rpc_protocol::REQ_HEAD_LEN), body, attachment);
         if(err != Errc::SUCCESS)
         {
-            RpcLogError("[CoroRpcServer] OnRecvData: read payload failed, err: {}", err);
+            RpcLogError("[CoroRpcServer] OnRecvReq: read payload failed, err: {}", err);
             return err;
         }
         std::string_view payload(body);
@@ -407,29 +420,41 @@ private:
         {
             auto core_handler = GetCoreHandler(key);
             auto handler_ret = HandleCoro(core_handler, payload, serialize_protocol.value(), key);
-            auto &&[resp_err, rpc_result] = handler_ret.get_result();
+            std::tie(resp_err, rpc_result) = handler_ret.get_result();
             if(resp_err != Errc::SUCCESS)
             {
-                RpcLogError("[CoroRpcServer] OnRecvData: handler error, err:%d", resp_err);
+                RpcLogError("[CoroRpcServer] OnRecvReq: handler error, err:%d", resp_err);
                 return resp_err;
             }
         }else {
-            auto &&[resp_err, rpc_result] = Handle(handler, payload, serialize_protocol.value());
+            std::tie(resp_err, rpc_result) = Handle(handler, payload, serialize_protocol.value());
             if(resp_err != Errc::SUCCESS)
             {
-                RpcLogError("[CoroRpcServer] OnRecvData: handler error, err:%d", resp_err);
+                RpcLogError("[CoroRpcServer] OnRecvReq: handler error, err:%d", resp_err);
                 return resp_err;
             }
         }
-
-        Errc ret = DirectResponseMsg(resp_err, rpc_result, header, std::move(resp_attachment_func_));
+        Errc ret = Errc::SUCCESS;
+        auto resp_attachment_func_iter = resp_attachment_func_map_.find(key);
+        if(resp_attachment_func_iter != resp_attachment_func_map_.end())
+        {
+            ret = DirectResponseMsg(resp_err, rpc_result, header, std::move(resp_attachment_func_iter->second));
+            resp_attachment_func_map_.erase(resp_attachment_func_iter);
+        } else {
+            ret = DirectResponseMsg(resp_err, rpc_result, header);
+        }
         if(ret != Errc::SUCCESS)
         {
-            RpcLogError("[CoroRpcServer] OnRecvData: prepare response header failed");
+            RpcLogError("[CoroRpcServer] OnRecvReq: prepare response header failed");
             return ret;
         }
 
         return Errc::SUCCESS;
+    }
+    Errc DirectResponseMsg(Errc resp_err, std::string & rpc_result, 
+        const typename rpc_protocol::ReqHeader &req_head) {
+        return DirectResponseMsg(resp_err, rpc_result, req_head, 
+                               [](){ return std::string_view{}; });
     }
     Errc DirectResponseMsg(Errc resp_err, std::string & rpc_result, 
         const typename rpc_protocol::ReqHeader &req_head,
@@ -444,7 +469,7 @@ private:
         }
         std::string_view attachment = attachment_func();
         std::vector<std::byte> resp_buf_bytes(rpc_protocol::RESP_HEAD_LEN + rpc_result.size() + attachment.length());
-        RpcLogDebug("[rpc][server] DirectResPonseMsg.resp_buf_bytes: size: %zu, head_body_size: %zu, attachment_size: %zu", resp_buf_bytes.size(), rpc_result.size(), attachment.length());
+        RpcLogDebug("[rpc][server] DirectResPonseMsg.resp_buf_bytes: resp_buf_bytes size: %zu, rpc_result: %zu, attachment_size: %zu", resp_buf_bytes.size(), rpc_result.size(), attachment.length());
         bool prepare_ret = rpc_protocol::PrepareResponseHeader(resp_buf_bytes, rpc_result, req_head, attachment.length(), resp_err, resp_error_msg);
         if(!prepare_ret)
         {

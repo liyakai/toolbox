@@ -5,6 +5,9 @@
 #include <variant>
 #include <vector>
 #include <cstring>
+#include <type_traits>
+#include <tuple>
+#include "../coro_rpc_def_interenal.h"
 namespace ToolBox::CoroRpc
 {
 
@@ -34,6 +37,12 @@ public:
         // 使用折叠表达式调用 lambda
         (serialize_one(args), ...);
         return result;
+    }
+
+    template<typename... Args>
+    static size_t SerializeSize(const Args&... args)
+    {
+        return (sizeof(Args) + ...);
     }
 
     template<typename T, typename... Args, typename View>
@@ -79,6 +88,7 @@ public:
     }
 };
 
+
 class StructPackProtocol
 {
 public:
@@ -92,11 +102,32 @@ public:
         return StructPackTools::Serialize<std::string>(std::monostate{});
     }
     template<typename T>
+    static Errc SerializeToBuffer(void* data, int size, const T &t)
+    {
+        std::string buffer = StructPackTools::Serialize<std::string>(t);
+        if(buffer.size() > size)
+        {
+            return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
+        }
+        std::memcpy(data, buffer.data(), buffer.size());
+        return CoroRpc::Errc::SUCCESS;
+    }
+    template<typename T>
+    static size_t SerializeSize(const T &t)
+    {
+        return StructPackTools::SerializeSize(t);
+    }
+    template<typename T>
     static bool Deserialize(T&t, std::string_view buffer)
     {
-        if constexpr(std::tuple_size_v<T> == 1)
+        if constexpr( is_tuple_like_v<T>)
         {
-            return StructPackTools::Deserialize(std::get<0>(t), buffer);
+            if constexpr(std::tuple_size_v<T> == 1)
+            {
+                return StructPackTools::Deserialize(std::get<0>(t), buffer);
+            }else {
+                return StructPackTools::Deserialize(t, buffer);
+            }
         }else {
             return StructPackTools::Deserialize(t, buffer);
         }

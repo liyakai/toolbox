@@ -5,11 +5,23 @@
 #include "tools/timer.h"
 #include <thread>
 #include "network/network_api.h"
+#include "test/protobuf/test_coro_rpc.pb.h"
 FIXTURE_BEGIN(CoroRpcServer)
 
-inline std::string_view echo(std::string_view str)
+// 声明 rpc server
+ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol, std::unordered_map> server;
+
+inline demo::GetUserResponse echo(demo::GetUserRequest request)
 {
-    return str;
+    fprintf(stderr, "coro_rpc server echo, user_id: %d\n", request.user_id());
+    server.template SetRespAttachmentFunc<echo>([]() {
+        return "This is a attachment";
+    });
+    demo::GetUserResponse response;
+    response.set_status(200);
+    response.set_message("success");
+    response.mutable_user()->set_id(request.user_id());
+    return response;
 }
 
 ToolBox::coro::Task<std::string_view> test_coro_rpc_server(ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol, std::unordered_map> &server) {
@@ -21,14 +33,13 @@ ToolBox::coro::Task<std::string_view> test_coro_rpc_server(ToolBox::CoroRpc::Cor
 CASE(CoroRpcServerCase1) 
 { 
     return;
-    // 声明 rpc server
-    ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol, std::unordered_map> server;
+
     //声明网络库句柄
     ToolBox::Network network;
     uint64_t server_conn_id = 0;
     //设置发送缓冲区回调函数
     server.SetSendCallback([&](std::vector<std::byte> &&buffer) {        
-        fprintf(stderr, "coro_rpc server send buffer content: ");
+        fprintf(stderr, "coro_rpc server recv buffer content[size:%zu]: ", buffer.size());
         for (size_t i = 0; i < buffer.size(); i++) {
             fprintf(stderr, "%02X ", static_cast<unsigned char>(buffer[i]));
         }
@@ -39,12 +50,12 @@ CASE(CoroRpcServerCase1)
         server_conn_id = conn_id;
         fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque
         , conn_id);
-            fprintf(stderr, "coro_rpc client send buffer content: ");
+        fprintf(stderr, "coro_rpc client send buffer content[size:%zu]: ", size);
         for (size_t i = 0; i < size; i++) {
             fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
         }
         fprintf(stderr, "\n");
-        server.OnRecvData(std::string_view(data, size));
+        server.OnRecvReq(std::string_view(data, size));
 
     }).SetOnAccepted([&](ToolBox::NetworkType type, uint64_t opaque, int32_t fd) {
         fprintf(stderr, "coro_rpc server accepted, opaque: %lu, fd: %d\n", opaque, fd);
