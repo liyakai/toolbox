@@ -130,6 +130,7 @@ private:
     ToolBox::HTIMER timer_;
     std::shared_ptr<control_t> control_;
     std::string_view req_attachment_;
+    std::string_view resp_attachment_;
     Config config_;
     SendCallback send_callback_ = nullptr;
 public:
@@ -163,7 +164,7 @@ public:
         req_attachment_ = attachment;
         return true;
     }
-    std::string_view GetRespAttachment() const noexcept { return control_->resp_buffer_.resp_attachment_buf_; }
+    std::string_view GetRespAttachment() const noexcept { return resp_attachment_; }
 
     
     struct RecvingGuard 
@@ -197,14 +198,12 @@ private:
         using return_type = std::invoke_result_t<decltype(func), Args...>;
         auto async_result = co_await co_await SendRequestForWithAttachment<func, Args...>(
                 duration, req_attachment_, std::forward<Args>(args)...);
-        fprintf(stderr, "[rpc][client] CallFor_ inner_task is created\n");
-        // auto async_result = co_await inner_task;
-        fprintf(stderr, "[rpc][client] CallFor_ async_result index: %zu\n", async_result.index());
         req_attachment_ = {};
         if (async_result.index() == 0) {
             if constexpr (std::is_void_v<return_type>) {
                 co_return {};
             } else {
+                resp_attachment_ = std::get<0>(async_result).get_attachment();
                 co_return std::move(std::get<0>(async_result).result());
             }
         } else {
@@ -240,9 +239,7 @@ private:
                 RpcLogError("[rpc][client] response handler table not found, id: %d", id);
                 return;
             }
-            fprintf(stderr, "[rpc][client] response handler table erase before local_error, id: %d, table size: %zu\n", id, control_->response_handler_table_.size());
             iter->second.local_error(CoroRpc::Errc::ERR_TIMEOUT);
-            fprintf(stderr, "[rpc][client] response handler table erase after local_error, id: %d, table size: %zu\n", id, control_->response_handler_table_.size());
             int ret = control_->response_handler_table_.erase(id);
             if(ret == 0)
             {
@@ -306,6 +303,7 @@ private:
                         RpcLogError("[rpc][client] HandleResponseBuffer_ deserialize failed");
                         return rpc_result<T>{{}, CoroRpc::Errc::ERR_DESERIALIZE_FAILED};
                     }else {
+                        fprintf(stderr, "HandleResponseBuffer_ deserialize success, value: %s\n", value.DebugString().c_str());
                         return rpc_result<T>{std::move(value), CoroRpc::Errc::SUCCESS};
                     }
                 }, protocols.value());

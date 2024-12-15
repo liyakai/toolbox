@@ -13,7 +13,7 @@ ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol, std::unordere
 
 inline demo::GetUserResponse echo(demo::GetUserRequest request)
 {
-    fprintf(stderr, "coro_rpc server echo, user_id: %d\n", request.user_id());
+    fprintf(stderr, "[echo]coro_rpc server echo, user_id: %d\n", request.user_id());
     server.template SetRespAttachmentFunc<echo>([]() {
         return "This is a attachment";
     });
@@ -21,6 +21,7 @@ inline demo::GetUserResponse echo(demo::GetUserRequest request)
     response.set_status(200);
     response.set_message("success");
     response.mutable_user()->set_id(request.user_id());
+    fprintf(stderr, "[echo]coro_rpc server echo, response:%s\n", response.DebugString().c_str());
     return response;
 }
 

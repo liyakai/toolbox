@@ -291,7 +291,6 @@ private:
             } else {
                 if constexpr (std::is_void_v<Self>)
                 {
-                    fprintf(stderr, "coro_rpc server Execute_, result: %s\n",  serialize_proto::Serialize(std::apply(func, std::move(args))).c_str());
                     return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::apply(func, std::move(args))));
                 } else {
                     return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)))));
