@@ -82,52 +82,44 @@ private:
     using PromiseCallback = std::function<void()>;
     using SendCallback = std::function<void(std::string &&)>;
     using rpc_func_key = typename CoroRpcTools::rpc_func_key;
-    struct handler_t;
     struct Config {
         uint64_t client_id = get_global_client_id();
         std::chrono::milliseconds Timeout_ = std::chrono::seconds(10);
-    };
-    struct control_t
-    {
-      bool is_timeout_ = false;
-      std::unordered_map<uint32_t, handler_t> response_handler_table_;
-      control_t(bool is_timeout) : is_timeout_(is_timeout) {}
-      std::atomic<uint32_t> recving_cnt_ = 0;
-      resp_body resp_buffer_;
-
     };
     struct async_rpc_raw_result_value_type{
         resp_body buffer_;
         uint8_t errc_;
     };
     using async_rpc_raw_result = std::variant<async_rpc_raw_result_value_type, CoroRpc::Errc>;
-    struct handler_t
+    struct control_t
     {
-        ToolBox::HTIMER timer_;
-        std::promise<async_rpc_raw_result> promise_;
-        const PromiseCallback &callback_;
-        handler_t(ToolBox::HTIMER && timer,
-                    std::promise<async_rpc_raw_result> && promise,
-                    PromiseCallback &&callback)
-            : timer_(std::move(timer)), promise_(std::move(promise)), callback_(std::move(callback)) {}
-        void operator()(resp_body &&buffer, uint8_t rpc_errc) {
-            RpcLogDebug("[rpc][client] promise set value is called, rpc_errc: %d", rpc_errc);
-            ToolBox::TimerMgr->KillTimer(timer_);
-            promise_.set_value(async_rpc_raw_result{async_rpc_raw_result_value_type{std::move(buffer), rpc_errc}});
-            callback_();
-        }
-        void local_error(CoroRpc::Errc ec) {
-            RpcLogError("[rpc][client] promise local_error is called, rpc_errc: %d", ec);
-            ToolBox::TimerMgr->KillTimer(timer_);
-            promise_.set_value(async_rpc_raw_result{ec});
-            callback_();
-        }
+        struct handler_t
+        {
+            ToolBox::HTIMER timer_;
+            std::promise<async_rpc_raw_result> promise_;
+            const PromiseCallback &callback_;
+            handler_t(ToolBox::HTIMER && timer,
+                        std::promise<async_rpc_raw_result> && promise,
+                        PromiseCallback &&callback)
+                : timer_(std::move(timer)), promise_(std::move(promise)), callback_(std::move(callback)) {}
+            void operator()(resp_body &&buffer, uint8_t rpc_errc) {
+                RpcLogDebug("[rpc][client] promise set value is called, rpc_errc: %d", rpc_errc);
+                ToolBox::TimerMgr->KillTimer(timer_);
+                promise_.set_value(async_rpc_raw_result{async_rpc_raw_result_value_type{std::move(buffer), rpc_errc}});
+                callback_();
+            }
+            void local_error(CoroRpc::Errc ec) {
+                RpcLogError("[rpc][client] promise local_error is called, rpc_errc: %d", ec);
+                ToolBox::TimerMgr->KillTimer(timer_);
+                promise_.set_value(async_rpc_raw_result{ec});
+                callback_();
+            }
+        };
+        std::unordered_map<uint32_t, handler_t> response_handler_table_;
+        std::atomic<uint32_t> recving_cnt_ = 0;
     };
 
-    uint64_t client_id_;
-    bool should_reset_ = false;
     std::atomic<uint32_t> request_id_ = 9527;
-    ToolBox::HTIMER timer_;
     std::shared_ptr<control_t> control_;
     std::string_view req_attachment_;
     std::string_view resp_attachment_;
@@ -138,7 +130,7 @@ public:
 public:
 
     CoroRpcClient(uint64_t client_id = get_global_client_id())
-    : control_(std::make_shared<control_t>(false))
+    : control_(std::make_shared<control_t>())
      {
         config_.client_id = client_id;
     }
@@ -231,7 +223,6 @@ private:
                 RpcLogError("[rpc][client] control is nullptr");
                 return;
             }
-            control_->is_timeout_ = true;
             RpcLogError("[rpc][client] rpc Timeout_, id: %d", id);
             auto iter = control_->response_handler_table_.find(id);
             if(iter == control_->response_handler_table_.end())
