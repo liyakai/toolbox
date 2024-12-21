@@ -190,7 +190,6 @@ private:
         using return_type = std::invoke_result_t<decltype(func), Args...>;
         auto async_result = co_await co_await SendRequestForWithAttachment<func, Args...>(
                 duration, req_attachment_, std::forward<Args>(args)...);
-        req_attachment_ = {};
         if (async_result.index() == 0) {
             if constexpr (std::is_void_v<return_type>) {
                 co_return {};
@@ -209,6 +208,7 @@ private:
         auto time_out_duration, std::string_view request_attachment,
         Args &&...args) -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<std::invoke_result_t<decltype(func), Args...>>, coro::NewThreadExecutor>, coro::NewThreadExecutor>
     {
+        req_attachment_ = {};   // 及时释放,防止混乱.
         using return_type = std::invoke_result_t<decltype(func), Args...>;
         RecvingGuard guard(control_.get());
         uint32_t id;
