@@ -48,8 +48,21 @@ public:
     : result_(std::move(result)), buffer_(std::move(buffer)) {}
     async_rpc_result_value_t(T &&result)
     : result_(std::move(result)) {}
-    T &result() noexcept { return result_; }
-    const T &result() const noexcept { return result_; }
+
+    // 允许直接访问value
+    T& operator*() & { return result_; }
+    const T& operator*() const & { return result_; }
+    T&& operator*() && { return std::move(result_); }
+    
+    // 允许像指针一样使用
+    T* operator->() { return &result_; }
+    const T* operator->() const { return &result_; }
+    
+    // 隐式转换为T的引用
+    operator T&() & { return result_; }
+    operator const T&() const & { return result_; }
+    operator T&&() && { return std::move(result_); }
+
     std::string_view get_attachment() const noexcept { return buffer_.resp_attachment_buf_; }
     resp_body release_buffer() noexcept { return std::move(buffer_); }
 
@@ -122,7 +135,6 @@ private:
     std::atomic<uint32_t> request_id_ = 9527;
     std::shared_ptr<control_t> control_;
     std::string_view req_attachment_;
-    std::string_view resp_attachment_;
     Config config_;
     SendCallback send_callback_ = nullptr;
 public:
@@ -143,7 +155,7 @@ public:
 
     // Call RPC with default Timeout_(5s)
     template <auto func, typename... Args>
-    auto Call(Args &&...args) -> ToolBox::coro::Task<std::invoke_result_t<decltype(func), Args...>, coro::NewThreadExecutor> {
+    auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...> >, coro::NewThreadExecutor> {
         return CallFor_<func>(std::chrono::seconds(5), std::forward<Args>(args)...);
     }
 
@@ -156,9 +168,6 @@ public:
         req_attachment_ = attachment;
         return true;
     }
-    std::string_view GetRespAttachment() const noexcept { return resp_attachment_; }
-
-    
     struct RecvingGuard 
     {
         RecvingGuard(control_t *ctrl):ctrl_(ctrl) { ctrl_->recving_cnt_++; }
@@ -186,7 +195,7 @@ private:
     // Call RPC with Timeout_
     template <auto func, typename... Args>
     auto CallFor_(auto duration, Args &&...args)
-        -> ToolBox::coro::Task<std::invoke_result_t<decltype(func), Args...>, coro::NewThreadExecutor> {
+        -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...>>, coro::NewThreadExecutor> {
         using return_type = std::invoke_result_t<decltype(func), Args...>;
         auto async_result = co_await co_await SendRequestForWithAttachment<func, Args...>(
                 duration, req_attachment_, std::forward<Args>(args)...);
@@ -194,8 +203,7 @@ private:
             if constexpr (std::is_void_v<return_type>) {
                 co_return {};
             } else {
-                resp_attachment_ = std::get<0>(async_result).get_attachment();
-                co_return std::move(std::get<0>(async_result).result());
+                co_return std::move(std::get<0>(async_result));
             }
         } else {
             co_return {};

@@ -13,9 +13,10 @@ ToolBox::coro::Task<std::string_view> test_coro_rpc_client(ToolBox::CoroRpc::Cor
     demo::GetUserRequest request;
     request.set_user_id(1010);
     auto result = co_await client.Call<echo>(request);
-    std::string_view resp_attachment = client.GetRespAttachment();
+        // 在这个函数的任何地方都可以获取到 attachment
+    auto resp_attachment = result.get_attachment();
     fprintf(stderr, "test_coro_rpc_client result status: %d, resp_message: %s, user_id: %d, resp_attachment size: %zu, resp_attachment:%s\n"
-                                , result.status(), result.message().data(), result.user().id(), resp_attachment.size(), resp_attachment.data());
+                                , result->status(), result->message().data(), result->user().id(), resp_attachment.size(), resp_attachment.data());
     co_return "test rpc client done.";
 }
 
