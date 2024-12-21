@@ -19,7 +19,9 @@ class CoroRpcServer;
 struct CoroRpcProtocol
 {
 public:
-    constexpr static inline uint8_t VERSION_NUMBER = 0;
+    constexpr static inline uint8_t MAGIC_NUMBER = 0xde;
+    constexpr static inline uint8_t VERSION_NUMBER = 1;
+    constexpr static inline uint8_t SERIALIZE_TYPE = 1;
 /*
 * RPC header
 * 
@@ -36,9 +38,9 @@ public:
 */
     struct ReqHeader
     {
-        uint8_t magic;
-        uint8_t version;
-        uint8_t serialize_type = 0;
+        uint8_t magic = MAGIC_NUMBER;
+        uint8_t version = VERSION_NUMBER;
+        uint8_t serialize_type = SERIALIZE_TYPE;
         uint8_t msg_type;
         uint32_t seq_num;
         uint32_t func_id;
@@ -53,9 +55,9 @@ public:
 
     struct RespHeader
     {
-        uint8_t magic;
-        uint8_t version;
-        uint8_t serialize_type = 0;
+        uint8_t magic = MAGIC_NUMBER;
+        uint8_t version = VERSION_NUMBER;
+        uint8_t serialize_type = SERIALIZE_TYPE;
         uint8_t err_code;
         uint8_t msg_type;
         uint32_t seq_num;
@@ -72,20 +74,20 @@ public:
     using rpc_server = CoroRpcServer<CoroRpcProtocol>;
 
     template<typename T>
-    static std::optional<supported_serialize_protocols> GetSerializeProtocol(T &header)
+    static std::optional<supported_serialize_protocols> GetSerializeProtocol(const T &header)
     {
         static_assert(std::is_same_v<T, ReqHeader> || std::is_same_v<T, RespHeader>, 
                   "T must be either ReqHeader or RespHeader");
-        if(header.serialize_type == 0)
+        if(header.serialize_type == SERIALIZE_TYPE)
         {
             return ProtobufProtocol();
         }else {
             return std::nullopt;
         }
     }
-    static std::optional<supported_serialize_protocols> GetSerializeProtocol(int serialize_type)
+    static std::optional<supported_serialize_protocols> GetSerializeProtocolByType(uint8_t serialize_type)
     {
-        if(serialize_type == 0)
+        if(serialize_type == SERIALIZE_TYPE)
         {
             return ProtobufProtocol();
         }else {
@@ -116,20 +118,27 @@ public:
     template<typename T>
     static Errc ReadHeader(std::string_view data, T &header)
     {
-        int size = sizeof(T);
+        const size_t size = sizeof(T);
         if(data.size() < size)
         {
             RpcLogError("[CoroRpcProtocol] ReadHeader: data size is less than header length");
             return Errc::ERR_PROTOCOL;
         }
-        std::memcpy(&header, data.data(), size);
+        // Check alignment for memcpy
+        if (reinterpret_cast<std::uintptr_t>(data.data()) % alignof(T) != 0) {
+            // If not aligned, use byte-by-byte copy
+            std::memcpy(&header, data.data(), size);
+        } else {
+            header = *reinterpret_cast<const T*>(data.data());
+        }
+        
         if(header.length > UINT32_MAX || header.attach_length > UINT32_MAX)
         {
             RpcLogError("[CoroRpcProtocol] ReadHeader: length is too large");
             return Errc::ERR_PROTOCOL;
         }
-        if (header.magic != magic_number) {
-            RpcLogError("[CoroRpcProtocol] ReadHeader: magic number is invalid, magic: %d, expected: %d", header.magic, magic_number);
+        if (header.magic != MAGIC_NUMBER) {
+            RpcLogError("[CoroRpcProtocol] ReadHeader: magic number is invalid, magic: %d, expected: %d", header.magic, MAGIC_NUMBER);
             return Errc::ERR_PROTOCOL;
         }
         if (header.version != VERSION_NUMBER) {
@@ -141,22 +150,17 @@ public:
     }
 
     template<typename T>
-    static Errc ReadPayLoad(const T &header, std::string_view data, std::string& body, std::string &attachment)
+    static Errc ReadPayLoad(const T &header, std::string_view data, std::string_view &body, std::string_view &attachment)
     {
         if(data.size() != header.length + header.attach_length)
         {
             RpcLogError("[CoroRpcProtocol] ReadPayLoad: data size is not equal to header length. data size: %zu, header length: %u, attach length: %u", data.size(), header.length, header.attach_length    );
             return Errc::ERR_PROTOCOL;
         }
-        body.resize(header.length);
-        std::memcpy(body.data(), data.data(), header.length);
+        body = std::string_view(data.data(), header.length);
         if(header.attach_length > 0)
         {
-            attachment.resize(header.attach_length);
-        }
-        if(header.attach_length > 0)
-        {
-            std::memcpy(attachment.data(), data.data() + header.length, header.attach_length);
+            attachment = std::string_view(data.data() + header.length, header.attach_length);
         }
         return Errc::SUCCESS;
     }
@@ -181,8 +185,9 @@ public:
             return false;
         }
         auto& resp_head = *(RespHeader*)header_buf.data();
-        resp_head.magic = magic_number;
+        resp_head.magic = MAGIC_NUMBER;
         resp_head.version = VERSION_NUMBER;
+        resp_head.serialize_type = SERIALIZE_TYPE;
         resp_head.seq_num = req_header.seq_num;
         resp_head.attach_length = attachment_len; 
         resp_head.length = rpc_result.size();
@@ -197,8 +202,6 @@ public:
         resp_head.err_code = static_cast<uint8_t>(err_code);
         return true;
     }
-
-    constexpr static inline uint8_t magic_number = 0xde;
 
     static constexpr inline auto REQ_HEAD_LEN = sizeof(ReqHeader);
     static_assert(REQ_HEAD_LEN == 20);

@@ -36,8 +36,8 @@ struct rpc_return_type<void>{
 
 struct resp_body{
     int serialize_type_;
-    std::string body_buffer_;
-    std::string resp_attachment_buf_;
+    std::string_view body_buffer_;
+    std::string_view resp_attachment_buf_;
 };
 
 template<typename T>
@@ -287,7 +287,7 @@ private:
             {
                 return rpc_result<T>{{}, CoroRpc::Errc::SUCCESS};
             } else {
-                auto protocols = rpc_protocol::GetSerializeProtocol(serialize_type);
+                auto protocols = rpc_protocol::GetSerializeProtocolByType(serialize_type);
                 if(!protocols.has_value())
                 {
                     RpcLogError("[CoroRpcServer] OnRecvReq: serialize protocol not supported");
@@ -381,15 +381,12 @@ private:
             co_return errc;
         }
         std::pair<std::error_code, std::size_t> send_result;
-        int head_body_size = buffer.size();
         if (!attachment.empty()) 
         {
             // Append attachment data to buffer
-            size_t original_size = buffer.size();
-            buffer.resize(original_size + attachment.size());
-            std::memcpy(buffer.data() + original_size, attachment.data(), attachment.size());
+            std::memcpy(buffer.data() + buffer.size() - attachment.size(), attachment.data(), attachment.size());
         }
-        RpcLogDebug("[rpc][client] SendImpl_ buffer size: %zu, head_body_size: %d, attachment_size: %zu, buffer: %s", buffer.size(), head_body_size, attachment.size(), buffer.c_str());
+        RpcLogDebug("[rpc][client] SendImpl_ buffer size: %zu, attachment_size: %zu, buffer: %s", buffer.size(), attachment.size(), buffer.c_str());
         if(!send_callback_)
         {
             RpcLogError("[rpc][client] SendImpl_: send_callback_ not set");
@@ -412,32 +409,37 @@ private:
         }
         RpcLogDebug("[rpc][client] RegisterOneHandler.auto_gen_key: key: %u, func: %s", key, ToolBox::GetFuncName<func>().data());
 
-        CoroRpcProtocol::ReqHeader req_head;
-        req_head = {};
-        req_head.magic = rpc_protocol::magic_number;
-        req_head.func_id = key;
-        req_head.attach_length = attachment_size;
-        id = ++request_id_;
-        req_head.seq_num = id;
-
-        auto serialize_proto = rpc_protocol::template GetSerializeProtocol(req_head); 
+        auto serialize_proto = rpc_protocol::GetSerializeProtocolByType(CoroRpcProtocol::SERIALIZE_TYPE); 
         if(!serialize_proto.has_value())
         {
             RpcLogError("[rpc][client] PrepareBuffer_: serialize protocol not supported");
             return CoroRpc::Errc::ERR_PROTOCOL_NOT_SUPPORTED;
         }
-        CoroRpc::Errc error_code = CoroRpc::Errc::SUCCESS;
+
         return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> CoroRpc::Errc {
-            req_head.length = serialize_protocol::SerializeSize(std::forward<Args>(args)...);
-            if(req_head.length > UINT32_MAX) [[unlikely]]
+            uint32_t body_length = serialize_protocol::SerializeSize(std::forward<Args>(args)...);
+            if(body_length > UINT32_MAX) [[unlikely]]
             {
                 RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
                 return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
             }
-            buffer.resize(rpc_protocol::REQ_HEAD_LEN + req_head.length);
-            memcpy(buffer.data(), &req_head, rpc_protocol::REQ_HEAD_LEN);
-            error_code = serialize_protocol::SerializeToBuffer(buffer.data() + rpc_protocol::REQ_HEAD_LEN, buffer.size() - rpc_protocol::REQ_HEAD_LEN, std::forward<Args>(args)...);
-            return error_code;
+            buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
+            // 使用placement new初始化ReqHeader
+            new (buffer.data()) CoroRpcProtocol::ReqHeader{
+                .magic = rpc_protocol::MAGIC_NUMBER,
+                .version = rpc_protocol::VERSION_NUMBER,
+                .serialize_type = rpc_protocol::SERIALIZE_TYPE,
+                .func_id = key,
+                .length = body_length,
+                .attach_length = static_cast<uint32_t>(attachment_size),
+                .seq_num = ++request_id_
+            };
+            // 保存序列号用于后续使用
+            id = request_id_;
+            return serialize_protocol::SerializeToBuffer(
+                buffer.data() + rpc_protocol::REQ_HEAD_LEN,
+                buffer.size() - rpc_protocol::REQ_HEAD_LEN,
+                std::forward<Args>(args)...);
         }, serialize_proto.value());
     }
 
@@ -450,8 +452,8 @@ private:
             return err;
         }
         RpcLogDebug("[rpc][client] OnRecvResp_ header: %s", header.ToString().c_str());
-        std::string body;
-        std::string attachment;
+        std::string_view body;
+        std::string_view attachment;
         err = rpc_protocol::ReadPayLoad(header, data.substr(rpc_protocol::RESP_HEAD_LEN), body, attachment);
         if(err != CoroRpc::Errc::SUCCESS)
         {

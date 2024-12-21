@@ -401,15 +401,14 @@ private:
             return Errc::ERR_PROTOCOL;
         }
 
-        std::string body;
-        std::string attachment;
-        err = rpc_protocol::ReadPayLoad(header, data.substr(rpc_protocol::REQ_HEAD_LEN), body, attachment);
+        std::string_view payload;
+        std::string_view attachment;
+        err = rpc_protocol::ReadPayLoad(header, data.substr(rpc_protocol::REQ_HEAD_LEN), payload, attachment);
         if(err != Errc::SUCCESS)
         {
             RpcLogError("[CoroRpcServer] OnRecvReq: read payload failed, err: {}", err);
             return err;
         }
-        std::string_view payload(body);
 
         Errc resp_err = Errc::SUCCESS;
         std::string rpc_result;
