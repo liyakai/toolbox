@@ -409,7 +409,7 @@ private:
         }
         RpcLogDebug("[rpc][client] RegisterOneHandler.auto_gen_key: key: %u, func: %s", key, ToolBox::GetFuncName<func>().data());
 
-        auto serialize_proto = rpc_protocol::GetSerializeProtocolByType(CoroRpcProtocol::SERIALIZE_TYPE); 
+        auto serialize_proto = rpc_protocol::GetSerializeProtocolByType(rpc_protocol::SERIALIZE_TYPE); 
         if(!serialize_proto.has_value())
         {
             RpcLogError("[rpc][client] PrepareBuffer_: serialize protocol not supported");
@@ -425,7 +425,7 @@ private:
             }
             buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
             // 使用placement new初始化ReqHeader
-            new (buffer.data()) CoroRpcProtocol::ReqHeader{
+            new (buffer.data()) rpc_protocol::ReqHeader{
                 .magic = rpc_protocol::MAGIC_NUMBER,
                 .version = rpc_protocol::VERSION_NUMBER,
                 .serialize_type = rpc_protocol::SERIALIZE_TYPE,
