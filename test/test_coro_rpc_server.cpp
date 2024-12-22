@@ -33,14 +33,14 @@ ToolBox::coro::Task<std::string_view> test_coro_rpc_server(ToolBox::CoroRpc::Cor
 
 CASE(CoroRpcServerCase1) 
 { 
-    return;
+    // return;
 
     //声明网络库句柄
     ToolBox::Network network;
     uint64_t server_conn_id = 0;
     //设置发送缓冲区回调函数
-    server.SetSendCallback([&](std::vector<std::byte> &&buffer) {        
-        fprintf(stderr, "coro_rpc server recv buffer content[size:%zu]: ", buffer.size());
+    server.SetSendCallback([&](std::string_view &&buffer) {        
+        fprintf(stderr, "coro_rpc server send buffer content[size:%zu]: ", buffer.size());
         for (size_t i = 0; i < buffer.size(); i++) {
             fprintf(stderr, "%02X ", static_cast<unsigned char>(buffer[i]));
         }
@@ -51,7 +51,7 @@ CASE(CoroRpcServerCase1)
         server_conn_id = conn_id;
         fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque
         , conn_id);
-        fprintf(stderr, "coro_rpc client send buffer content[size:%zu]: ", size);
+        fprintf(stderr, "coro_rpc server recv buffer content[size:%zu]: ", size);
         for (size_t i = 0; i < size; i++) {
             fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
         }

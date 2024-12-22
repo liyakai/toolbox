@@ -14,12 +14,12 @@ concept HasGenRegisterKey = requires() {
 
 template <typename rpc_protocol, template<typename...> typename map_t>
 class CoroRpcServer {
-public:
+private:
     using handler_t = std::function<std::pair<Errc, std::string>(std::string_view, typename rpc_protocol::supported_serialize_protocols)>;
     using core_handler_t = std::function<ToolBox::coro::Task<std::pair<Errc, std::string>>(std::string_view, typename rpc_protocol::supported_serialize_protocols protocols)>;
     using rpc_func_key = typename CoroRpcTools::rpc_func_key_t;
-private:
-    using SendCallback = std::function<void(std::vector<std::byte> &&)>;
+    using SendCallback = std::function<void(std::string_view &&)>;
+
     SendCallback send_callback_ = nullptr;
     std::unordered_map<rpc_func_key, handler_t> rpc_server_handler_map_;
     std::unordered_map<rpc_func_key, core_handler_t> rpc_server_core_handler_map_;
@@ -69,7 +69,7 @@ public:
     Errc OnRecvReq(std::string_view data) {
         return OnRecvReq_(data);
     }
-    Errc SetSendCallback(std::function<void(std::vector<std::byte> &&)> &&callback) {
+    Errc SetSendCallback(SendCallback &&callback) {
         send_callback_ = std::move(callback);
         return Errc::SUCCESS;
     }
@@ -466,7 +466,8 @@ private:
             RpcLogWarn("[CoroRpcServer] DirectResPonseMsg: response error, err:%d", resp_err);
         }
         std::string_view attachment = attachment_func();
-        std::vector<std::byte> resp_buf_bytes(rpc_protocol::RESP_HEAD_LEN + rpc_result.size() + attachment.length());
+        std::string resp_buf_bytes;
+        resp_buf_bytes.resize(rpc_protocol::RESP_HEAD_LEN + rpc_result.size() + attachment.length());
         RpcLogDebug("[rpc][server] DirectResPonseMsg.resp_buf_bytes: resp_buf_bytes size: %zu, rpc_result: %zu, attachment_size: %zu", resp_buf_bytes.size(), rpc_result.size(), attachment.length());
         bool prepare_ret = rpc_protocol::PrepareResponseHeader(resp_buf_bytes, rpc_result, req_head, attachment.length(), resp_err, resp_error_msg);
         if(!prepare_ret)
@@ -483,10 +484,11 @@ private:
         }
         return Errc::SUCCESS;
     }
-    ToolBox::coro::Task<Errc> Response(std::vector<std::byte> &&resp_buf_bytes, std::string &&rpc_result, std::string_view &&attachment)
+    ToolBox::coro::Task<Errc> Response(std::string &&resp_buf_bytes, std::string &&rpc_result, std::string_view &&attachment)
     {
         if(!send_callback_)
         {
+            RpcLogError("[CoroRpcServer] Response: send callback not set");
             co_return Errc::ERR_SEND_CALLBACK_NOT_SET;
         }
         std::memcpy(resp_buf_bytes.data() + rpc_protocol::RESP_HEAD_LEN, rpc_result.data(), rpc_result.size());

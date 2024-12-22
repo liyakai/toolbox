@@ -374,31 +374,31 @@ private:
     template<auto func, typename... Args>
     ToolBox::coro::Task<CoroRpc::Errc, coro::NewThreadExecutor> SendImpl_(uint32_t &id, std::string_view attachment, Args &&...args)
     {
-        std::string buffer;
-        auto errc = PrepareBuffer_<func>(id, attachment.size(), buffer, std::forward<Args>(args)...);
+        std::string send_buffer;
+        auto errc = PrepareSendBuffer_<func>(id, attachment.size(), send_buffer, std::forward<Args>(args)...);
         if (errc != CoroRpc::Errc::SUCCESS) {
-            RpcLogError("[rpc][client] SendImpl_ PrepareBuffer_ failed, rpc_errc: %d", errc);
+            RpcLogError("[rpc][client] SendImpl_ PrepareSendBuffer_ failed, rpc_errc: %d", errc);
             co_return errc;
         }
         std::pair<std::error_code, std::size_t> send_result;
         if (!attachment.empty()) 
         {
-            // Append attachment data to buffer
-            std::memcpy(buffer.data() + buffer.size() - attachment.size(), attachment.data(), attachment.size());
+            // Append attachment data to send_buffer
+            std::memcpy(send_buffer.data() + send_buffer.size() - attachment.size(), attachment.data(), attachment.size());
         }
-        RpcLogDebug("[rpc][client] SendImpl_ buffer size: %zu, attachment_size: %zu, buffer: %s", buffer.size(), attachment.size(), buffer.c_str());
+        RpcLogDebug("[rpc][client] SendImpl_ send_buffer size: %zu, attachment_size: %zu, send_buffer: %s", send_buffer.size(), attachment.size(), send_buffer.c_str());
         if(!send_callback_)
         {
             RpcLogError("[rpc][client] SendImpl_: send_callback_ not set");
             co_return CoroRpc::Errc::ERR_SEND_CALLBACK_NOT_SET;
         }
-        send_callback_(std::move(buffer));
+        send_callback_(std::move(send_buffer));
         // send buffer
         co_return CoroRpc::Errc::SUCCESS;
     }
 
     template<auto func, typename... Args>
-    auto PrepareBuffer_(uint32_t &id, std::size_t attachment_size, std::string & buffer, Args &&...args) -> CoroRpc::Errc
+    auto PrepareSendBuffer_(uint32_t &id, std::size_t attachment_size, std::string & buffer, Args &&...args) -> CoroRpc::Errc
     {
         rpc_func_key key{};
         if constexpr(HasGenRegisterKey<rpc_protocol, func>)
@@ -412,7 +412,7 @@ private:
         auto serialize_proto = rpc_protocol::GetSerializeProtocolByType(rpc_protocol::SERIALIZE_TYPE); 
         if(!serialize_proto.has_value())
         {
-            RpcLogError("[rpc][client] PrepareBuffer_: serialize protocol not supported");
+            RpcLogError("[rpc][client] PrepareSendBuffer_: serialize protocol not supported");
             return CoroRpc::Errc::ERR_PROTOCOL_NOT_SUPPORTED;
         }
 
@@ -438,7 +438,7 @@ private:
             id = request_id_;
             return serialize_protocol::SerializeToBuffer(
                 buffer.data() + rpc_protocol::REQ_HEAD_LEN,
-                buffer.size() - rpc_protocol::REQ_HEAD_LEN,
+                buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment_size,
                 std::forward<Args>(args)...);
         }, serialize_proto.value());
     }

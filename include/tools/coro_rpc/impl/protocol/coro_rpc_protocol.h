@@ -175,13 +175,13 @@ public:
 
 
 
-    static bool PrepareResponseHeader(std::vector<std::byte> &response_buf, std::string& rpc_result, const ReqHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
+    static bool PrepareResponseHeader(std::string &response_buf, std::string& rpc_result, const ReqHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
     {
         std::string err_msg_buf;
-        std::vector<std::byte>& header_buf = response_buf;
-        if(header_buf.size() < RESP_HEAD_LEN)
+        std::string& header_buf = response_buf;
+        if(header_buf.capacity() < RESP_HEAD_LEN)
         {
-            RpcLogError("[CoroRpcProtocol] PrepareResponseHeader: response buffer is too small");
+            RpcLogError("[CoroRpcProtocol] PrepareResponseHeader: response buffer is too small, size: %zu, expected: %zu", header_buf.size(), RESP_HEAD_LEN);
             return false;
         }
         auto& resp_head = *(RespHeader*)header_buf.data();
