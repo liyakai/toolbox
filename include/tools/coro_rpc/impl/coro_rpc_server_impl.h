@@ -118,6 +118,9 @@ private:
         using ReturnType = std::invoke_result_t<decltype(func)>;
         constexpr auto name = ToolBox::GetFuncName<func>();
 
+        RpcLogInfo("[CoroRpcServer] RegistOneHandlerImpl: key: %u, func: %s",
+                   key, name.c_str());
+
         if constexpr(ToolBox::is_specialization_v<ReturnType, ToolBox::coro::Task>)
         {
             auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string_view data, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
