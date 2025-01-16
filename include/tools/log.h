@@ -1,6 +1,7 @@
 #pragma once
-#include <stdarg.h>
+#include "singleton.h"
 #include <functional>
+#include <stdarg.h>
 // 实现日志模块
 namespace ToolBox
 {
