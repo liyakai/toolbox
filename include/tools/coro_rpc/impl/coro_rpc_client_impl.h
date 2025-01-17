@@ -155,7 +155,8 @@ public:
 
     // Call RPC with default Timeout_(5s)
     template <auto func, typename... Args>
-    auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...> >, coro::NewThreadExecutor> {
+    auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...>>, coro::SharedLooperExecutor> 
+    {
         return CallFor_<func>(std::chrono::seconds(5), std::forward<Args>(args)...);
     }
 
@@ -193,9 +194,10 @@ public:
 
 private:
     // Call RPC with Timeout_
-    template <auto func, typename... Args>
-    auto CallFor_(auto duration, Args &&...args)
-        -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...>>, coro::NewThreadExecutor> {
+  template <auto func, typename... Args>
+  auto CallFor_(auto duration, Args &&...args) 
+  -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...>>, coro::SharedLooperExecutor> 
+  {
         using return_type = std::invoke_result_t<decltype(func), Args...>;
         auto async_result = co_await co_await SendRequestForWithAttachment<func, Args...>(
                 duration, req_attachment_, std::forward<Args>(args)...);
@@ -208,14 +210,14 @@ private:
         } else {
             co_return {};
         }
-    }
+  }
 
-    
-    template <auto func, typename... Args>
-    auto SendRequestForWithAttachment(
-        auto time_out_duration, std::string_view request_attachment,
-        Args &&...args) -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<std::invoke_result_t<decltype(func), Args...>>, coro::NewThreadExecutor>, coro::NewThreadExecutor>
-    {
+  template <auto func, typename... Args>
+  auto SendRequestForWithAttachment(auto time_out_duration,
+                                    std::string_view request_attachment,
+                                    Args &&...args)
+      -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<std::invoke_result_t<decltype(func), Args...>>, coro::SharedLooperExecutor>, coro::SharedLooperExecutor> 
+      {
         req_attachment_ = {};   // 及时释放,防止混乱.
         using return_type = std::invoke_result_t<decltype(func), Args...>;
         RecvingGuard guard(control_.get());
@@ -268,8 +270,7 @@ private:
         }else {
             co_return BuildFailedRpcResult_<return_type>(std::move(result));
         }
-        
-    }
+  }
 
     auto Timeout_(auto duration, std::string error_msg)
     {
@@ -315,8 +316,9 @@ private:
         
     }
 
-    template<typename T>
-    auto DeserializeRpcResult_(std::future<async_rpc_raw_result> &&future, coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback, std::weak_ptr<control_t> &&ctrl) -> ToolBox::coro::Task<async_rpc_result<T>, coro::NewThreadExecutor>
+    template <typename T>
+    auto DeserializeRpcResult_(std::future<async_rpc_raw_result> &&future, coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback, std::weak_ptr<control_t> &&ctrl)
+        -> ToolBox::coro::Task<async_rpc_result<T>, coro::SharedLooperExecutor> 
     {
         auto result = co_await coro::FutureAwaiter<async_rpc_raw_result>(std::move(future)).with_future_callback(std::move(future_callback));
         fprintf(stderr, "[rpc][client] DeserializeRpcResult_ result index: %zu\n", result.index());
@@ -351,17 +353,17 @@ private:
         }
     }
 
-    template<typename T>
-    auto BuildFailedRpcResult_(CoroRpc::Errc Errc) -> ToolBox::coro::Task<async_rpc_result<T>, coro::NewThreadExecutor>
+    template <typename T>
+    auto BuildFailedRpcResult_(CoroRpc::Errc Errc)
+        -> ToolBox::coro::Task<async_rpc_result<T>, coro::SharedLooperExecutor> 
     {
         co_return async_rpc_result<T>{Errc};
     }
 
-    template<auto func, typename... Args>
-    ToolBox::coro::Task<CoroRpc::Errc, coro::NewThreadExecutor> SendRequestForImpl_(auto duration, uint32_t &id, ToolBox::HTIMER &&timer, std::string_view attachment, Args &&...args)
+    template <auto func, typename... Args>
+    ToolBox::coro::Task<CoroRpc::Errc, coro::SharedLooperExecutor>
+    SendRequestForImpl_(auto duration, uint32_t &id, ToolBox::HTIMER &&timer, std::string_view attachment, Args &&...args) 
     {
-        using return_type = std::invoke_result_t<decltype(func), Args...>;
-
         // 检查定时器
         int32_t time_left = ToolBox::TimerMgr->GetTimeLeft(timer);
         if(time_left <= 0)
@@ -371,8 +373,9 @@ private:
         co_return co_await SendImpl_<func>(id, attachment, std::forward<Args>(args)...);
     }
 
-    template<auto func, typename... Args>
-    ToolBox::coro::Task<CoroRpc::Errc, coro::NewThreadExecutor> SendImpl_(uint32_t &id, std::string_view attachment, Args &&...args)
+    template <auto func, typename... Args>
+    ToolBox::coro::Task<CoroRpc::Errc, coro::SharedLooperExecutor>
+    SendImpl_(uint32_t &id, std::string_view attachment, Args &&...args)
     {
         std::string send_buffer;
         auto errc = PrepareSendBuffer_<func>(id, attachment.size(), send_buffer, std::forward<Args>(args)...);
