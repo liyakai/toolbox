@@ -21,6 +21,7 @@ AUX_SOURCE_DIRECTORY(./protobuf TEST_SRC)
 
 link_directories(
     ${PROJECT_SOURCE_DIR}/lib
+    ${PROJECT_SOURCE_DIR}/3rdparty/gperf_2_16
 )
 set(TARGET_NAME test_tools)
 add_executable(${TARGET_NAME} ${TEST_SRC})
@@ -59,10 +60,21 @@ if(CMAKE_GPERF_TOOLS_CPU)
 endif()
 
 # 内存泄漏评测工具
-option(CMAKE_GPERF_TOOLS_HEAP "Use Gperf Tools heap checker" OFF)
-if(CMAKE_GPERF_TOOLS_HEAP)
-    message(STATUS "Use Gperf Tools heap checker")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltcmalloc")
+option(CMAKE_GPERF_TOOLS_MEM "Use tcmalloc_and_profile" OFF)
+if(CMAKE_GPERF_TOOLS_MEM)
+    message(STATUS "Use tcmalloc_and_profile")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltcmalloc")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined -fno-omit-frame-pointer")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined -fno-omit-frame-pointer")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined")
+    target_link_libraries(${TARGET_NAME} libtcmalloc_and_profiler.a )
+endif()
+
+# 使用 tcmalloc 内存分配器
+option(CMAKE_TCMALLOC "Use tcmalloc" OFF)
+if(CMAKE_TCMALLOC)
+    message(STATUS "Use tcmalloc")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltcmalloc")
     target_link_libraries(${TARGET_NAME} libtcmalloc.a )
 endif()
 
