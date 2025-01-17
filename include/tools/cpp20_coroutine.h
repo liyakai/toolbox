@@ -20,7 +20,7 @@ namespace ToolBox {
 
 namespace coro {
 
-class NewThreadExecutor;
+class SharedLooperExecutor;
 
 template <typename ResultType, typename Executor> struct Task;
 template <typename ResultType, typename Executor> struct TaskPromise;
@@ -108,7 +108,7 @@ private:
     Task<Result, Executor> task_; // 二阶Task,即协程体内部的 co_await 获得的 task.
 };
 
-template <typename ResultType, typename Executor = NewThreadExecutor>
+template <typename ResultType, typename Executor = SharedLooperExecutor>
 struct Task {
     // 声明 promise_type 为 TaskPromise 类型
     using promise_type = TaskPromise<ResultType, Executor>;
