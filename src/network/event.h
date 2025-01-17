@@ -75,7 +75,7 @@ namespace ToolBox
         /*
         * 析构
         */
-        virtual ~NetEventWorker();
+        virtual ~NetEventWorker() override;
         /*
         * 设置 IP
         */

@@ -14,7 +14,8 @@ namespace ToolBox
     }
     Event::~Event()
     {
-
+      id_ = EID_NONE; // 事件ID
+      opaque_ = 0;    // 信道标记
     }
     EventID Event::GetID()
     {
@@ -96,7 +97,6 @@ namespace ToolBox
     {
         net_req_.stream_.data_ = const_cast<char*>(data);
         net_req_.stream_.size_ = size;
-        memmove(net_req_.stream_.data_, data, size);
     }
     char* NetEventWorker::GetData() const
     {
@@ -136,7 +136,7 @@ namespace ToolBox
     {
         switch (GetID())
         {
-            case EID_WorkerToMainRecv:
+            case EID_WorkerToMainRecv: 
                 GIVE_BACK_MEMORY_RAW((char*)net_evt_.recv_.data_);
                 break;
             default:
