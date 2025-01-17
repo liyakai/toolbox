@@ -815,8 +815,8 @@ namespace ToolBox
             return;
         }
 
-        uint32_t packet_size = 0;
-        memcpy((char*)&packet_size, data, sizeof(uint32_t));
+        // uint32_t packet_size = 0;
+        // memcpy((char*)&packet_size, data, sizeof(uint32_t));
         // NetworkLogTrace("[Network][TcpSocket] Send data size:%u. socket id:%d, conn_id:%llu", packet_size, GetSocketID(), GetConnID());
 
         if (debug_statistic_save_ + debug_statistic_send_ >= 6000)
