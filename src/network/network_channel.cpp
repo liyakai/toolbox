@@ -142,15 +142,16 @@ namespace ToolBox
         auto iter = conn_type_.find(conn_id);
         if (iter == conn_type_.end())
         {
+            NetworkLogError("[network] invalid conn_id:%lu", conn_id);
             return ENetErrCode::NET_INVALID_CONNID;
         }
         size = size + sizeof(uint32_t);
-        auto* data_to_worker = GET_NET_MEMORY(size);
-        memmove(data_to_worker, (char*)&size, sizeof(uint32_t));
-        memmove(data_to_worker + sizeof(uint32_t), data, size);
+        auto* data_to_worker = GET_NET_MEMORY(size+sizeof(uint32_t));
+        memcpy(data_to_worker, (char*)&size, sizeof(uint32_t));
+        memcpy(data_to_worker + sizeof(uint32_t), data, size);
         auto* event = GET_NET_OBJECT(NetEventWorker, EID_MainToWorkerSend);
         event->SetConnectID(conn_id);
-        event->SetData(data_to_worker, size);
+        event->SetData(data_to_worker, size+sizeof(uint32_t));
         NotifyWorker(event, iter->second, GetNetThreadIndex(conn_id));
         return ENetErrCode::NET_SUCCESS;
     }
@@ -335,6 +336,7 @@ namespace ToolBox
         auto* event_main = dynamic_cast<NetEventMain*>(event);
         if (nullptr == event_main)
         {
+            NetworkLogError("[network] event dynamic_cast to NetEventMain failed");
             return;
         }
         int32_t fd = event_main->net_evt_.accepting_.fd_;
