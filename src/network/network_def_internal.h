@@ -127,7 +127,7 @@ namespace ToolBox
     new char[SIZE]
     // 宏定义释放原生内存[选项1]
 #define GIVE_BACK_MEMORY_RAW(POINTER,...)   \
-    delete POINTER;
+    delete[] POINTER;
 
 
     // 宏定义从内存池中获取内存[选项2]
