@@ -110,8 +110,15 @@ public:
             }
         }
     }
+
+    template<auto func>
+    static CoroRpcTools::rpc_func_key GenRegisterKey()
+    {
+        // 使用函数指针的地址作为唯一标识符
+        return CoroRpcTools::AutoGenRegisterKey<func>();;
+    }
     
-    static CoroRpcTools::rpc_func_key GenRpcFuncKey(const ReqHeader &header)
+    static CoroRpcTools::rpc_func_key GetRpcFuncKey(const ReqHeader &header)
     {
         return header.func_id;
     }
@@ -165,13 +172,13 @@ public:
         return Errc::SUCCESS;
     }
 
-    template <auto func>
-    struct HasGenRegisterKey {
-        template <typename T>
-        static constexpr bool check(T*) {
-            return requires { T::template HasGenRegisterKey<func>(); };
-        }
-    };
+    // template <auto func>
+    // struct HasGenRegisterKey {
+    //     template <typename T>
+    //     static constexpr bool check(T*) {
+    //         return requires { T::template HasGenRegisterKey<func>(); };
+    //     }
+    // };
 
 
 

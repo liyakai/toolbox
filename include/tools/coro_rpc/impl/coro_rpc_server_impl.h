@@ -23,7 +23,8 @@ private:
     SendCallback send_callback_ = nullptr;
     std::unordered_map<rpc_func_key, handler_t> rpc_server_handler_map_;
     std::unordered_map<rpc_func_key, core_handler_t> rpc_server_core_handler_map_;
-    std::unordered_map<rpc_func_key, std::string> id2name_map_;
+    std::unordered_map<rpc_func_key, std::string> func_key2name_map_;
+    std::unordered_map<std::string, rpc_func_key> name2func_key_map_;
     std::unordered_map<rpc_func_key, std::function<std::string_view()>> resp_attachment_func_map_;
 public:
     CoroRpcServer() = default;
@@ -57,10 +58,10 @@ public:
         RegistOneHandlerImpl<func>(key);
     }
 
-    const std::string& GetName(const rpc_func_key &key) const {
+    const std::string& GetFunctionKeyName(const rpc_func_key &key) const {
         static std::string empty_str;
-        auto it = id2name_map_.find(key);
-        if (it == id2name_map_.end()) {
+        auto it = func_key2name_map_.find(key);
+        if (it == func_key2name_map_.end()) {
             return empty_str;
         }
         return it->second;
@@ -76,12 +77,23 @@ public:
     template <auto func>
     void SetRespAttachmentFunc(std::function<std::string_view()> &&resp_attachment_func) {
         rpc_func_key key{};
-        if constexpr(HasGenRegisterKey<rpc_protocol, func>)
+        constexpr auto name = ToolBox::GetFuncName<func>();
+        std::string func_name(name);
+        auto it = name2func_key_map_.find(func_name);
+        if(it == name2func_key_map_.end())
         {
-            key = rpc_protocol::template GenRegisterKey<func>();
+            if constexpr(HasGenRegisterKey<rpc_protocol, func>)
+            {
+                key = rpc_protocol::template GenRegisterKey<func>();
+            } else {
+                key = CoroRpcTools::AutoGenRegisterKey<func>();
+            }
+            name2func_key_map_[func_name] = key;
+            func_key2name_map_[key] = func_name;
         } else {
-            key = CoroRpcTools::AutoGenRegisterKey<func>();
+            key = it->second;
         }
+
         resp_attachment_func_map_[key] = std::move(resp_attachment_func);
     }
 private:
@@ -266,7 +278,6 @@ private:
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
         using ReturnType = typename traits_type::return_type;
-        fprintf(stderr, "coro_rpc server Execute_, func type: %s, data size: %zu, data: %s\n", ToolBox::GetFuncName<func>().data(), data.size(), data.data());
         if constexpr(!std::is_void_v<param_type>)
         {
             using First = std::tuple_element_t<0, param_type>;
@@ -395,7 +406,6 @@ private:
             RpcLogError("[CoroRpcServer] OnRecvReq: read header failed, err:%d", err);
             return err;
         }
-        fprintf(stderr, "coro_rpc server recv data[size:%zu], header: %s\n", data.size(), header.ToString().c_str());
 
         auto serialize_protocol = rpc_protocol::GetSerializeProtocol(header);
         if(!serialize_protocol.has_value())
@@ -415,7 +425,7 @@ private:
 
         Errc resp_err = Errc::SUCCESS;
         std::string rpc_result;
-        auto key = rpc_protocol::GenRpcFuncKey(header);
+        auto key = rpc_protocol::GetRpcFuncKey(header);
         auto handler = GetHandler(key);
         if(handler == nullptr)
         {
@@ -471,7 +481,7 @@ private:
         std::string_view attachment = attachment_func();
         std::string resp_buf_bytes;
         resp_buf_bytes.resize(rpc_protocol::RESP_HEAD_LEN + rpc_result.size() + attachment.length());
-        RpcLogDebug("[rpc][server] DirectResPonseMsg.resp_buf_bytes: resp_buf_bytes size: %zu, rpc_result: %zu, attachment_size: %zu", resp_buf_bytes.size(), rpc_result.size(), attachment.length());
+        // RpcLogDebug("[rpc][server] DirectResPonseMsg.resp_buf_bytes: resp_buf_bytes size: %zu, rpc_result: %zu, attachment_size: %zu", resp_buf_bytes.size(), rpc_result.size(), attachment.length());
         bool prepare_ret = rpc_protocol::PrepareResponseHeader(resp_buf_bytes, rpc_result, req_head, attachment.length(), resp_err, resp_error_msg);
         if(!prepare_ret)
         {
