@@ -475,15 +475,15 @@ namespace ToolBox
         OnReceived(event_main->network_type_
                    , event_main->GetOpaque()
                    , event_main->net_evt_.recv_.connect_id_
-                   , event_main->net_evt_.recv_.data_ + sizeof(uint32_t)
-                   , event_main->net_evt_.recv_.size_ - sizeof(uint32_t));
+                   , event_main->net_evt_.recv_.data_
+                   , event_main->net_evt_.recv_.size_);
         if (received_)
         {
             received_(event_main->network_type_
                       , event_main->GetOpaque()
                       , event_main->net_evt_.recv_.connect_id_
-                      , event_main->net_evt_.recv_.data_ + sizeof(uint32_t)
-                      , event_main->net_evt_.recv_.size_ - sizeof(uint32_t));
+                      , event_main->net_evt_.recv_.data_
+                      , event_main->net_evt_.recv_.size_);
         }
     }
 

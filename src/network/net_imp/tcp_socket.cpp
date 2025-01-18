@@ -278,14 +278,14 @@ namespace ToolBox
         while (true)
         {
             auto data_size = recv_ring_buffer_.ReadableSize();
-            // 这里暂时采用 len|buff 的方式[len包含len自身的长度]分割数据.可重构为传入解包方法
+            // 这里暂时采用 len|buff 的方式[len不包含len自身的长度]分割数据.可重构为传入解包方法
             if (data_size < sizeof(uint32_t))
             {
                 // return ErrCode::ERR_INSUFFICIENT_LENGTH;
                 break;
             }
             uint32_t len = 0;
-            recv_ring_buffer_.Copy((char*)&len, sizeof(uint32_t));
+            recv_ring_buffer_.Read((char*)&len, sizeof(uint32_t));
             if (len > static_cast<uint32_t>(recv_buff_len_))
             {
                 NetworkLogError("[Network][TcpSocket] Packet size is invaliable. socket id:%d, conn_id:%llu, len.%u", GetSocketID(), GetConnID(), len);
