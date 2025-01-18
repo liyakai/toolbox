@@ -323,7 +323,6 @@ private:
         auto func = executable_queue.front();
         executable_queue.pop();
         lock.unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         func();
         }
   }
