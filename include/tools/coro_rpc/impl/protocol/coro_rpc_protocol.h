@@ -121,7 +121,7 @@ public:
         const size_t size = sizeof(T);
         if(data.size() < size)
         {
-            RpcLogError("[CoroRpcProtocol] ReadHeader: data size is less than header length");
+            RpcLogError("[CoroRpcProtocol] ReadHeader: data size is less than header length, data size: %zu, header length: %zu", data.size(), size);
             return Errc::ERR_PROTOCOL;
         }
         // Check alignment for memcpy
