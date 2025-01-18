@@ -145,7 +145,6 @@ namespace ToolBox
             NetworkLogError("[network] invalid conn_id:%lu", conn_id);
             return ENetErrCode::NET_INVALID_CONNID;
         }
-        size = size + sizeof(uint32_t);
         auto* data_to_worker = GET_NET_MEMORY(size+sizeof(uint32_t));
         memcpy(data_to_worker, (char*)&size, sizeof(uint32_t));
         memcpy(data_to_worker + sizeof(uint32_t), data, size);
