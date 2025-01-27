@@ -30,6 +30,7 @@ message(STATUS "CMAKE_BUILD_TYPE -> ${CMAKE_BUILD_TYPE}")
 INCLUDE_DIRECTORIES(
     .
     ../include/
+    ../3rdparty/
     ./tools
     ./network
 	./net_work/net_imp
@@ -37,7 +38,6 @@ INCLUDE_DIRECTORIES(
 	./net_work/net_imp/net_iocp
     ./net_work/net_imp/net_kqueue
     ./net_work/net_imp/net_io_uring
-    ./thirdparty
 )
 
 # 源文件
@@ -49,6 +49,7 @@ AUX_SOURCE_DIRECTORY(./network/net_imp/net_epoll DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./network/net_imp/net_iocp DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./network/net_imp/net_kqueue DIR_SRCS)
 AUX_SOURCE_DIRECTORY(./network/net_imp/net_io_uring DIR_SRCS)
+AUX_SOURCE_DIRECTORY(../3rdparty/kcp DIR_SRCS)
 
 # 设置输出路径
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)

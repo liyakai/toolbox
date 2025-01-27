@@ -11,8 +11,7 @@ INCLUDE_DIRECTORIES(
     .
     ..
     ../include/
-    ../src/thirdparty/
-    ../thirdparty/protobuf_30.0/include
+    ../3rdparty/
 )
 # 源文件
 AUX_SOURCE_DIRECTORY(. TEST_SRC)
