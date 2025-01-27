@@ -41,18 +41,14 @@ public:
     template<typename T>
     static bool Deserialize(T&t, std::string_view buffer)
     {
-        // fprintf(stderr, "protobuf Deserialize, buffer size: %zu, deserialize content:%s\n", buffer.size(), buffer.data());
-
         if constexpr(is_tuple_like_v<T>)
         {
             if constexpr(std::tuple_size_v<T> == 1)
             {
                 std::get<0>(t).ParseFromArray(buffer.data(), buffer.size());
-                // fprintf(stderr, "protobuf Deserialize, buffer size: %zu, t:%s\n", buffer.size(), std::get<0>(t).DebugString().c_str());
                 return std::get<0>(t).ParseFromArray(buffer.data(), buffer.size());
             }else {
                 t.ParseFromString(std::string(buffer));
-                // fprintf(stderr, "protobuf Deserialize, buffer size: %zu, t:%s\n", buffer.size(), t.DebugString().c_str());
                 return true;
             }
         }else {
