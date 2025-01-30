@@ -15,6 +15,8 @@
 #include <functional>
 #include <future>
 
+#include "tools/ringbuffer.h"
+
 
 namespace ToolBox {
 
@@ -370,10 +372,72 @@ public:
     }
 };
 
+#define LOOPER_EVENT_QUEUE_MAX_COUNT 10240
+class RingBufferSPSCEventExecutor : public IExecutor {
+private:
+    RingBufferSPSC<std::function<void()>, LOOPER_EVENT_QUEUE_MAX_COUNT> executable_queue;
+    std::atomic<bool> is_active; // true是工作状态,如果要关闭事件循环,就置为 false
+    std::thread work_thread;
+
+private:
+    // 处理事件循环
+    void run_loop() {
+        // 检查当前事件循环是否是工作状态,或者队列没有清空.
+        while (is_active.load(std::memory_order_relaxed)) {
+
+            if (executable_queue.Empty()) 
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+            auto func = executable_queue.Pop();
+            func();
+        }
+  }
+
+public:
+    RingBufferSPSCEventExecutor() {
+        work_thread = std::thread(&RingBufferSPSCEventExecutor::run_loop, this);
+        is_active.store(true, std::memory_order_relaxed);
+    }
+    ~RingBufferSPSCEventExecutor() {
+        shutdown(false);
+        // 等待线程执行完,防止出现意外情况.
+        join();
+    }
+
+    void execute(std::function<void()> &&func) override {
+        if (is_active.load(std::memory_order_relaxed)) {
+            if (executable_queue.Full()) 
+            {
+                // TO DO: add error log
+                fprintf(stderr,"[coroutine] execute failed for executable_queue is full.");
+            }
+            executable_queue.Push(std::move(func));
+        }
+    }
+    void shutdown(bool wait_for_complete = true) {
+        is_active.store(false, std::memory_order_relaxed);
+        if (!wait_for_complete) {
+            // 清空任务队列
+            executable_queue.Clear();
+        }
+    }
+
+    void join() {
+        if (work_thread.joinable()) {
+            work_thread.join();
+        }
+    }
+};
+
+// RingBufferSPSC<NetEventWorker*, NETWORK_EVENT_QUEUE_MAX_COUNT>;
+
 class SharedLooperExecutor : public IExecutor {
 public:
     void execute(std::function<void()> &&func) override {
-        static LooperExecutor shared_looper;
+        // static LooperExecutor shared_looper;
+        static RingBufferSPSCEventExecutor shared_looper;
         shared_looper.execute(std::move(func));
     }
 };
