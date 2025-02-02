@@ -372,6 +372,7 @@ public:
     }
 };
 
+// RingBufferSPSCEventExecutor 实现方式略显暴力,但其响应速度比LooperExecutor更佳.
 #define LOOPER_EVENT_QUEUE_MAX_COUNT 10240
 class RingBufferSPSCEventExecutor : public IExecutor {
 private:
@@ -382,18 +383,32 @@ private:
 private:
     // 处理事件循环
     void run_loop() {
+        int idle_count = 0;
         // 检查当前事件循环是否是工作状态,或者队列没有清空.
         while (is_active.load(std::memory_order_relaxed)) {
 
             if (executable_queue.Empty()) 
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                if (idle_count < 100) 
+                {
+                    std::this_thread::yield();
+                }
+                else 
+                {
+                    std::this_thread::sleep_for(std::chrono::microseconds(1));
+                }
+                idle_count++;
                 continue;
             }
-            auto func = executable_queue.Pop();
-            func();
+            while (!executable_queue.Empty()) 
+            {
+                auto func = executable_queue.Pop();
+                func();
+            }
+            std::this_thread::yield(); // 处理一批后让出CPU
+            idle_count = 0;
         }
-  }
+    }
 
 public:
     RingBufferSPSCEventExecutor() {
@@ -436,8 +451,9 @@ public:
 class SharedLooperExecutor : public IExecutor {
 public:
     void execute(std::function<void()> &&func) override {
-        // static LooperExecutor shared_looper;
-        static RingBufferSPSCEventExecutor shared_looper;
+        //static LooperExecutor shared_looper;
+        // static RingBufferSPSCEventExecutor shared_looper;
+        static NoopExecutor shared_looper;
         shared_looper.execute(std::move(func));
     }
 };

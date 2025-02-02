@@ -14,31 +14,28 @@ ToolBox::CoroRpc::CoroRpcServer<ToolBox::CoroRpc::CoroRpcProtocol,
     server;
 
 inline demo::GetUserResponse echo(demo::GetUserRequest request) {
-  fprintf(stderr, "[echo]coro_rpc server echo, user_id: %d\n",
-          request.user_id());
+//   fprintf(stderr, "[echo]coro_rpc server echo, user_id: %d\n", request.user_id());
   server.SetRespAttachmentFunc<echo>(
       []() -> std::string_view { return "This is a attachment"; });
   demo::GetUserResponse response;
   response.set_status(200);
   response.set_message("success");
   response.mutable_user()->set_id(request.user_id());
-  fprintf(stderr, "[echo]coro_rpc server echo, response:%s\n",
-          response.DebugString().c_str());
+//   fprintf(stderr, "[echo]coro_rpc server echo, response:%s\n", response.DebugString().c_str());
   return response;
 }
 
 class Service {
 public:
   demo::GetUserResponse class_echo(demo::GetUserRequest request) {
-    fprintf(stderr, "[echo]coro_rpc server echo, user_id: %d\n",
-            request.user_id());
+    // fprintf(stderr, "[echo]coro_rpc server echo, user_id: %d\n", request.user_id());
     server.SetRespAttachmentFunc<echo>(
         []() -> std::string_view { return "This is a attachment"; });
     demo::GetUserResponse response;
     response.set_status(200);
     response.set_message("success");
     response.mutable_user()->set_id(request.user_id());
-    fprintf(stderr, "[echo]coro_rpc server echo, response:%s\n", response.DebugString().c_str());
+    // fprintf(stderr, "[echo]coro_rpc server echo, response:%s\n", response.DebugString().c_str());
     return response;
   }
 
@@ -59,32 +56,31 @@ CASE(CoroRpcServerCase1)
   uint64_t server_conn_id = 0;
     //设置发送缓冲区回调函数
   server.SetSendCallback([&](std::string_view &&buffer) {
-        fprintf(stderr, "coro_rpc server send buffer content[size:%zu]: ", buffer.size());
-    for (size_t i = 0; i < buffer.size(); i++) {
-      fprintf(stderr, "%02X ", static_cast<unsigned char>(buffer[i]));
-    }
-    fprintf(stderr, "\n");
-        network.Send(server_conn_id, reinterpret_cast<const char*>(buffer.data()), buffer.size());
+    // fprintf(stderr, "coro_rpc server send buffer content[size:%zu]: ", buffer.size());
+    // for (size_t i = 0; i < buffer.size(); i++) {
+    //   fprintf(stderr, "%02X[%u] ", static_cast<unsigned char>(buffer[i]), static_cast<uint8_t>(buffer[i]));
+    // }
+    // fprintf(stderr, "\n");
+    network.Send(server_conn_id, reinterpret_cast<const char*>(buffer.data()), buffer.size());
   });
     network.SetOnReceived([&](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) {
         server_conn_id = conn_id;
-        fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque
-        , conn_id);
-        fprintf(stderr, "coro_rpc server recv buffer content[size:%zu]: ", size);
-        for (size_t i = 0; i < size; i++) {
-          fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
-        }
-        fprintf(stderr, "\n");
+        // fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque, conn_id);
+        // fprintf(stderr, "coro_rpc server recv buffer content[size:%zu]: ", size);
+        // for (size_t i = 0; i < size; i++) {
+        //   fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
+        // }
+        // fprintf(stderr, "\n");
         server.OnRecvReq(std::string_view(data, size));
 
     }).SetOnAccepted([&](ToolBox::NetworkType type, uint64_t opaque, int32_t fd) {
         fprintf(stderr, "coro_rpc server accepted, opaque: %lu, fd: %d\n", opaque, fd);
     }).SetOnBinded([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const std::string & ip, uint16_t port)
     {
-        printf("[TestNetworkForward] Server has established listening port, network type:%d, connection tag:%lu, connection ID:%lu, ip:%s, port:%d\n", type, opaque, conn_id, ip.c_str(), port);
+        printf("[TestRpcEcho] Server has established listening port, network type:%d, connection tag:%lu, connection ID:%lu, ip:%s, port:%d\n", type, opaque, conn_id, ip.c_str(), port);
     }).SetOnAccepting([](ToolBox::NetworkType type, uint64_t opaque, int32_t fd)
     {
-        printf("[TestNetworkForward] Preparing to add new connection to IO multiplexing, network type:%d, connection tag:%lu, fd:%d\n", type, opaque, fd);
+        printf("[TestRpcEcho] Preparing to add new connection to IO multiplexing, network type:%d, connection tag:%lu, fd:%d\n", type, opaque, fd);
     }).SetOnErrored([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) {
         fprintf(stderr, "coro_rpc server error, opaque: %lu, conn_id: %lu, err_code: %d, err_no: %d\n", opaque
         , conn_id, err_code, err_no);

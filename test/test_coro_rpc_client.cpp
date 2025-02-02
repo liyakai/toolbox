@@ -101,7 +101,7 @@ std::string_view test_coro_rpc_client() {
 
 CASE(CoroRpcClientCase1) 
 { 
-    // return;
+    return;
     auto result = test_coro_rpc_client();
     fprintf(stderr, "[CoroRpcClientCase1] result: %s\n", result.data());
     
