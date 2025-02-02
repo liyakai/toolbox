@@ -2,7 +2,7 @@
 
 #include "network/network_api.h"
 #include "test/protobuf/test_coro_rpc.pb.h"
-#include "tools/coro_rpc/coro_rpc_server.h"
+#include "coro_rpc/coro_rpc_server.h"
 #include "tools/timer.h"
 #include "unit_test_frame/unittest.h"
 #include <thread>

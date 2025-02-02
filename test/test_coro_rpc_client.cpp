@@ -1,7 +1,7 @@
 
 
 #include "unit_test_frame/unittest.h"
-#include "tools/coro_rpc/coro_rpc_client.h"
+#include "coro_rpc/coro_rpc_client.h"
 #include "network/network_api.h"
 #include "test/protobuf/test_coro_rpc.pb.h"
 FIXTURE_BEGIN(CoroRpcClient)
