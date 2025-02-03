@@ -14,7 +14,7 @@ namespace ToolBox {
 namespace CoroRpc {
 
 template<typename T, auto func>
-concept HasGenRegisterKey = requires() {
+concept ClientHasGenRegisterKey = requires() {
     T::template GenRegisterKey<func>();
 };
 
@@ -63,8 +63,8 @@ public:
     operator const T&() const & { return result_; }
     operator T&&() && { return std::move(result_); }
 
-    std::string_view get_attachment() const noexcept { return buffer_.resp_attachment_buf_; }
-    resp_body release_buffer() noexcept { return std::move(buffer_); }
+    std::string_view GetRespAttachment() const noexcept { return buffer_.resp_attachment_buf_; }
+    resp_body ReleaseBuffer() noexcept { return std::move(buffer_); }
 
 private:
     T result_;
@@ -76,8 +76,8 @@ struct async_rpc_result_value_t<void>{
     async_rpc_result_value_t() = default;
     resp_body buffer_;
 
-    std::string_view get_attachment() const noexcept { return buffer_.resp_attachment_buf_; }
-    resp_body release_buffer() noexcept { return std::move(buffer_); }
+    std::string_view GetRespAttachment() const noexcept { return buffer_.resp_attachment_buf_; }
+    resp_body ReleaseBuffer() noexcept { return std::move(buffer_); }
 
 };
 template<typename T>
@@ -224,7 +224,7 @@ private:
         uint32_t id;
         std::function<void()> promise_callback;
         typename ToolBox::coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback = [&promise_callback](std::function<void()> &&handle) {
-            RpcLogDebug("[rpc][client] future_callback is called");
+            // RpcLogDebug("[rpc][client] future_callback is called");
             promise_callback = std::move(handle);
         };
         auto timer = ToolBox::TimerMgr->AddTimer([&](int times) {
@@ -251,7 +251,7 @@ private:
         }, (int32_t)std::chrono::duration_cast<std::chrono::milliseconds>(time_out_duration).count(), 1, __FILE__, __LINE__);
 
         auto result = co_await SendRequestForImpl_<func>(time_out_duration, id, std::move(timer), request_attachment, std::forward<Args>(args)...);
-        RpcLogDebug("[rpc][client] SendRequestForWithAttachment end, result:%d", result);
+        // RpcLogDebug("[rpc][client] SendRequestForWithAttachment end, result:%d", result);
         auto& control = *control_;
         if (result == CoroRpc::Errc::SUCCESS) 
         {
@@ -389,7 +389,7 @@ private:
             // Append attachment data to send_buffer
             std::memcpy(send_buffer.data() + send_buffer.size() - attachment.size(), attachment.data(), attachment.size());
         }
-        RpcLogDebug("[rpc][client] SendImpl_ send_buffer size: %zu, attachment_size: %zu, send_buffer: %s", send_buffer.size(), attachment.size(), send_buffer.c_str());
+        // RpcLogDebug("[rpc][client] SendImpl_ send_buffer size: %zu, attachment_size: %zu, send_buffer: %s", send_buffer.size(), attachment.size(), send_buffer.c_str());
         if(!send_callback_)
         {
             RpcLogError("[rpc][client] SendImpl_: send_callback_ not set");
@@ -404,7 +404,7 @@ private:
     auto PrepareSendBuffer_(uint32_t &id, std::size_t attachment_size, std::string & buffer, Args &&...args) -> CoroRpc::Errc
     {
         rpc_func_key key{};
-        if constexpr(HasGenRegisterKey<rpc_protocol, func>)
+        if constexpr(ClientHasGenRegisterKey<rpc_protocol, func>)
         {
             key = rpc_protocol::template GenRegisterKey<func>();
         } else {

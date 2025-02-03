@@ -46,7 +46,7 @@ public:
         uint32_t func_id;
         uint32_t length;
         uint32_t attach_length;
-        std::string ToString()
+        std::string ToString() const
         {
             return std::format("magic: {}, version: {}, serialize_type: {}, msg_type: {}, seq_num: {}, func_id: {}, length: {}, attach_length: {}",
                             magic, version, serialize_type, msg_type, seq_num, func_id, length, attach_length);
@@ -63,7 +63,7 @@ public:
         uint32_t seq_num;
         uint32_t length;
         uint32_t attach_length;
-        std::string ToString()
+        std::string ToString() const
         {
             return std::format("magic: {}, version: {}, serialize_type: {}, err_code: {}, msg_type: {}, seq_num: {}, length: {}, attach_length: {}",
                             magic, version, serialize_type, err_code, msg_type, seq_num, length, attach_length);
@@ -182,7 +182,7 @@ public:
 
 
 
-    static bool PrepareResponseHeader(std::string &response_buf, std::string& rpc_result, const ReqHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
+    static bool PrepareResponseHeader(std::string &response_buf, const std::string& rpc_result, const ReqHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
     {
         std::string err_msg_buf;
         std::string& header_buf = response_buf;
