@@ -336,7 +336,6 @@ private:
         using param_type = typename traits_type::parameters_type;
         using ReturnType = typename traits_type::return_type;
 
-        fprintf(stderr, "coro_rpc server ExecuteCore_, func type: %s\n", ToolBox::GetFuncName<func>().data());
         req_attachment_ = attachment;
         if constexpr(!std::is_void_v<param_type>){
             using First = std::tuple_element_t<0, param_type>;
@@ -349,6 +348,7 @@ private:
             }
             if (!is_ok)[[unlikely]]
             {
+                RpcLogError("[rpc] Deserialize failed. data size:%zu, attachment size:%zu", data.size(), attachment.size());
                 co_return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "deserialize arguments failed"s);
             }
             if constexpr (std::is_void_v<ReturnType>)
@@ -414,7 +414,7 @@ private:
         err = rpc_protocol::ReadPayLoad(header, data.substr(rpc_protocol::REQ_HEAD_LEN), payload, attachment);
         if(err != Errc::SUCCESS)
         {
-            RpcLogError("[CoroRpcServer] OnRecvReq: read payload failed, err: {}", err);
+            RpcLogError("[CoroRpcServer] OnRecvReq: read payload failed, err: %d", err);
             return err;
         }
 

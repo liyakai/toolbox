@@ -116,7 +116,7 @@ private:
                         PromiseCallback &&callback)
                 : timer_(std::move(timer)), promise_(std::move(promise)), callback_(std::move(callback)) {}
             void operator()(resp_body &&buffer, uint8_t rpc_errc) {
-                RpcLogDebug("[rpc][client] promise set value is called, rpc_errc: %d", rpc_errc);
+                // RpcLogDebug("[rpc][client] promise set value is called, rpc_errc: %d", rpc_errc);
                 ToolBox::TimerMgr->KillTimer(timer_);
                 promise_.set_value(async_rpc_raw_result{async_rpc_raw_result_value_type{std::move(buffer), rpc_errc}});
                 callback_();
@@ -303,7 +303,6 @@ private:
                         RpcLogError("[rpc][client] HandleResponseBuffer_ deserialize failed");
                         return rpc_result<T>{{}, CoroRpc::Errc::ERR_DESERIALIZE_FAILED};
                     }else {
-                        fprintf(stderr, "HandleResponseBuffer_ deserialize success, value: %s\n", value.DebugString().c_str());
                         return rpc_result<T>{std::move(value), CoroRpc::Errc::SUCCESS};
                     }
                 }, protocols.value());
@@ -321,7 +320,6 @@ private:
         -> ToolBox::coro::Task<async_rpc_result<T>, coro::SharedLooperExecutor> 
     {
         auto result = co_await coro::FutureAwaiter<async_rpc_raw_result>(std::move(future)).with_future_callback(std::move(future_callback));
-        fprintf(stderr, "[rpc][client] DeserializeRpcResult_ result index: %zu\n", result.index());
         if(result.index() == 1) [[unlikely]]
         {
             auto &ret = std::get<1>(result);
@@ -339,7 +337,6 @@ private:
         auto resp_result = HandleResponseBuffer_<T>(ret.buffer_.serialize_type_, ret.buffer_.body_buffer_, ret.errc_);
         if(std::get<1>(resp_result) == CoroRpc::Errc::SUCCESS)
         {
-            RpcLogDebug("[rpc][client] DeserializeRpcResult_ success");
             if constexpr (std::is_void_v<T>)
             {
                 co_return {};
@@ -411,7 +408,6 @@ private:
                 return CoroRpcTools::AutoGenRegisterKey<func>();
             }
         }();
-        RpcLogDebug("[rpc][client] RegisterOneHandler.auto_gen_key: key: %u, func: %s", key, ToolBox::GetFuncName<func>().data());
 
         auto serialize_proto = rpc_protocol::GetSerializeProtocolByType(rpc_protocol::SERIALIZE_TYPE); 
         if(!serialize_proto.has_value())
@@ -455,7 +451,6 @@ private:
             RpcLogError("[CoroRpcServer] OnRecvReq: read header failed, err:%d", err);
             return err;
         }
-        RpcLogDebug("[rpc][client] OnRecvResp_ header: %s", header.ToString().c_str());
         std::string_view body;
         std::string_view attachment;
         err = rpc_protocol::ReadPayLoad(header, data.substr(rpc_protocol::RESP_HEAD_LEN), body, attachment);

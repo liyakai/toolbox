@@ -24,7 +24,6 @@ public:
     template<typename T>
     static Errc SerializeToBuffer(void* data, int size, const T &t)
     {
-        fprintf(stderr, "protobuf SerializeToBuffer, buffer size: %d,  t:%s\n", size, t.DebugString().c_str());
         if(t.SerializeToArray(data, size))
         {
             return CoroRpc::Errc::SUCCESS;
