@@ -207,6 +207,7 @@ namespace ToolBox
             int32_t bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
             if (bytes < 0)
             {
+                NetworkLogError("[network] tcp socket UpdateRecv. SocketRecv failed.");
                 Close(ENetErrCode::NET_RECV_FAILED);
                 return;
             }
