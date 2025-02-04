@@ -19,7 +19,8 @@ inline demo::GetUserResponse echo(demo::GetUserRequest request) {
     response.set_status(200);
     response.set_message("success");
     response.mutable_user()->set_id(request.user_id());
-    //   fprintf(stderr, "[echo]coro_rpc server echo, response:%s\n", response.DebugString().c_str());
+    auto attachment = server.GetReqAttachment();
+    fprintf(stderr, "[echo]coro_rpc server echo, response:%s, attachment:%s.\n", response.DebugString().c_str(), attachment.data());
     return response;
 }
 
@@ -53,20 +54,20 @@ CASE(CoroRpcEchoCase1)
     ToolBox::Network network;
         //设置发送缓冲区回调函数
     server.SetSendCallback([&](uint64_t opaque, std::string_view &&buffer) {
-        fprintf(stderr, "coro_rpc server send buffer content[size:%zu]: ", buffer.size());
-        for (size_t i = 0; i < buffer.size(); i++) {
-          fprintf(stderr, "%02X[%u] ", static_cast<unsigned char>(buffer[i]), static_cast<uint8_t>(buffer[i]));
-        }
-        fprintf(stderr, "opaque: %lu\n", opaque);
+        // fprintf(stderr, "coro_rpc server send buffer content[size:%zu]: ", buffer.size());
+        // for (size_t i = 0; i < buffer.size(); i++) {
+        //   fprintf(stderr, "%02X[%u] ", static_cast<unsigned char>(buffer[i]), static_cast<uint8_t>(buffer[i]));
+        // }
+        // fprintf(stderr, "opaque: %lu\n", opaque);
         network.Send(opaque, reinterpret_cast<const char*>(buffer.data()), buffer.size());
     });
     network.SetOnReceived([&](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size) {
-        fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque, conn_id);
-        fprintf(stderr, "coro_rpc server recv buffer content[size:%zu]: ", size);
-        for (size_t i = 0; i < size; i++) {
-          fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
-        }
-        fprintf(stderr, "opaque: %lu\n", opaque);
+        // fprintf(stderr, "coro_rpc server received data, opaque: %lu, conn_id: %lu\n", opaque, conn_id);
+        // fprintf(stderr, "coro_rpc server recv buffer content[size:%zu]: ", size);
+        // for (size_t i = 0; i < size; i++) {
+        //   fprintf(stderr, "%02X ", static_cast<unsigned char>(data[i]));
+        // }
+        // fprintf(stderr, "opaque: %lu\n", opaque);
         server.OnRecvReq(conn_id, std::string_view(data, size));
 
     }).SetOnAccepted([&](ToolBox::NetworkType type, uint64_t opaque, int32_t fd) {
@@ -90,17 +91,17 @@ CASE(CoroRpcEchoCase1)
     // 等待网络库停止
     uint64_t used_time = 0;
     uint64_t old_time = 0;
-    uint64_t run_mill_seconds = 1 * 60 * 60 * 1000 * 1000;
+    uint64_t run_mill_seconds = 24 * 60 * 60 * 1000;
     while (true)
     {
         if (used_time > run_mill_seconds)
         {
             break;
         }
-        uint64_t time_left = (run_mill_seconds - used_time) / 1000000;
+        uint64_t time_left = (run_mill_seconds - used_time) / 1000;
         if (time_left != old_time)
         {
-            if (time_left + 10*1000 <= old_time || old_time == 0)
+            if (time_left + 10 <= old_time || old_time == 0)
             {
                 fprintf(stderr, "距离网络库停止还有%lu秒 \n", time_left);
                 old_time = time_left;
@@ -108,8 +109,8 @@ CASE(CoroRpcEchoCase1)
         }
         ToolBox::TimerMgr->Update();
         network.Update();
-        std::this_thread::sleep_for(std::chrono::microseconds(100));
-        used_time += 100*1000;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        used_time += 100;
     }
     network.StopWait();
 }
