@@ -112,7 +112,7 @@ public:
     }
 
     template<auto func>
-    static CoroRpcTools::rpc_func_key GenRegisterKey()
+    static constexpr CoroRpcTools::rpc_func_key GenRegisterKey()
     {
         // 使用函数指针的地址作为唯一标识符
         return CoroRpcTools::AutoGenRegisterKey<func>();;

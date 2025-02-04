@@ -77,25 +77,18 @@ public:
     }
     template <auto func>
     void SetRespAttachmentFunc(std::function<std::string_view()> &&resp_attachment_func) {
-        rpc_func_key key{};
-        constexpr auto name = ToolBox::GetFuncName<func>();
-        std::string func_name(name);
-        auto it = name2func_key_map_.find(func_name);
-        if(it == name2func_key_map_.end())
-        {
-            if constexpr(ServerHasGenRegisterKey<rpc_protocol, func>)
-            {
-                key = rpc_protocol::template GenRegisterKey<func>();
+        // 编译期静态存储（零查找开销）
+        static auto& storage = [&]() -> auto& {
+            if constexpr(ServerHasGenRegisterKey<rpc_protocol, func>) {
+                constexpr auto key = rpc_protocol::template GenRegisterKey<func>();
+                return resp_attachment_func_map_[key]; // 直接返回引用
             } else {
-                key = CoroRpcTools::AutoGenRegisterKey<func>();
+                constexpr auto key = CoroRpcTools::AutoGenRegisterKey<func>();
+                return resp_attachment_func_map_[key]; // 直接返回引用
             }
-            name2func_key_map_[func_name] = key;
-            func_key2name_map_[key] = func_name;
-        } else {
-            key = it->second;
-        }
-
-        resp_attachment_func_map_[key] = std::move(resp_attachment_func);
+        }();
+        
+        storage = std::move(resp_attachment_func);
     }
     std::string_view GetReqAttachment() const noexcept { return req_attachment_; }
 private:
@@ -461,7 +454,7 @@ private:
         if(resp_attachment_func_iter != resp_attachment_func_map_.end())
         {
             ret = DirectResponseMsg(opaque, resp_err, rpc_result, req_header, std::move(resp_attachment_func_iter->second));
-            resp_attachment_func_map_.erase(resp_attachment_func_iter);
+            // resp_attachment_func_map_.erase(resp_attachment_func_iter);
         } else {
             ret = DirectResponseMsg(opaque, resp_err, rpc_result, req_header);
         }

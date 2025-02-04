@@ -94,7 +94,7 @@ public:
     }
 
     template<auto func>
-    static rpc_func_key AutoGenRegisterKey()
+    static constexpr rpc_func_key AutoGenRegisterKey()
     {
         constexpr auto name = ToolBox::GetFuncName<func>();
         auto id = MD5Hash32Constexpr(name);

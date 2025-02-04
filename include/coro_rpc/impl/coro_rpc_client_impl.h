@@ -403,13 +403,14 @@ private:
     template<auto func, typename... Args>
     auto PrepareSendBuffer_(uint32_t &id, std::size_t attachment_size, std::string & buffer, Args &&...args) -> CoroRpc::Errc
     {
-        rpc_func_key key{};
-        if constexpr(ClientHasGenRegisterKey<rpc_protocol, func>)
-        {
-            key = rpc_protocol::template GenRegisterKey<func>();
-        } else {
-            key = CoroRpcTools::AutoGenRegisterKey<func>();
-        }
+        // 编译期计算唯一key（无运行时开销）
+        static constexpr rpc_func_key key = [](){
+            if constexpr(ClientHasGenRegisterKey<rpc_protocol, func>) {
+                return rpc_protocol::template GenRegisterKey<func>();
+            } else {
+                return CoroRpcTools::AutoGenRegisterKey<func>();
+            }
+        }();
         RpcLogDebug("[rpc][client] RegisterOneHandler.auto_gen_key: key: %u, func: %s", key, ToolBox::GetFuncName<func>().data());
 
         auto serialize_proto = rpc_protocol::GetSerializeProtocolByType(rpc_protocol::SERIALIZE_TYPE); 
