@@ -34,6 +34,7 @@
 #include "network/net_imp/net_iocp/tcp_iocp_network.h"
 #include "network/net_imp/net_kqueue/tcp_kqueue_network.h"
 #include "imp_network.h"
+#include "tools/string_util.h"
 
 namespace ToolBox
 {
@@ -207,7 +208,7 @@ namespace ToolBox
             int32_t bytes = SocketRecv(socket_id_, recv_ring_buffer_.GetWritePtr(), size);
             if (bytes < 0)
             {
-                NetworkLogError("[network] tcp socket UpdateRecv. SocketRecv failed.");
+                NetworkLogError("[network] tcp socket UpdateRecv. SocketRecv failed. errno:%d.", errno);
                 Close(ENetErrCode::NET_RECV_FAILED);
                 return;
             }
@@ -286,28 +287,32 @@ namespace ToolBox
                 break;
             }
             uint32_t len = 0;
-            recv_ring_buffer_.Read((char*)&len, sizeof(uint32_t));
+            recv_ring_buffer_.Copy((char*)&len, sizeof(uint32_t));
             if (len > static_cast<uint32_t>(recv_buff_len_))
             {
-                NetworkLogError("[Network][TcpSocket] Packet size is invaliable. socket id:%d, conn_id:%llu, len.%u", GetSocketID(), GetConnID(), len);
+                int readable_size = recv_ring_buffer_.ReadableSize();
+                int continue_read_size = recv_ring_buffer_.ContinuouslyReadableSize();
+                std::size_t read_pos = recv_ring_buffer_.ReadPos();
+                NetworkLogError("[Network][TcpSocket] Packet size is invaliable. socket id:%d, conn_id:%llu, capa:%d, len:%u, readable_size:%d, continue_read_size:%d, read_pos:%zu, buffer:%s, buffer2:%s."
+                        , GetSocketID(), GetConnID(), recv_ring_buffer_.GetBufferSize(), len, readable_size, continue_read_size, read_pos, ToolBox::MemoryToStr(recv_ring_buffer_.GetReadPtr(), 45).c_str()
+                        , ToolBox::MemoryToStr(recv_ring_buffer_.GetReadPtr()-90, 180).c_str());
                 Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
                 return ErrCode::ERR_INVALID_PACKET_SIZE;
             }
-            else if (data_size < len)
+            else if (data_size - sizeof(uint32_t) < len)
             {
                 // return ErrCode::ERR_INSUFFICIENT_LENGTH;
                 break;
             }
+            recv_ring_buffer_.AdjustReadPos(sizeof(uint32_t));
             char* buff_block = MemPoolLockFreeMgr->GetMemory(len);
-            recv_ring_buffer_.Read(buff_block, len);
-
-            // std::time_t now_time = ToolBox::GetMillSecondTimeStamp();
-            // uint64_t connect_id = 0;
-            // memmove(&connect_id, buff_block + sizeof(uint32_t), sizeof(connect_id));
-            // if (3 == connect_id)
-            // {
-            //     NetworkLogDebug("[Network] ProcessRecvData 连接ID:%llu now_time:%llu, data size:%zu\n", connect_id, now_time, len);
-            // }
+            uint32_t readed_len = recv_ring_buffer_.Read(buff_block, len);
+            if (readed_len != len)
+            {
+                NetworkLogError("[Network][TcpSocket] recv_ring_buffer_ data is not enough to read. socket id:%d, conn_id:%llu, len:%u, readed_len:%u", GetSocketID(), GetConnID(), len, readed_len);
+                Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
+                return ErrCode::ERR_INVALID_PACKET_SIZE;
+            }
 
             p_network_->OnReceived(GetOpaque(), GetConnID(), buff_block, len);
         }
@@ -861,7 +866,7 @@ namespace ToolBox
             int32_t sended = SocketSend(GetSocketID(), data, len);
             if (-1 == sended)
             {
-                NetworkLogError("[Network][TcpSocket] SocketSend failed. socket id:%d, conn_id:%llu, errno.%d", GetSocketID(), GetConnID(), errno);
+                NetworkLogError("[Network][TcpSocket] SocketSend failed. socket id:%d, conn_id:%llu, errno:%d, len:%d.", GetSocketID(), GetConnID(), errno, len);
                 Close(ENetErrCode::NET_SYS_ERROR, errno);
                 return;
             }
