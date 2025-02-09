@@ -118,6 +118,8 @@ public:
     {
         return (write_pos_ - read_pos_) % buffer_size_;
     }
+    std::size_t ReadPos(){return read_pos_;}
+    std::size_t WritePos(){return write_pos_;}
     /*
     * 获取 buffer size
     */
