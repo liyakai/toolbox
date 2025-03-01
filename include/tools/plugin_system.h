@@ -7,6 +7,26 @@
 
 namespace ToolBox
 {
+class PluginInterface;
+
+class PluginManager
+{
+public:
+    void registerPlugin(PluginInterface* plugin)
+    {
+        plugins.emplace_back(plugin);
+    }
+    void unregisterPlugin(PluginInterface* plugin)
+    {
+        plugins.erase(std::remove(plugins.begin(), plugins.end(), plugin), plugins.end());
+    }
+
+    void executeAllPlugins();
+private:
+    std::vector<PluginInterface*> plugins;
+};
+
+#define PluginMgr Singleton<PluginManager>::Instance()
 
 class PluginInterface 
 {
@@ -23,32 +43,15 @@ protected:
     }
 };
 
-class PluginManager
+inline void PluginManager::executeAllPlugins()
 {
-public:
-    void registerPlugin(PluginInterface* plugin)
+    for (auto plugin : plugins)
     {
-        plugins.emplace_back(plugin);
+        plugin->execute();
     }
-    void unregisterPlugin(PluginInterface* plugin)
-    {
-        plugins.erase(std::remove(plugins.begin(), plugins.end(), plugin), plugins.end());
-    }
-
-    void executeAllPlugins()
-    {
-        for (auto plugin : plugins)
-        {
-            plugin->execute();
-        }
-    }
-private:
-    std::vector<PluginInterface*> plugins;
-};
+}
 
 
-/*
-*/
-#define PluginMgr Singleton<PluginManager>::Instance()
+
 
 }   // namespace ToolBox
