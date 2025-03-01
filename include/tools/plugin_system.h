@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <algorithm>
 #include "tools/singleton.h"
 
 
@@ -12,7 +13,7 @@ class PluginInterface
 public:
     virtual ~PluginInterface()
     {
-        PluginMgr->unregisterPlugin(this)
+        PluginMgr->unregisterPlugin(this);
     }
     virtual void execute() = 0; // 执行插件
 protected:
@@ -47,7 +48,6 @@ private:
 
 
 /*
-* 定义插件管理器单件
 */
 #define PluginMgr Singleton<PluginManager>::Instance()
 
