@@ -7,28 +7,31 @@
 namespace ToolBox
 {
 
-template<typename T>
-concept PluginConcept = requires(T t) {
-    {t.execute()} -> std::same_as<void>;
-};
-
 class PluginInterface 
 {
 public:
-    virtual ~PluginInterface() = default;
+    virtual ~PluginInterface()
+    {
+        PluginMgr->unregisterPlugin(this)
+    }
     virtual void execute() = 0; // 执行插件
+protected:
+    PluginInterface() 
+    {
+        PluginMgr->registerPlugin(this);
+    }
 };
 
 class PluginManager
 {
 public:
-    template<typename T>
-    void registerPlugin(T* plugin)
+    void registerPlugin(PluginInterface* plugin)
     {
-        if constexpr (PluginConcept<T>)
-        {
-            plugins.push_back(plugin);
-        }
+        plugins.emplace_back(plugin);
+    }
+    void unregisterPlugin(PluginInterface* plugin)
+    {
+        plugins.erase(std::remove(plugins.begin(), plugins.end(), plugin), plugins.end());
     }
 
     void executeAllPlugins()
