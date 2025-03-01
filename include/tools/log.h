@@ -2,6 +2,7 @@
 #include "singleton.h"
 #include <functional>
 #include <stdarg.h>
+#include <cstdio>
 // 实现日志模块
 namespace ToolBox
 {
