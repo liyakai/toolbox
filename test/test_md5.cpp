@@ -17,7 +17,7 @@ CASE(TestMD5)
 
     const TestCase test_cases[] = {
         // Empty string
-        {"", 0xd41d8cd98f000000ULL, 0xd41d8cd9},
+        {"", 0xd41d8cd98f00b204ULL, 0xd41d8cd9},
         // Basic test cases
         {"a", 0x0cc175b9c0f1b6a8ULL, 0x0cc175b9},
         {"abc", 0x900150983cd24fb0ULL, 0x90015098},
