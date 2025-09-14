@@ -109,18 +109,37 @@ public:
         if (nullptr != vtable)
         {
             int i = 0;
-            while(nullptr != reinterpret_cast<FUNC>(*vtable))
+            // 使用更保守的方法：最多遍历5个虚函数，避免访问无效内存
+            int max_virtual_functions = 5;
+            
+            while(i < max_virtual_functions)
             {
-                Print("第 %d 个虚函数地址: 0X%x ->", ++i, vtable);
                 FUNC f = reinterpret_cast<FUNC>(*vtable);
+                
+                // 检查虚函数指针是否有效
+                if(nullptr == f)
+                {
+                    Print("虚函数表结束（遇到nullptr）\n");
+                    break;
+                }
+                
+                // 检查函数指针是否指向合理的地址范围
+                uintptr_t func_addr = reinterpret_cast<uintptr_t>(f);
+                if(func_addr < 0x1000 || func_addr > 0x7fffffffffff)
+                {
+                    Print("虚函数表结束（遇到无效地址: 0x%lx）\n", func_addr);
+                    break;
+                }
+                
+                Print("第 %d 个虚函数地址: 0X%x ->", ++i, vtable);
                 //Print(" FUNC:%x f:%x ",*vtable, f);
-                if(nullptr != f && true == GetDebugStatus())
+                if(true == GetDebugStatus())
                 {
                     f();
                 }
                 vtable = vtable + 1;
-                
             }
+            Print("虚函数表遍历完成（共%d个虚函数）\n", i);
         } 
         else
         {

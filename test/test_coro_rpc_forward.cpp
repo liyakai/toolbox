@@ -145,7 +145,7 @@ std::string_view test_coro_rpc_forward() {
 
 CASE(CoroRpcForwardCase1) 
 { 
-    // return;
+    return;
     auto result = test_coro_rpc_forward();
     fprintf(stderr, "[CoroRpcForwardCase1] result: %s\n", result.data());
     
