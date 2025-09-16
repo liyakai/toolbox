@@ -370,8 +370,6 @@ extern "C" {
     delete obj;
     delete derived;
     std::cout << "=== 虚函数热修补测试完成 ===" << std::endl;
-
-    sleep(1000000);
 }
 
 
