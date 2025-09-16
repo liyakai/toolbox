@@ -49,6 +49,7 @@ windows 系统:
 16. [纳秒级获取堆栈](./include/tools/backtrace.h)
 17. [获取函数名](./include/tools/function_name.h)
 18. [获取函数参数](./include/tools/function_traits.h)
+19. [C++热修补功能(支持C风格函数,C++类成员函数,C++虚函数)](./include/tools/hotpatch.h)
 ### 3. 下一步开发计划
 1. ~~linux下的异步io机制:io_uring~~.
 2. 基于协程的RPC实现.

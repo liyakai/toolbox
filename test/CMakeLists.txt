@@ -29,7 +29,7 @@ add_executable(${TARGET_NAME} ${TEST_SRC})
 # 设置 protobuf 和 abseil 的路径
 set(PROTOBUF_ROOT ${PROJECT_SOURCE_DIR}/3rdparty/protobuf_3.21.11)
 
-TARGET_LINK_LIBRARIES(${TARGET_NAME} -lpthread)
+TARGET_LINK_LIBRARIES(${TARGET_NAME} -lpthread -ldl)
 if(WIN32 OR MSVC)
     target_link_libraries(${TARGET_NAME} ${PROJECT_SOURCE_DIR}/lib/libtoolbox.lib)
 elseif (UNIX)
@@ -39,9 +39,10 @@ elseif (UNIX)
         ${PROJECT_SOURCE_DIR}/lib/libtoolbox.a
         ${PROTOBUF_ROOT}/lib/libprotobuf.a
         # protobuf 依赖的 absl 库
-        ${ABSL_LIBRARIES}  # 使用通配符替换所有 abseil 库
+        # ${ABSL_LIBRARIES}  # 使用通配符替换所有 abseil 库
         -lz
         -pthread
+        -ldl
     )
 if(CMAKE_USE_LIBIOURING)
     target_link_libraries(${TARGET_NAME} ${PROJECT_SOURCE_DIR}/lib/liburing.a)
