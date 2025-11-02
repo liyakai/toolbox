@@ -29,6 +29,7 @@
 #include <utility>
 #include <variant>
 #include <cstdio>
+#include "platform.h"
 
 #if defined(PLATFORM_WINDOWS)
     #include <windows.h>
@@ -81,19 +82,30 @@ public:
         // 确保全局信号处理已设置（只设置一次）
         EnsureGlobalSignalHandler();
         
+        // 先清除就绪标志，防止在 sigsetjmp 完成前信号触发
+        thread_local_ready_ = false;
+        
         // 设置线程局部存储的跳转缓冲区指针
         thread_local_jump_buffer_ = &jump_buffer_;
         thread_local_context_ = &context_;
         thread_local_signal_caught_ = &signal_caught_;
         
         // 使用 sigsetjmp，保存信号掩码（第二个参数为 1）
-        return sigsetjmp(jump_buffer_, 1);
+        int result = sigsetjmp(jump_buffer_, 1);
+        
+        // sigsetjmp 完成后，设置就绪标志
+        // 如果是从 siglongjmp 跳回（result != 0），也保持就绪状态（因为恢复点已经建立）
+        thread_local_ready_ = true;
+        
+        return result;
     }
 
     /**
      * @brief 恢复线程局部状态（不清除全局信号处理，因为可能还有其他 SignalGuard 在使用）
      */
     void Restore() {
+        // 清除就绪标志，防止在下次 Setup 之前信号误触发
+        thread_local_ready_ = false;
         // 不再恢复全局信号处理，因为它可能是共享的
         // 只清除线程局部引用（如果需要的话，可以在析构时做）
         // 这里不需要做任何操作，因为下一个 Setup 会重新设置线程局部变量
@@ -143,6 +155,14 @@ private:
      * @brief 全局信号处理程序（所有线程共享）
      */
     static void SignalHandler(int sig) {
+        // 检查就绪标志：只有在 sigsetjmp 完成后才允许跳转
+        // 这样可以避免在线程局部变量设置和 sigsetjmp 调用之间的竞态条件
+        if (!thread_local_ready_) {
+            // sigsetjmp 还未完成，不应该跳转，直接返回让信号继续
+            // 这可能导致程序崩溃，但这是比跳转到无效位置更好的行为
+            return;
+        }
+        
         // 通过线程局部存储找到当前线程的 SignalGuard 实例
         if (thread_local_signal_caught_ && thread_local_context_ && thread_local_jump_buffer_) {
             *thread_local_signal_caught_ = true;
@@ -157,6 +177,7 @@ private:
     static thread_local sigjmp_buf* thread_local_jump_buffer_;
     static thread_local std::string* thread_local_context_;
     static thread_local bool* thread_local_signal_caught_;
+    static thread_local bool thread_local_ready_;  // 标记 sigsetjmp 是否已完成
 
     // 全局状态：信号处理是否已初始化
     static std::atomic<bool> signal_handler_initialized_;
@@ -177,6 +198,7 @@ private:
 thread_local sigjmp_buf* SignalGuard::thread_local_jump_buffer_ = nullptr;
 thread_local std::string* SignalGuard::thread_local_context_ = nullptr;
 thread_local bool* SignalGuard::thread_local_signal_caught_ = nullptr;
+thread_local bool SignalGuard::thread_local_ready_ = false;
 
 // 全局状态（线程安全初始化）
 std::atomic<bool> SignalGuard::signal_handler_initialized_(false);

@@ -6,8 +6,7 @@
 #include <cstring>
 #include <vector>
 #include <functional>
-#include "../include/tools/platform.h"
-#include "../include/tools/safe_call.h"
+#include "tools/safe_call.h"
 #include "unit_test_frame/unittest.h"
 
 FIXTURE_BEGIN(TestSafeCall)
