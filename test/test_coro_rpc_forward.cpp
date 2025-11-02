@@ -94,7 +94,7 @@ std::string_view test_coro_rpc_forward() {
         
     }).SetOnErrored([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) {
         fprintf(stderr, "coro_rpc client error, opaque: %lu, conn_id: %lu, err_code: %d, err_no: %d\n", opaque
-        , conn_id, err_code, err_no);
+        , conn_id, static_cast<int32_t>(err_code), err_no);
     });
     network.Connect(ToolBox::NT_TCP, 9702, "0.0.0.0", 9700);
     network.Accept(ToolBox::NT_TCP, 9703, "0.0.0.0", 9500);

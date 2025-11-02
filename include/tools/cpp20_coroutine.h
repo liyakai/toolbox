@@ -558,7 +558,7 @@ public:
     auto coAwait(IExecutor* executor) const noexcept{
         return *this;
     }
-    decltype(auto) await_resume() noexcept{
+    decltype(auto) await_resume(){
         if(future_.valid()){
             return future_.get();
         } else {

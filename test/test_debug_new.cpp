@@ -24,8 +24,8 @@ public:
         fprintf(stderr, "[TestDebugNew] TestClass 析构\n");
     };
 private:
-    int32_t m_a = 0;
-    int32_t m_b = 1;
+    [[maybe_unused]] int32_t m_a = 0;
+    [[maybe_unused]] int32_t m_b = 1;
 };
 
 CASE(TestNewNormal)

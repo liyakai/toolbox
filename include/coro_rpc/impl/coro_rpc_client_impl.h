@@ -424,15 +424,16 @@ private:
                 return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
             }
             buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
-            // 使用placement new初始化ReqHeader
+            // 使用placement new初始化ReqHeader（按照结构体字段声明顺序）
             new (buffer.data()) rpc_protocol::ReqHeader{
                 .magic = rpc_protocol::MAGIC_NUMBER,
                 .version = rpc_protocol::VERSION_NUMBER,
                 .serialize_type = rpc_protocol::SERIALIZE_TYPE,
+                .msg_type = 0,
+                .seq_num = ++request_id_,
                 .func_id = key,
                 .length = body_length,
-                .attach_length = static_cast<uint32_t>(attachment_size),
-                .seq_num = ++request_id_
+                .attach_length = static_cast<uint32_t>(attachment_size)
             };
             // 保存序列号用于后续使用
             id = request_id_;

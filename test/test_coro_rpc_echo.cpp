@@ -80,7 +80,7 @@ CASE(CoroRpcEchoCase1)
         printf("[TestRpcEcho] Preparing to add new connection to IO multiplexing, network type:%d, connection tag:%lu, fd:%d\n", type, opaque, fd);
     }).SetOnErrored([](ToolBox::NetworkType type, uint64_t opaque, uint64_t conn_id, ToolBox::ENetErrCode err_code, int32_t err_no) {
         fprintf(stderr, "coro_rpc server error, opaque: %lu, conn_id: %lu, err_code: %d, err_no: %d\n", opaque
-        , conn_id, err_code, err_no);
+        , conn_id, static_cast<int32_t>(err_code), err_no);
       });
     network.Accept(ToolBox::NT_TCP, 9701, "0.0.0.0", 9700);
     network.Start(2);

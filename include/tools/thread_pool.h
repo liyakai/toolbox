@@ -6,6 +6,7 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <type_traits>
 #include <stdint.h>
 
 namespace ToolBox{
@@ -47,7 +48,7 @@ public:
     * 增加任务
     */
     template<typename Function, typename... Args>
-    std::future<typename std::result_of<Function(Args...)>::type> Add(Function&&, Args&&...);
+    std::future<typename std::invoke_result_t<Function, Args...>> Add(Function&&, Args&&...);
 private:
     ThreadPool(ThreadPool&& tp) = delete;
     ThreadPool& operator = (ThreadPool&& tp) = delete;
@@ -101,10 +102,10 @@ inline ThreadPool::ThreadPool(int32_t n)
     }
 
 template<typename Function, typename... Args>
-std::future<typename std::result_of<Function(Args...)>::type>
+std::future<typename std::invoke_result_t<Function, Args...>>
 ThreadPool::Add(Function&& func, Args&&... args)
 {
-    using return_type = typename std::result_of<Function(Args...)>::type;
+    using return_type = typename std::invoke_result_t<Function, Args...>;
     using task = std::packaged_task<return_type()>;
 
     auto tk = std::make_shared<task>(std::bind(std::forward<Function>(func), std::forward<Args>(args)...));

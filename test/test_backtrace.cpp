@@ -35,7 +35,7 @@ CASE(TestBacktraceCase1)
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    fprintf(stderr, "TestBacktraceCase1 cost: %lld ms\n", duration);
+    fprintf(stderr, "TestBacktraceCase1 cost: %ld ms\n", duration);
     
 }
 
@@ -70,7 +70,7 @@ CASE(TestBacktraceCase2)
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    fprintf(stderr, "TestBacktraceCase2 cost: %lld ms\n", duration);
+    fprintf(stderr, "TestBacktraceCase2 cost: %ld ms\n", duration);
 }
 
 FIXTURE_END(Ftrace)

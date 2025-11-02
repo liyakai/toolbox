@@ -277,7 +277,6 @@ private:
         req_attachment_ = attachment;
         if constexpr(!std::is_void_v<param_type>)
         {
-            using First = std::tuple_element_t<0, param_type>;
             param_type args;
             bool is_ok = true;
             constexpr size_t size = std::tuple_size_v<param_type>;
@@ -338,7 +337,6 @@ private:
 
         req_attachment_ = attachment;
         if constexpr(!std::is_void_v<param_type>){
-            using First = std::tuple_element_t<0, param_type>;
             bool is_ok = true;
             constexpr size_t size = std::tuple_size_v<param_type>;
             param_type args;

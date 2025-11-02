@@ -285,6 +285,7 @@ auto SafeCall(Func&& func,
         return {false, std::monostate{}};
     }
 #endif
+    return {false, std::monostate{}};
 }
 
 // 非 void 函数版本
