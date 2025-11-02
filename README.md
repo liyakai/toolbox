@@ -50,9 +50,11 @@ windows 系统:
 17. [获取函数名](./include/tools/function_name.h)
 18. [获取函数参数](./include/tools/function_traits.h)
 19. [C++热修补功能(支持C风格函数,C++类成员函数,C++虚函数)](./include/tools/hotpatch.h)
+20. [安全调用函数（支持异常和信号捕获）](./include/tools/safe_call.h)
+21. [基于协程的RPC实现](./include/coro_rpc/)
 ### 3. 下一步开发计划
 1. ~~linux下的异步io机制:io_uring~~.
-2. 基于协程的RPC实现.
+2. ~~基于协程的RPC实现.~~
 
    // TODO 扩充工具库
 -------------------
