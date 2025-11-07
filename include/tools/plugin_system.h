@@ -21,7 +21,7 @@ public:
         plugins.erase(std::remove(plugins.begin(), plugins.end(), plugin), plugins.end());
     }
 
-    void executeAllPlugins();
+    void updateAllPlugins();
 private:
     std::vector<PluginInterface*> plugins;
 };
@@ -35,7 +35,7 @@ public:
     {
         PluginMgr->unregisterPlugin(this);
     }
-    virtual void execute() = 0; // 执行插件
+    virtual void pluginUpdate() = 0; // 执行插件
 protected:
     PluginInterface() 
     {
@@ -43,11 +43,11 @@ protected:
     }
 };
 
-inline void PluginManager::executeAllPlugins()
+inline void PluginManager::updateAllPlugins()
 {
     for (auto plugin : plugins)
     {
-        plugin->execute();
+        plugin->pluginUpdate();
     }
 }
 
