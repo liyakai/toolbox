@@ -103,7 +103,7 @@ struct TaskAwaiter
     }
     // 协程恢复执行时,被等待的Task 已经执行完,调用 get_result 来获取结果
     // await_resume 的返回值类型也是不限定的，返回值将作为 co_await 表达式的返回值
-    Result await_resume() noexcept { return task_.get_result(); }
+    Result await_resume() { return task_.get_result(); }
 
 private:
     IExecutor &executor_;
