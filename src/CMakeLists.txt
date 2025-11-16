@@ -14,7 +14,7 @@ endif()
 
 
 # 设置编译选项
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++20")
 message(STATUS "CMAKE_CXX_FLAGS -> ${CMAKE_CXX_FLAGS}")
 
 # 设置编译调试信息
@@ -64,6 +64,8 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #     ${PROJECT_SOURCE_DIR}/lib
 # )
 
+# 启用位置无关代码（Position Independent Code），用于生成共享库
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # add library
 ADD_LIBRARY(toolbox ${DIR_SRCS})
