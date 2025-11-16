@@ -28,6 +28,8 @@ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
     -DCMAKE_TCMALLOC=OFF     \
     -DCMAKE_JEMALLOC=OFF    \
     -DCMAKE_USE_LIBIOURING=OFF  \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     .. 
 
 # clangd tool
