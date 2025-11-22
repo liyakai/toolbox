@@ -21,12 +21,12 @@ private:
     using SendCallback = std::function<void(uint64_t opaque, std::string_view &&)>;
 
     SendCallback send_callback_ = nullptr;
-    std::unordered_map<rpc_func_key, handler_t> rpc_server_handler_map_;
-    std::unordered_map<rpc_func_key, core_handler_t> rpc_server_core_handler_map_;
-    std::unordered_map<rpc_func_key, std::string> func_key2name_map_;
-    std::unordered_map<std::string, rpc_func_key> name2func_key_map_;
+    map_t<rpc_func_key, handler_t> rpc_server_handler_map_;
+    map_t<rpc_func_key, core_handler_t> rpc_server_core_handler_map_;
+    map_t<rpc_func_key, std::string> func_key2name_map_;
+    map_t<std::string, rpc_func_key> name2func_key_map_;
     std::string_view req_attachment_;
-    std::unordered_map<rpc_func_key, std::function<std::string_view()>> resp_attachment_func_map_;
+    map_t<rpc_func_key, std::function<std::string_view()>> resp_attachment_func_map_;
 public:
     CoroRpcServer() = default;
     ~CoroRpcServer() = default;
