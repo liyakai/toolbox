@@ -90,7 +90,23 @@ public:
         
         storage = std::move(resp_attachment_func);
     }
+    
     std::string_view GetReqAttachment() const noexcept { return req_attachment_; }
+
+    std::vector<rpc_func_key> GetAllServiceHandlerKeys()
+    {
+        std::vector<rpc_func_key> keys;
+        keys.reserve(rpc_server_handler_map_.size() + rpc_server_core_handler_map_.size());
+        for(auto &iter : rpc_server_handler_map_)
+        {
+            keys.push_back(iter.first);
+        }
+        for(auto &iter : rpc_server_core_handler_map_)
+        {
+            keys.push_back(iter.first);
+        }
+        return keys;
+    }
 private:
     template <auto func, typename Self>
     void RegisterOneHandler(Self *self)
@@ -213,21 +229,6 @@ private:
             return nullptr;
         }
         return iter->second;
-    }
-
-    std::vector<rpc_func_key> GetAllServiceHandlerKeys()
-    {
-        std::vector<rpc_func_key> keys;
-        keys.reserve(rpc_server_handler_map_.size() + rpc_server_core_handler_map_.size());
-        for(auto &iter : rpc_server_handler_map_)
-        {
-            keys.push_back(iter.first);
-        }
-        for(auto &iter : rpc_server_core_handler_map_)
-        {
-            keys.push_back(iter.first);
-        }
-        return keys;
     }
 
     ToolBox::coro::Task<std::pair<Errc, std::string>> HandleCoro(auto handler, std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols, const typename CoroRpcTools::rpc_func_key_t &key)
