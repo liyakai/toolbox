@@ -32,16 +32,16 @@ public:
     ~CoroRpcServer() = default;
 
     /*
-    * @brief Register RPC service functions(member function)
-    */
+     * @brief Register RPC service functions(member function)
+     */
     template <auto first, auto... functions>
-    void RegisterService(decltype(first) *self) {
+    void RegisterService(typename ToolBox::FunctionTraits<decltype(first)>::class_type *self) {
         RegisterOneHandler<first>(self);
         (RegisterOneHandler<functions>(self), ...);
     }
 
     template <auto first>
-    void RegisterService(decltype(first) *self, const auto &key) {
+    void RegisterService(typename ToolBox::FunctionTraits<decltype(first)>::class_type *self, const auto &key) {
         RegistOneHandlerImpl<first>(self, key);
     }
 
@@ -124,7 +124,7 @@ private:
             key = CoroRpcTools::AutoGenRegisterKey<func>();
         }
 
-        RpcLogDebug("[rpc][server] RegisterOneHandler.class: key: %u, func: %s", key, ToolBox::GetFuncName<func>().c_str());
+        RpcLogDebug("[rpc][server] RegisterOneHandler.class: key: %u, func: %.*s", key, static_cast<int>(ToolBox::GetFuncName<func>().size()), ToolBox::GetFuncName<func>().data());
 
         RegistOneHandlerImpl<func>(self,key);
     }
@@ -138,11 +138,11 @@ private:
             RpcLogError("[CoroRpcServer] RegistOneHandlerImpl: self is nullptr");
             return;
         }
-        using ReturnType = std::invoke_result_t<decltype(func)>;
+        using ReturnType = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
         constexpr auto name = ToolBox::GetFuncName<func>();
 
-        RpcLogInfo("[CoroRpcServer] RegistOneHandlerImpl: key: %u, func: %s",
-                   key, name.c_str());
+        RpcLogInfo("[CoroRpcServer] RegistOneHandlerImpl: key: %u, func: %.*s",
+                   key, static_cast<int>(name.size()), name.data());
 
         if constexpr(ToolBox::is_specialization_v<ReturnType, ToolBox::coro::Task>)
         {
