@@ -112,6 +112,19 @@ public:
         std::memcpy(data, buffer.data(), buffer.size());
         return CoroRpc::Errc::SUCCESS;
     }
+    
+    // 可变参数版本：支持多个参数
+    template<typename... Args>
+    static Errc SerializeToBuffer(void* data, int size, const Args&... args)
+    {
+        std::string buffer = StructPackTools::Serialize<std::string>(args...);
+        if(buffer.size() > size)
+        {
+            return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
+        }
+        std::memcpy(data, buffer.data(), buffer.size());
+        return CoroRpc::Errc::SUCCESS;
+    }
     template<typename T>
     static size_t SerializeSize(const T &t)
     {

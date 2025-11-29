@@ -410,39 +410,46 @@ private:
             }
         }();
 
-        auto serialize_proto = rpc_protocol::GetSerializeProtocolByType(rpc_protocol::SERIALIZE_TYPE); 
-        if(!serialize_proto.has_value())
-        {
-            RpcLogError("[rpc][client] PrepareSendBuffer_: serialize protocol not supported");
-            return CoroRpc::Errc::ERR_PROTOCOL_NOT_SUPPORTED;
-        }
+        // 根据参数类型自动选择合适的序列化协议
+        typename rpc_protocol::supported_serialize_protocols serialize_proto = rpc_protocol::template GetSerializeProtocol<func>();
 
         return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> CoroRpc::Errc {
-            uint32_t body_length = serialize_protocol::SerializeSize(std::forward<Args>(args)...);
-            if(body_length > UINT32_MAX) [[unlikely]]
-            {
-                RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
-                return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
+            if constexpr (std::is_same_v<serialize_protocol, CoroRpc::ProtobufProtocol>) {
+                // ProtobufProtocol 只支持 protobuf message 类型
+                // 如果参数是基本类型，应该使用 StructPackProtocol
+                // 这里不应该被调用，因为 GetSerializeProtocol 应该已经选择了正确的协议
+                RpcLogError("[rpc][client] ProtobufProtocol should not be used for basic types");
+                return CoroRpc::Errc::ERR_SERIALIZE_FAILED;
+            } else {
+                // StructPackProtocol
+                uint32_t body_length = serialize_protocol::SerializeSize(std::forward<Args>(args)...);
+                if(body_length > UINT32_MAX) [[unlikely]]
+                {
+                    RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
+                    return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
+                }
+                buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
+                // 确定序列化类型
+                uint8_t serialize_type = 0; // StructPack
+                // 使用placement new初始化ReqHeader（按照结构体字段声明顺序）
+                new (buffer.data()) rpc_protocol::ReqHeader{
+                    .magic = rpc_protocol::MAGIC_NUMBER,
+                    .version = rpc_protocol::VERSION_NUMBER,
+                    .serialize_type = serialize_type,
+                    .msg_type = 0,
+                    .seq_num = ++request_id_,
+                    .func_id = key,
+                    .length = body_length,
+                    .attach_length = static_cast<uint32_t>(attachment_size)
+                };
+                // 保存序列号用于后续使用
+                id = request_id_;
+                return serialize_protocol::SerializeToBuffer(
+                    buffer.data() + rpc_protocol::REQ_HEAD_LEN,
+                    buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment_size,
+                    std::forward<Args>(args)...);
             }
-            buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
-            // 使用placement new初始化ReqHeader（按照结构体字段声明顺序）
-            new (buffer.data()) rpc_protocol::ReqHeader{
-                .magic = rpc_protocol::MAGIC_NUMBER,
-                .version = rpc_protocol::VERSION_NUMBER,
-                .serialize_type = rpc_protocol::SERIALIZE_TYPE,
-                .msg_type = 0,
-                .seq_num = ++request_id_,
-                .func_id = key,
-                .length = body_length,
-                .attach_length = static_cast<uint32_t>(attachment_size)
-            };
-            // 保存序列号用于后续使用
-            id = request_id_;
-            return serialize_protocol::SerializeToBuffer(
-                buffer.data() + rpc_protocol::REQ_HEAD_LEN,
-                buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment_size,
-                std::forward<Args>(args)...);
-        }, serialize_proto.value());
+        }, serialize_proto);
     }
 
     Errc OnRecvResp_(std::string_view data) {

@@ -9,6 +9,7 @@
 #include "../coro_rpc_def_interenal.h"
 #include "struct_pack_protocol.h"
 #include "protobuf_protocol.h"
+#include "tools/function_traits.h"
 #include <google/protobuf/message.h>
 
 namespace ToolBox::CoroRpc
@@ -94,14 +95,18 @@ public:
             return std::nullopt;
         }
     }
-    template<auto func, typename... Args>
+    template<auto func>
     static supported_serialize_protocols GetSerializeProtocol()
     {
-        if constexpr (sizeof...(Args) == 0) {
+        using func_type = decltype(func);
+        using traits_type = ToolBox::FunctionTraits<func_type>;
+        using param_type = typename traits_type::parameters_type;
+        
+        if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
             return ProtobufProtocol();
         }
         else {
-            using first_arg_type = std::tuple_element_t<0, std::tuple<Args...>>;
+            using first_arg_type = std::tuple_element_t<0, param_type>;
             if constexpr (std::is_base_of_v<::google::protobuf::Message, std::remove_cvref_t<first_arg_type>>) {
                 return ProtobufProtocol();
             }
