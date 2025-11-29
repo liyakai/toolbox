@@ -8,6 +8,7 @@
 
 #include "tools/cpp20_coroutine.h"
 #include "tools/timer.h"
+#include "tools/function_traits.h"
 #include "protocol/coro_rpc_protocol.h"
 
 namespace ToolBox {
@@ -155,7 +156,7 @@ public:
 
     // Call RPC with default Timeout_(5s)
     template <auto func, typename... Args>
-    auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...>>, coro::SharedLooperExecutor> 
+    auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>, coro::SharedLooperExecutor> 
     {
         return CallFor_<func>(std::chrono::seconds(5), std::forward<Args>(args)...);
     }
@@ -196,9 +197,9 @@ private:
     // Call RPC with Timeout_
   template <auto func, typename... Args>
   auto CallFor_(auto duration, Args &&...args) 
-  -> ToolBox::coro::Task<async_rpc_result_value_t<std::invoke_result_t<decltype(func), Args...>>, coro::SharedLooperExecutor> 
+  -> ToolBox::coro::Task<async_rpc_result_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>, coro::SharedLooperExecutor> 
   {
-        using return_type = std::invoke_result_t<decltype(func), Args...>;
+        using return_type = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
         auto async_result = co_await co_await SendRequestForWithAttachment<func, Args...>(
                 duration, req_attachment_, std::forward<Args>(args)...);
         if (async_result.index() == 0) {
@@ -216,10 +217,10 @@ private:
   auto SendRequestForWithAttachment(auto time_out_duration,
                                     std::string_view request_attachment,
                                     Args &&...args)
-      -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<std::invoke_result_t<decltype(func), Args...>>, coro::SharedLooperExecutor>, coro::SharedLooperExecutor> 
+      -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<typename ToolBox::FunctionTraits<decltype(func)>::return_type>, coro::SharedLooperExecutor>, coro::SharedLooperExecutor> 
       {
         req_attachment_ = {};   // 及时释放,防止混乱.
-        using return_type = std::invoke_result_t<decltype(func), Args...>;
+        using return_type = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
         RecvingGuard guard(control_.get());
         uint32_t id;
         std::function<void()> promise_callback;
