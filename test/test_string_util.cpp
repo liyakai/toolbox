@@ -30,6 +30,46 @@ CASE(test_char_delimiters)
     }
 }
 
+// VectorToStr 测试 - 默认逗号分隔符
+CASE(test_vector_to_str_default_delimiter)
+{
+    std::vector<int> vec = {1, 2, 3, 4, 5};
+    std::string result = ToolBox::VectorToStr(vec);
+    fprintf(stderr, "[Vector转字符串测试] 默认逗号分隔符测试 vector=[1,2,3,4,5], 结果=[%s]\n", result.c_str());
+}
+
+// VectorToStr 测试 - 自定义分隔符
+CASE(test_vector_to_str_custom_delimiter)
+{
+    std::vector<int> vec = {10, 20, 30};
+    std::string result = ToolBox::VectorToStr(vec, " | ");
+    fprintf(stderr, "[Vector转字符串测试] 自定义分隔符测试 vector=[10,20,30], 分隔符=\" | \", 结果=[%s]\n", result.c_str());
+}
+
+// VectorToStr 测试 - double 类型
+CASE(test_vector_to_str_double)
+{
+    std::vector<double> vec = {1.5, 2.7, 3.9};
+    std::string result = ToolBox::VectorToStr(vec);
+    fprintf(stderr, "[Vector转字符串测试] double类型测试 vector=[1.5,2.7,3.9], 结果=[%s]\n", result.c_str());
+}
+
+// VectorToStr 测试 - 空 vector
+CASE(test_vector_to_str_empty)
+{
+    std::vector<int> vec;
+    std::string result = ToolBox::VectorToStr(vec);
+    fprintf(stderr, "[Vector转字符串测试] 空vector测试, 结果=[%s]\n", result.c_str());
+}
+
+// VectorToStr 测试 - 单个元素
+CASE(test_vector_to_str_single_element)
+{
+    std::vector<int> vec = {42};
+    std::string result = ToolBox::VectorToStr(vec);
+    fprintf(stderr, "[Vector转字符串测试] 单个元素测试 vector=[42], 结果=[%s]\n", result.c_str());
+}
+
 
 
 FIXTURE_END(TestStringUtil)

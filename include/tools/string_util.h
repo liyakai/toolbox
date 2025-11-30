@@ -48,5 +48,24 @@ inline std::string MemoryToStr(const char* str, uint32_t char_len)
     return result;
 }
 
+/*
+* @brief 将 vector 中的内容转为字符串,默认以逗号为间隔
+*/
+template<typename T>
+inline std::string VectorToStr(const std::vector<T>& vec, const std::string& delimiter = ",")
+{
+    std::string result;
+    result.reserve(vec.size() * sizeof(T));
+    for(const auto& item : vec)
+    {
+        result += std::to_string(item);
+        if(&item != &vec.back())
+        {
+            result += delimiter;
+        }
+    }
+    return result;
+}   
+
 
 }
