@@ -212,13 +212,18 @@ public:
         // 备份原始虚函数地址
         original_vtable_entries_[vtable_key] = original_vfunc;
 
+        // 计算要修改的内存地址（vtable + vtable_index）
+        void** target_addr = &vtable[vtable_index];
+        
         // 修改内存权限
-        if (!make_memory_writable(vtable, sizeof(void*))) {
+        if (!make_memory_writable(target_addr, sizeof(void*))) {
             return false;
         }
 
         // 替换虚函数表中的函数指针
-        vtable[vtable_index] = patch_func;
+        // 使用 memcpy 来避免直接赋值可能导致的段错误
+        // 如果内存真的不可写，memcpy 也会失败，但至少不会在编译时优化掉
+        std::memcpy(target_addr, &patch_func, sizeof(void*));
 
         // 刷新指令缓存
         flush_instruction_cache(vtable, sizeof(void*));
