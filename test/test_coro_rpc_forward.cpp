@@ -54,7 +54,7 @@ std::string_view test_coro_rpc_forward() {
     ToolBox::Network network;
     uint64_t echo_conn_id = 0;
     bool is_connected = false;
-    forward_server.SetSendCallback([&](uint64_t opaque, std::string_view &&buffer) {
+    forward_server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
         // fprintf(stderr, "coro_rpc server send buffer content[size:%zu]: ", buffer.size());
         // for (size_t i = 0; i < buffer.size(); i++) {
         //   fprintf(stderr, "%02X[%u] ", static_cast<unsigned char>(buffer[i]), static_cast<uint8_t>(buffer[i]));

@@ -530,7 +530,7 @@ CASE(TestCoroRpcServer_SetSendCallback)
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     bool callback_called = false;
     
-    Errc err = server.SetSendCallback([&](uint64_t opaque, std::string_view &&buffer) {
+    Errc err = server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
         callback_called = true;
     });
     
@@ -594,7 +594,7 @@ CASE(TestCoroRpcServer_OnRecvReq_UnregisteredFunction)
     buffer.resize(CoroRpcProtocol::REQ_HEAD_LEN);
     std::memcpy(buffer.data(), &req_header, sizeof(req_header));
     
-    server.SetSendCallback([](uint64_t, std::string_view &&) {});
+    server.SetSendCallback([](uint64_t, std::string &&) {});
     
     Errc err = server.OnRecvReq(1, buffer);
     
@@ -620,10 +620,10 @@ CASE(TestClientServer_Integration_BasicCall)
     
     // 设置服务器发送回调
     std::string server_sent_data;
-    server.SetSendCallback([&](uint64_t opaque, std::string_view &&buffer) {
-        server_sent_data = std::string(buffer);
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        server_sent_data = buffer;
         // 模拟服务器响应
-        client.OnRecvResp(buffer);
+        client.OnRecvResp(std::string_view(buffer));
     });
     
     // 设置客户端发送回调
@@ -631,7 +631,7 @@ CASE(TestClientServer_Integration_BasicCall)
     client.SetSendCallback([&](std::string &&buffer) {
         client_sent_data = buffer;
         // 模拟客户端请求到达服务器
-        server.OnRecvReq(1, buffer);
+        server.OnRecvReq(1, std::string_view(buffer));
     });
     
     // 注意：这是一个简化的测试，实际需要协程执行器来运行
@@ -659,13 +659,13 @@ CASE(TestClientServer_Integration_WithAttachment)
     });
     
     // 设置服务器发送回调
-    server.SetSendCallback([&](uint64_t opaque, std::string_view &&buffer) {
-        client.OnRecvResp(buffer);
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        client.OnRecvResp(std::string_view(buffer));
     });
     
     // 设置客户端发送回调
     client.SetSendCallback([&](std::string &&buffer) {
-        server.OnRecvReq(1, buffer);
+        server.OnRecvReq(1, std::string_view(buffer));
     });
     
     // 设置请求附件
@@ -688,12 +688,12 @@ CASE(TestClientServer_Integration_AsyncFunction)
     // 注册协程服务
     server.RegisterService<async_add>();
     
-    server.SetSendCallback([&](uint64_t opaque, std::string_view &&buffer) {
-        client.OnRecvResp(buffer);
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        client.OnRecvResp(std::string_view(buffer));
     });
     
     client.SetSendCallback([&](std::string &&buffer) {
-        server.OnRecvReq(1, buffer);
+        server.OnRecvReq(1, std::string_view(buffer));
     });
     
     // 注意：需要协程执行器来完整测试
@@ -737,7 +737,7 @@ CASE(TestErrorHandling_InvalidProtocol)
     buffer.resize(CoroRpcProtocol::REQ_HEAD_LEN);
     std::memcpy(buffer.data(), &req_header, sizeof(req_header));
     
-    server.SetSendCallback([](uint64_t, std::string_view &&) {});
+    server.SetSendCallback([](uint64_t, std::string &&) {});
     
     Errc err = server.OnRecvReq(1, buffer);
     

@@ -18,7 +18,7 @@ private:
     using handler_t = std::function<std::pair<Errc, std::string>(std::string_view, std::string_view, typename rpc_protocol::supported_serialize_protocols)>;
     using core_handler_t = std::function<ToolBox::coro::Task<std::pair<Errc, std::string>>(std::string_view, std::string_view, typename rpc_protocol::supported_serialize_protocols protocols)>;
     using rpc_func_key = typename CoroRpcTools::rpc_func_key_t;
-    using SendCallback = std::function<void(uint64_t opaque, std::string_view &&)>;
+    using SendCallback = std::function<void(uint64_t opaque, std::string &&)>;
 
     SendCallback send_callback_ = nullptr;
     map_t<rpc_func_key, handler_t> rpc_server_handler_map_;

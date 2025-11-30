@@ -53,7 +53,7 @@ CASE(CoroRpcEchoCase1)
     //声明网络库句柄
     ToolBox::Network network;
         //设置发送缓冲区回调函数
-    server.SetSendCallback([&](uint64_t opaque, std::string_view &&buffer) {
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
         // fprintf(stderr, "coro_rpc server send buffer content[size:%zu]: ", buffer.size());
         // for (size_t i = 0; i < buffer.size(); i++) {
         //   fprintf(stderr, "%02X[%u] ", static_cast<unsigned char>(buffer[i]), static_cast<uint8_t>(buffer[i]));
