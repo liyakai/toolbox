@@ -139,7 +139,7 @@ private:
             return;
         }
         using ReturnType = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
-        constexpr auto name = ToolBox::GetFuncName<func>();
+        constexpr auto name = ToolBox::GetFuncNameWithClass<func>();
 
         RpcLogInfo("[CoroRpcServer] RegistOneHandlerImpl: key: %u, func: %.*s",
                    key, static_cast<int>(name.size()), name.data());
