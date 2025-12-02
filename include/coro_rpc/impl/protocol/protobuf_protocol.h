@@ -63,7 +63,8 @@ public:
         if constexpr(sizeof...(Args) == 0) {
             return CoroRpc::Errc::SUCCESS;
         } else {
-            return SerializeToBuffer(data, size, (args, ...));
+            // 修复：使用折叠表达式获取第一个（也是唯一的）参数
+            return SerializeToBuffer(data, size, std::get<0>(std::forward_as_tuple(args...)));
         }
     }
     

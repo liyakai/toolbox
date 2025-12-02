@@ -5,6 +5,8 @@
 #include <variant>
 #include <string>
 #include <format>
+#include <utility>
+#include <tuple>
 
 #include "../coro_rpc_def_interenal.h"
 #include "struct_pack_protocol.h"
@@ -24,14 +26,26 @@ namespace ToolBox::CoroRpc
         using func_type = decltype(func);
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
+        using return_type = typename traits_type::return_type;
         
         static constexpr bool value = []() {
+            // 检查返回值类型
+            if constexpr (!std::is_void_v<return_type>) {
+                if constexpr (!IsProtobufMessage<return_type>) {
+                    return false;
+                }
+            }
+            
+            // 检查所有参数类型
             if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
-                // 无参数函数现在使用 StructPackProtocol
-                return false;
+                // 无参数函数，只检查返回值
+                return std::is_void_v<return_type> || IsProtobufMessage<return_type>;
             } else {
-                using first_arg_type = std::tuple_element_t<0, param_type>;
-                return IsProtobufMessage<first_arg_type>;
+                // 检查所有参数是否都是 protobuf 消息类型
+                return []<std::size_t... I>(std::index_sequence<I...>) {
+                    return (IsProtobufMessage<std::tuple_element_t<I, param_type>> && ...);
+                }(std::make_index_sequence<std::tuple_size_v<param_type>>{}) 
+                    && (std::is_void_v<return_type> || IsProtobufMessage<return_type>);
             }
         }();
     };
@@ -138,19 +152,35 @@ public:
         using func_type = decltype(func);
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
+        using return_type = typename traits_type::return_type;
         
-        if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
-            // 无参数函数使用 StructPackProtocol，更轻量级
+        // 检查返回值类型
+        constexpr bool return_type_is_protobuf = []() {
+            if constexpr (std::is_void_v<return_type>) {
+                return true;  // void 返回值视为兼容
+            } else {
+                return IsProtobufMessage<return_type>;
+            }
+        }();
+        
+        // 检查所有参数类型
+        constexpr bool all_params_are_protobuf = []() {
+            if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
+                // 无参数函数
+                return true;
+            } else {
+                // 检查所有参数是否都是 protobuf 消息类型
+                return []<std::size_t... I>(std::index_sequence<I...>) {
+                    return (IsProtobufMessage<std::tuple_element_t<I, param_type>> && ...);
+                }(std::make_index_sequence<std::tuple_size_v<param_type>>{});
+            }
+        }();
+        
+        // 只有当所有参数和返回值都是 protobuf 消息类型时，才使用 ProtobufProtocol
+        if constexpr (all_params_are_protobuf && return_type_is_protobuf) {
+            return ProtobufProtocol();
+        } else {
             return StructPackProtocol();
-        }
-        else {
-            using first_arg_type = std::tuple_element_t<0, param_type>;
-            if constexpr (IsProtobufMessage<first_arg_type>) {
-                return ProtobufProtocol();
-            }
-            else {
-                return StructPackProtocol();
-            }
         }
     }
 
@@ -158,7 +188,7 @@ public:
     static constexpr CoroRpcTools::rpc_func_key GenRegisterKey()
     {
         // 使用函数指针的地址作为唯一标识符
-        return CoroRpcTools::AutoGenRegisterKey<func>();;
+        return CoroRpcTools::AutoGenRegisterKey<func>();
     }
     
     static CoroRpcTools::rpc_func_key GetRpcFuncKey(const ReqHeader &header)

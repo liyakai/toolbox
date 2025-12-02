@@ -2,6 +2,7 @@
 
 #include "coro_rpc_def_interenal.h"
 #include "protocol/coro_rpc_protocol.h"
+#include "protocol/serialize_adapter.h"
 #include "tools/cpp20_coroutine.h"
 #include "tools/function_traits.h"
 namespace ToolBox {
@@ -148,7 +149,7 @@ private:
         {
             auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
-                    co_return co_await ExecuteCore_<serialize_protocol, func>(data, attachment, self);
+                    co_return co_await ExecuteCoro_<serialize_protocol, func>(data, attachment, self);
                 }, protocols);
             });
             if (!iter.second) [[unlikely]]
@@ -159,13 +160,7 @@ private:
         } else {
             auto iter = rpc_server_handler_map_.emplace(key, [&](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> std::pair<Errc, std::string> {
-                    if constexpr (std::is_same_v<serialize_protocol, ProtobufProtocol>) {
-                        if constexpr (!CoroRpc::IsProtobufCompatible_v<func>) {
-                            RpcLogError("[CoroRpcServer] ProtobufProtocol should not be used for basic types");
-                            return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, std::string("protocol mismatch"));
-                        }
-                    }
-                    // StructPackProtocol 或有效的 ProtobufProtocol
+                    // Execute_ 内部已经有兼容性检查，这里可以移除冗余检查
                     return Execute_<serialize_protocol, func>(data, attachment, self);
                 }, protocols);
             });
@@ -200,7 +195,7 @@ private:
         {
             auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
-                    co_return co_await ExecuteCore_<serialize_protocol, func>(data, attachment);
+                    co_return co_await ExecuteCoro_<serialize_protocol, func>(data, attachment);
                 }, protocols);
             });
             if (!iter.second) [[unlikely]]
@@ -292,6 +287,50 @@ private:
         }
     }
 
+    // 统一的函数调用辅助：处理 Self 和参数的组合
+    // 有参数版本
+    template<auto func, typename Self, typename ArgsTuple>
+    requires (!std::is_void_v<ArgsTuple>)
+    static auto invoke_with_params(Self* self, ArgsTuple&& args) {
+        if constexpr (std::is_void_v<Self>) {
+            return std::apply(func, std::forward<ArgsTuple>(args));
+        } else {
+            return std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::forward<ArgsTuple>(args)));
+        }
+    }
+    
+    // 无参数版本
+    template<auto func, typename Self>
+    static auto invoke_with_params(Self* self) {
+        if constexpr (std::is_void_v<Self>) {
+            return func();
+        } else {
+            return std::apply(func, std::forward_as_tuple(*self));
+        }
+    }
+    
+    // 统一的函数调用辅助（协程版本）- 有参数版本
+    template<auto func, typename Self, typename ArgsTuple>
+    requires (!std::is_void_v<ArgsTuple>)
+    static auto invoke_with_params_coro(Self* self, ArgsTuple&& args) {
+        if constexpr (std::is_void_v<Self>) {
+            return std::apply(func, std::forward<ArgsTuple>(args));
+        } else {
+            return std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::forward<ArgsTuple>(args)));
+        }
+    }
+    
+    // 无参数版本
+    template<auto func, typename Self>
+    static auto invoke_with_params_coro(Self* self) {
+        if constexpr (std::is_void_v<Self>) {
+            return func();
+        } else {
+            return std::apply(func, std::forward_as_tuple(*self));
+        }
+    }
+    
+    // 统一的执行逻辑：反序列化 -> 调用函数 -> 序列化返回值
     template<typename serialize_proto, auto func, typename Self = void>
     inline std::pair<Errc, std::string> Execute_(std::string_view data, std::string_view attachment, Self *self = nullptr)
     {
@@ -300,123 +339,111 @@ private:
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
         using ReturnType = typename traits_type::return_type;
+        using adapter = SerializeAdapter<func, serialize_proto>;
 
         req_attachment_ = attachment;
-        if constexpr(!std::is_void_v<param_type>)
+        
+        // 1. 反序列化参数（如果有）
+        if constexpr(!std::is_void_v<param_type> && std::tuple_size_v<param_type> > 0)
         {
             param_type args;
-            bool is_ok = true;
-            constexpr size_t size = std::tuple_size_v<param_type>;
-            if constexpr(size > 0)
-            {
-                is_ok = serialize_proto::Deserialize(args, data);
-            }
-            if (!is_ok)[[unlikely]]
+            if (!serialize_proto::Deserialize(args, data)) [[unlikely]]
             {
                 RpcLogError("[CoroRpcServer] Execute_: deserialize arguments failed");
                 return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "deserialize arguments failed"s);
             }
+            
+            // 2. 防御性兼容性检查
+            if constexpr (!std::is_void_v<ReturnType> && !adapter::is_compatible()) {
+                RpcLogError("[CoroRpcServer] Execute_: Protocol compatibility check failed");
+                return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "protocol mismatch"s);
+            }
+            
+            // 3. 调用函数并序列化返回值
             if constexpr (std::is_void_v<ReturnType>)
             {
-                if constexpr (std::is_void_v<Self>)
-                {
-                    std::apply(func, std::move(args));
-                } else {
-                    std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)));
-                }
-                return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize());
+                invoke_with_params<func>(self, std::move(args));
+                return std::make_pair(Errc::SUCCESS, adapter::serialize());
             } else {
-                if constexpr (std::is_void_v<Self>)
-                {
-                    return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::apply(func, std::move(args))));
-                } else {
-                    return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)))));
-                }
+                auto result = invoke_with_params<func>(self, std::move(args));
+                return std::make_pair(Errc::SUCCESS, adapter::serialize(result));
             }
-        }else {
-            if constexpr(std::is_void_v<ReturnType>)
+        } else {
+            // 无参数函数
+            // 2. 防御性兼容性检查
+            if constexpr (!std::is_void_v<ReturnType> && !adapter::is_compatible()) {
+                RpcLogError("[CoroRpcServer] Execute_: Protocol compatibility check failed");
+                return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "protocol mismatch"s);
+            }
+            
+            // 3. 调用函数并序列化返回值
+            if constexpr (std::is_void_v<ReturnType>)
             {
-                if constexpr(std::is_void_v<Self>)
-                {
-                    func();
-                } else {
-                    std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)));
-                }
+                invoke_with_params<func>(self);
+                return std::make_pair(Errc::SUCCESS, adapter::serialize());
             } else {
-                if constexpr(std::is_void_v<Self>)
-                {
-                    return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(func()));
-                }else {
-                    return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)))));
-                }
+                auto result = invoke_with_params<func>(self);
+                return std::make_pair(Errc::SUCCESS, adapter::serialize(result));
             }
         }
     }
 
     template<typename serialize_proto, auto func, typename Self = void>
-    inline coro::Task<std::pair<Errc, std::string>> ExecuteCore_(std::string_view data, std::string_view attachment, Self *self = nullptr)
+    inline coro::Task<std::pair<Errc, std::string>> ExecuteCoro_(std::string_view data, std::string_view attachment, Self *self = nullptr)
     {
         using namespace std::string_literals;
         using func_type = decltype(func);
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
         using ReturnType = typename traits_type::return_type;
+        using adapter = SerializeAdapter<func, serialize_proto>;
 
         req_attachment_ = attachment;
-        if constexpr(!std::is_void_v<param_type>){
-            bool is_ok = true;
-            constexpr size_t size = std::tuple_size_v<param_type>;
+        
+        // 1. 反序列化参数（如果有）
+        if constexpr(!std::is_void_v<param_type> && std::tuple_size_v<param_type> > 0)
+        {
             param_type args;
-            if constexpr(size > 0)
-            {
-                is_ok = serialize_proto::Deserialize(args, data);
-            }
-            if (!is_ok)[[unlikely]]
+            if (!serialize_proto::Deserialize(args, data)) [[unlikely]]
             {
                 RpcLogError("[rpc] Deserialize failed. data size:%zu, attachment size:%zu", data.size(), attachment.size());
                 co_return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "deserialize arguments failed"s);
             }
+            
+            // 2. 防御性兼容性检查
+            if constexpr (!std::is_void_v<ReturnType> && !adapter::is_compatible()) {
+                RpcLogError("[CoroRpcServer] ExecuteCoro_: Protocol compatibility check failed");
+                co_return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "protocol mismatch"s);
+            }
+            
+            // 3. 调用函数并序列化返回值
             if constexpr (std::is_void_v<ReturnType>)
             {
-                if constexpr(std::is_void_v<Self>)
-                {
-                    // call void func(args...)
-                    co_await std::apply(func, std::move(args));
-                } else {
-                    // call void self->func(self, args...)
-                    co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)));
-                }
-                co_return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::monostate{}));
+                co_await invoke_with_params_coro<func>(self, std::move(args));
+                co_return std::make_pair(Errc::SUCCESS, adapter::serialize());
             } else {
-                if constexpr (std::is_void_v<Self>)
-                {
-                    // call return_type func(args...)
-                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(co_await std::apply(func, std::move(args))));
-                } else {
-                    // call return_type self->func(self, args...)
-                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self), std::move(args)))));
-                }
+                auto result = co_await invoke_with_params_coro<func>(self, std::move(args));
+                co_return std::make_pair(Errc::SUCCESS, adapter::serialize(result));
             }
         } else {
+            // 无参数函数
+            // 2. 防御性兼容性检查
+            if constexpr (!std::is_void_v<ReturnType> && !adapter::is_compatible()) {
+                RpcLogError("[CoroRpcServer] ExecuteCoro_: Protocol compatibility check failed");
+                co_return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, "protocol mismatch"s);
+            }
+            
+            // 3. 调用函数并序列化返回值
             if constexpr (std::is_void_v<ReturnType>)
             {
-                if constexpr(std::is_void_v<Self>)
-                {
-                    co_await func();
-                } else {
-                    co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)));
-                }
-                co_return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(std::monostate{}));
+                co_await invoke_with_params_coro<func>(self);
+                co_return std::make_pair(Errc::SUCCESS, adapter::serialize());
             } else {
-                if constexpr(std::is_void_v<Self>)
-                {
-                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(co_await func()));
-                } else {
-                    co_return std::make_pair(Errc::SUCCESS, serialize_proto::Serialize(co_await std::apply(func, std::tuple_cat(std::forward_as_tuple(*self)))));
-                }
+                auto result = co_await invoke_with_params_coro<func>(self);
+                co_return std::make_pair(Errc::SUCCESS, adapter::serialize(result));
             }
         }
-    }   // ExecuteCore_
+    }   // ExecuteCoro_
     Errc OnRecvReq_(uint64_t opaque, std::string_view data)
     {
         typename rpc_protocol::ReqHeader header;

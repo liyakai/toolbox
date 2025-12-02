@@ -5,11 +5,14 @@
 #include <unordered_map>
 #include <functional>
 #include <atomic>
+#include <utility>
+#include <tuple>
 
 #include "tools/cpp20_coroutine.h"
 #include "tools/timer.h"
 #include "tools/function_traits.h"
 #include "protocol/coro_rpc_protocol.h"
+#include "protocol/serialize_adapter.h"
 
 namespace ToolBox {
 namespace CoroRpc {
@@ -385,12 +388,14 @@ private:
         if (!attachment.empty()) 
         {
             // Append attachment data to send_buffer
-            // 验证缓冲区大小
-            if (send_buffer.size() < attachment.size()) {
+            // 验证缓冲区大小：缓冲区应该已经预留了 attachment_size 的空间
+            size_t expected_buffer_size = rpc_protocol::REQ_HEAD_LEN + (send_buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment.size()) + attachment.size();
+            if (send_buffer.size() < expected_buffer_size || send_buffer.size() < attachment.size()) {
                 RpcLogError("[rpc][client] SendImpl_: buffer too small for attachment, buffer size: %zu, attachment size: %zu", 
                            send_buffer.size(), attachment.size());
                 co_return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
             }
+            // 将 attachment 数据复制到缓冲区末尾（已经预留的空间）
             std::memcpy(send_buffer.data() + send_buffer.size() - attachment.size(), 
                        attachment.data(), attachment.size());
         }
@@ -404,6 +409,7 @@ private:
         // send buffer
         co_return CoroRpc::Errc::SUCCESS;
     }
+
 
     template<auto func, typename... Args>
     auto PrepareSendBuffer_(uint32_t &id, std::size_t attachment_size, std::string & buffer, Args &&...args) -> CoroRpc::Errc
@@ -421,37 +427,31 @@ private:
         typename rpc_protocol::supported_serialize_protocols serialize_proto = rpc_protocol::template GetSerializeProtocol<func>();
 
         return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> CoroRpc::Errc {
-            // 检查 ProtobufProtocol 的参数类型是否有效
-            if constexpr (std::is_same_v<serialize_protocol, CoroRpc::ProtobufProtocol>) {
-                if constexpr (!CoroRpc::IsProtobufCompatible_v<func>) {
-                    // 参数类型不匹配，应该使用 StructPackProtocol
-                    // 这里不应该被调用，因为 GetSerializeProtocol 应该已经选择了正确的协议
-                    RpcLogError("[rpc][client] ProtobufProtocol should not be used for basic types");
-                    return CoroRpc::Errc::ERR_SERIALIZE_FAILED;
-                }
+            using adapter = CoroRpc::SerializeAdapter<func, serialize_protocol>;
+            
+            // 防御性兼容性检查
+            if constexpr (!adapter::is_compatible()) {
+                RpcLogError("[rpc][client] Protocol compatibility check failed");
+                return CoroRpc::Errc::ERR_SERIALIZE_FAILED;
             }
             
-            // 使用可变参数版本，ProtobufProtocol 和 StructPackProtocol 都支持
-            uint32_t body_length = serialize_protocol::SerializeSize(std::forward<Args>(args)...);
+            // 计算序列化大小
+            uint32_t body_length = adapter::serialize_size(std::forward<Args>(args)...);
             
             if(body_length > UINT32_MAX) [[unlikely]]
             {
-                RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
+                RpcLogError("[rpc][client] body is too long, max length is %u", UINT32_MAX);
                 return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
             }
             
+            // 分配缓冲区
             buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
             
-            // 确定序列化类型
-            uint8_t serialize_type = std::is_same_v<serialize_protocol, CoroRpc::ProtobufProtocol> 
-                ? static_cast<uint8_t>(rpc_protocol::SerializeType::SERIALIZE_TYPE_PROTOBUF)   // Protobuf
-                : static_cast<uint8_t>(rpc_protocol::SerializeType::SERIALIZE_TYPE_STRUCT);    // StructPack
-            
-            // 使用placement new初始化ReqHeader（按照结构体字段声明顺序）
+            // 初始化请求头
             new (buffer.data()) rpc_protocol::ReqHeader{
                 .magic = rpc_protocol::MAGIC_NUMBER,
                 .version = rpc_protocol::VERSION_NUMBER,
-                .serialize_type = serialize_type,
+                .serialize_type = adapter::get_serialize_type(),
                 .msg_type = 0,
                 .seq_num = ++request_id_,
                 .func_id = key,
@@ -459,12 +459,11 @@ private:
                 .attach_length = static_cast<uint32_t>(attachment_size)
             };
             
-            // 保存序列号用于后续使用
+            // 保存序列号
             id = request_id_;
             
             // 执行序列化
-            // 使用可变参数版本，ProtobufProtocol 和 StructPackProtocol 都支持
-            return serialize_protocol::SerializeToBuffer(
+            return adapter::serialize_to_buffer(
                 buffer.data() + rpc_protocol::REQ_HEAD_LEN,
                 buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment_size,
                 std::forward<Args>(args)...);
