@@ -86,7 +86,7 @@ CASE(TestCoroRpcProtocol_ReadHeader_Valid)
     CoroRpcProtocol::ReqHeader header;
     header.magic = CoroRpcProtocol::MAGIC_NUMBER;
     header.version = CoroRpcProtocol::VERSION_NUMBER;
-    header.serialize_type = CoroRpcProtocol::SERIALIZE_TYPE;
+    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);
     header.msg_type = 0;
     header.seq_num = 12345;
     header.func_id = 67890;
@@ -206,7 +206,7 @@ CASE(TestCoroRpcProtocol_PrepareResponseHeader)
     
     CoroRpcProtocol::ReqHeader req_header;
     req_header.seq_num = 12345;
-    req_header.serialize_type = CoroRpcProtocol::SERIALIZE_TYPE;
+    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
     
     std::string rpc_result = "test result";
     std::string response_buf;
@@ -398,7 +398,7 @@ CASE(TestCoroRpcClient_OnRecvResp_Valid)
     CoroRpcProtocol::RespHeader resp_header;
     resp_header.magic = CoroRpcProtocol::MAGIC_NUMBER;
     resp_header.version = CoroRpcProtocol::VERSION_NUMBER;
-    resp_header.serialize_type = CoroRpcProtocol::SERIALIZE_TYPE;
+    resp_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
     resp_header.seq_num = 9528;  // 使用默认的 request_id + 1
     resp_header.err_code = static_cast<uint8_t>(Errc::SUCCESS);
     resp_header.length = 0;
@@ -584,7 +584,7 @@ CASE(TestCoroRpcServer_OnRecvReq_UnregisteredFunction)
     CoroRpcProtocol::ReqHeader req_header;
     req_header.magic = CoroRpcProtocol::MAGIC_NUMBER;
     req_header.version = CoroRpcProtocol::VERSION_NUMBER;
-    req_header.serialize_type = CoroRpcProtocol::SERIALIZE_TYPE;
+    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
     req_header.seq_num = 1;
     req_header.func_id = 99999;  // 未注册的函数 ID
     req_header.length = 0;
@@ -951,7 +951,7 @@ CASE(TestProtocolSelection_GetSerializeProtocolByType)
     using namespace ToolBox::CoroRpc;
     
     // 测试通过类型获取协议
-    auto protocol1 = CoroRpcProtocol::GetSerializeProtocolByType(CoroRpcProtocol::SERIALIZE_TYPE);
+    auto protocol1 = CoroRpcProtocol::GetSerializeProtocolByType(static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF));
     
     if (!protocol1.has_value()) {
         SetError("应该能够获取有效的协议");
@@ -1022,7 +1022,7 @@ CASE(TestPerformance_HeaderParsing)
     CoroRpcProtocol::ReqHeader header;
     header.magic = CoroRpcProtocol::MAGIC_NUMBER;
     header.version = CoroRpcProtocol::VERSION_NUMBER;
-    header.serialize_type = CoroRpcProtocol::SERIALIZE_TYPE;
+    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
     header.seq_num = 12345;
     header.func_id = 67890;
     header.length = 100;
@@ -1268,7 +1268,7 @@ CASE(TestMemoryAlignment_ReadHeader)
     CoroRpcProtocol::ReqHeader header;
     header.magic = CoroRpcProtocol::MAGIC_NUMBER;
     header.version = CoroRpcProtocol::VERSION_NUMBER;
-    header.serialize_type = CoroRpcProtocol::SERIALIZE_TYPE;
+    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);
     header.seq_num = 12345;
     header.func_id = 67890;
     header.length = 100;

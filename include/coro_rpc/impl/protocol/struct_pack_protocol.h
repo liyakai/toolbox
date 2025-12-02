@@ -104,12 +104,25 @@ public:
     template<typename T>
     static Errc SerializeToBuffer(void* data, int size, const T &t)
     {
-        std::string buffer = StructPackTools::Serialize<std::string>(t);
-        if(buffer.size() > size)
+        constexpr size_t required_size = sizeof(T);
+        if(static_cast<size_t>(size) < required_size)
         {
             return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
         }
-        std::memcpy(data, buffer.data(), buffer.size());
+        
+        // 只对 trivially copyable 类型直接使用 memcpy，避免复制虚函数表指针
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            // 直接写入目标缓冲区，避免中间拷贝
+            std::memcpy(data, &t, required_size);
+        } else {
+            // 对于非 trivially copyable 类型（如有虚函数表的类），使用原来的序列化方式
+            std::string buffer = StructPackTools::Serialize<std::string>(t);
+            if(buffer.size() > static_cast<size_t>(size))
+            {
+                return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
+            }
+            std::memcpy(data, buffer.data(), buffer.size());
+        }
         return CoroRpc::Errc::SUCCESS;
     }
     
@@ -117,18 +130,45 @@ public:
     template<typename... Args>
     static Errc SerializeToBuffer(void* data, int size, const Args&... args)
     {
-        std::string buffer = StructPackTools::Serialize<std::string>(args...);
-        if(buffer.size() > size)
+        constexpr size_t required_size = (sizeof(Args) + ...);
+        if(static_cast<size_t>(size) < required_size)
         {
             return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
         }
-        std::memcpy(data, buffer.data(), buffer.size());
+        
+        // 检查所有参数是否都是 trivially copyable
+        constexpr bool all_trivially_copyable = (std::is_trivially_copyable_v<Args> && ...);
+        
+        if constexpr (all_trivially_copyable) {
+            // 直接写入目标缓冲区，避免中间拷贝
+            size_t offset = 0;
+            auto write_one = [data, &offset](const auto& arg) {
+                std::memcpy(static_cast<char*>(data) + offset, &arg, sizeof(arg));
+                offset += sizeof(arg);
+            };
+            (write_one(args), ...);
+        } else {
+            // 对于非 trivially copyable 类型，使用原来的序列化方式
+            std::string buffer = StructPackTools::Serialize<std::string>(args...);
+            if(buffer.size() > static_cast<size_t>(size))
+            {
+                return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
+            }
+            std::memcpy(data, buffer.data(), buffer.size());
+        }
         return CoroRpc::Errc::SUCCESS;
     }
     template<typename T>
     static size_t SerializeSize(const T &t)
     {
         return StructPackTools::SerializeSize(t);
+    }
+    
+    // 可变参数版本：支持多个参数
+    template<typename... Args>
+    static size_t SerializeSize(const Args&... args)
+    {
+        return StructPackTools::SerializeSize(args...);
     }
     template<typename T>
     static bool Deserialize(T&t, std::string_view buffer)

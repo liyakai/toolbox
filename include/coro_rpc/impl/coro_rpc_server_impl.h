@@ -159,31 +159,14 @@ private:
         } else {
             auto iter = rpc_server_handler_map_.emplace(key, [&](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> std::pair<Errc, std::string> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> std::pair<Errc, std::string> {
-                    // 根据函数参数类型选择正确的协议
-                    // 如果 serialize_protocol 不匹配，应该使用正确的协议
-                    // 这里我们直接调用 Execute_，因为它会根据实际的协议类型工作
                     if constexpr (std::is_same_v<serialize_protocol, ProtobufProtocol>) {
-                        // 检查参数类型是否匹配 ProtobufProtocol
-                        using func_type = decltype(func);
-                        using traits_type = ToolBox::FunctionTraits<func_type>;
-                        using param_type = typename traits_type::parameters_type;
-                        if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
-                            return Execute_<serialize_protocol, func>(data, attachment, self);
-                        } else {
-                            using first_arg_type = std::tuple_element_t<0, param_type>;
-                            if constexpr (std::is_base_of_v<::google::protobuf::Message, std::remove_cvref_t<first_arg_type>>) {
-                                return Execute_<serialize_protocol, func>(data, attachment, self);
-                            } else {
-                                // 参数类型不匹配，应该使用 StructPackProtocol
-                                // 这里不应该被调用，因为 GetSerializeProtocol 应该已经选择了正确的协议
-                                RpcLogError("[CoroRpcServer] ProtobufProtocol should not be used for basic types");
-                                return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, std::string("protocol mismatch"));
-                            }
+                        if constexpr (!CoroRpc::IsProtobufCompatible_v<func>) {
+                            RpcLogError("[CoroRpcServer] ProtobufProtocol should not be used for basic types");
+                            return std::make_pair(Errc::ERR_INVALID_ARGUMENTS, std::string("protocol mismatch"));
                         }
-                    } else {
-                        // StructPackProtocol
-                        return Execute_<serialize_protocol, func>(data, attachment, self);
                     }
+                    // StructPackProtocol 或有效的 ProtobufProtocol
+                    return Execute_<serialize_protocol, func>(data, attachment, self);
                 }, protocols);
             });
             if (!iter.second) [[unlikely]]

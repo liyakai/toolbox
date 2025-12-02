@@ -36,7 +36,7 @@ struct rpc_return_type<void>{
 };
 
 struct resp_body{
-    int serialize_type_;
+    uint8_t serialize_type_;  // 与协议头中的 serialize_type 类型保持一致
     std::string_view body_buffer_;
     std::string_view resp_attachment_buf_;
 };
@@ -133,7 +133,8 @@ private:
         std::atomic<uint32_t> recving_cnt_ = 0;
     };
 
-    std::atomic<uint32_t> request_id_ = 9527;
+    static constexpr uint32_t INITIAL_REQUEST_ID = 9527;
+    std::atomic<uint32_t> request_id_ = INITIAL_REQUEST_ID;
     std::shared_ptr<control_t> control_;
     std::string_view req_attachment_;
     Config config_;
@@ -381,11 +382,17 @@ private:
             RpcLogError("[rpc][client] SendImpl_ PrepareSendBuffer_ failed, rpc_errc: %d", errc);
             co_return errc;
         }
-        std::pair<std::error_code, std::size_t> send_result;
         if (!attachment.empty()) 
         {
             // Append attachment data to send_buffer
-            std::memcpy(send_buffer.data() + send_buffer.size() - attachment.size(), attachment.data(), attachment.size());
+            // 验证缓冲区大小
+            if (send_buffer.size() < attachment.size()) {
+                RpcLogError("[rpc][client] SendImpl_: buffer too small for attachment, buffer size: %zu, attachment size: %zu", 
+                           send_buffer.size(), attachment.size());
+                co_return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
+            }
+            std::memcpy(send_buffer.data() + send_buffer.size() - attachment.size(), 
+                       attachment.data(), attachment.size());
         }
         // RpcLogDebug("[rpc][client] SendImpl_ send_buffer size: %zu, attachment_size: %zu, send_buffer: %s", send_buffer.size(), attachment.size(), send_buffer.c_str());
         if(!send_callback_)
@@ -414,41 +421,53 @@ private:
         typename rpc_protocol::supported_serialize_protocols serialize_proto = rpc_protocol::template GetSerializeProtocol<func>();
 
         return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> CoroRpc::Errc {
+            // 检查 ProtobufProtocol 的参数类型是否有效
             if constexpr (std::is_same_v<serialize_protocol, CoroRpc::ProtobufProtocol>) {
-                // ProtobufProtocol 只支持 protobuf message 类型
-                // 如果参数是基本类型，应该使用 StructPackProtocol
-                // 这里不应该被调用，因为 GetSerializeProtocol 应该已经选择了正确的协议
-                RpcLogError("[rpc][client] ProtobufProtocol should not be used for basic types");
-                return CoroRpc::Errc::ERR_SERIALIZE_FAILED;
-            } else {
-                // StructPackProtocol
-                uint32_t body_length = serialize_protocol::SerializeSize(std::forward<Args>(args)...);
-                if(body_length > UINT32_MAX) [[unlikely]]
-                {
-                    RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
-                    return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
+                if constexpr (!CoroRpc::IsProtobufCompatible_v<func>) {
+                    // 参数类型不匹配，应该使用 StructPackProtocol
+                    // 这里不应该被调用，因为 GetSerializeProtocol 应该已经选择了正确的协议
+                    RpcLogError("[rpc][client] ProtobufProtocol should not be used for basic types");
+                    return CoroRpc::Errc::ERR_SERIALIZE_FAILED;
                 }
-                buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
-                // 确定序列化类型
-                uint8_t serialize_type = 0; // StructPack
-                // 使用placement new初始化ReqHeader（按照结构体字段声明顺序）
-                new (buffer.data()) rpc_protocol::ReqHeader{
-                    .magic = rpc_protocol::MAGIC_NUMBER,
-                    .version = rpc_protocol::VERSION_NUMBER,
-                    .serialize_type = serialize_type,
-                    .msg_type = 0,
-                    .seq_num = ++request_id_,
-                    .func_id = key,
-                    .length = body_length,
-                    .attach_length = static_cast<uint32_t>(attachment_size)
-                };
-                // 保存序列号用于后续使用
-                id = request_id_;
-                return serialize_protocol::SerializeToBuffer(
-                    buffer.data() + rpc_protocol::REQ_HEAD_LEN,
-                    buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment_size,
-                    std::forward<Args>(args)...);
             }
+            
+            // 使用可变参数版本，ProtobufProtocol 和 StructPackProtocol 都支持
+            uint32_t body_length = serialize_protocol::SerializeSize(std::forward<Args>(args)...);
+            
+            if(body_length > UINT32_MAX) [[unlikely]]
+            {
+                RpcLogError("[rpc][client] attachment is too long, max length is %u", UINT32_MAX);
+                return CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
+            }
+            
+            buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
+            
+            // 确定序列化类型
+            uint8_t serialize_type = std::is_same_v<serialize_protocol, CoroRpc::ProtobufProtocol> 
+                ? static_cast<uint8_t>(rpc_protocol::SerializeType::SERIALIZE_TYPE_PROTOBUF)   // Protobuf
+                : static_cast<uint8_t>(rpc_protocol::SerializeType::SERIALIZE_TYPE_STRUCT);    // StructPack
+            
+            // 使用placement new初始化ReqHeader（按照结构体字段声明顺序）
+            new (buffer.data()) rpc_protocol::ReqHeader{
+                .magic = rpc_protocol::MAGIC_NUMBER,
+                .version = rpc_protocol::VERSION_NUMBER,
+                .serialize_type = serialize_type,
+                .msg_type = 0,
+                .seq_num = ++request_id_,
+                .func_id = key,
+                .length = body_length,
+                .attach_length = static_cast<uint32_t>(attachment_size)
+            };
+            
+            // 保存序列号用于后续使用
+            id = request_id_;
+            
+            // 执行序列化
+            // 使用可变参数版本，ProtobufProtocol 和 StructPackProtocol 都支持
+            return serialize_protocol::SerializeToBuffer(
+                buffer.data() + rpc_protocol::REQ_HEAD_LEN,
+                buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment_size,
+                std::forward<Args>(args)...);
         }, serialize_proto);
     }
 
@@ -457,7 +476,7 @@ private:
         auto err = rpc_protocol::ReadHeader(data, header);
         if(err != Errc::SUCCESS)
         {
-            RpcLogError("[CoroRpcServer] OnRecvReq: read header failed, err:%d", err);
+            RpcLogError("[rpc][client] OnRecvResp_: read header failed, err:%d", err);
             return err;
         }
         std::string_view body;

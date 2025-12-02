@@ -14,6 +14,30 @@
 
 namespace ToolBox::CoroRpc
 {
+    // Concepts 增强类型安全
+    template<typename T>
+    concept IsProtobufMessage = std::is_base_of_v<::google::protobuf::Message, std::remove_cvref_t<T>>;
+    
+    // 检查函数是否适用于 ProtobufProtocol
+    template<auto func>
+    struct IsProtobufCompatible {
+        using func_type = decltype(func);
+        using traits_type = ToolBox::FunctionTraits<func_type>;
+        using param_type = typename traits_type::parameters_type;
+        
+        static constexpr bool value = []() {
+            if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
+                // 无参数函数现在使用 StructPackProtocol
+                return false;
+            } else {
+                using first_arg_type = std::tuple_element_t<0, param_type>;
+                return IsProtobufMessage<first_arg_type>;
+            }
+        }();
+    };
+    
+    template<auto func>
+    inline constexpr bool IsProtobufCompatible_v = IsProtobufCompatible<func>::value;
     
 template <typename RpcProtocol, template<typename...> typename map_t = std::unordered_map>
 class CoroRpcServer;
@@ -22,7 +46,12 @@ struct CoroRpcProtocol
 public:
     constexpr static inline uint8_t MAGIC_NUMBER = 0xde;
     constexpr static inline uint8_t VERSION_NUMBER = 1;
-    constexpr static inline uint8_t SERIALIZE_TYPE = 1;
+    
+    // 序列化类型枚举
+    enum class SerializeType : uint8_t {
+        SERIALIZE_TYPE_STRUCT = 0,    // StructPack 序列化方式（用于基本类型）
+        SERIALIZE_TYPE_PROTOBUF = 1   // Protobuf 序列化方式（用于 protobuf message）
+    };
 /*
 * RPC header
 * 
@@ -41,7 +70,7 @@ public:
     {
         uint8_t magic = MAGIC_NUMBER;
         uint8_t version = VERSION_NUMBER;
-        uint8_t serialize_type = SERIALIZE_TYPE;
+        uint8_t serialize_type = static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT);  // 默认使用 StructPack
         uint8_t msg_type;
         uint32_t seq_num;
         uint32_t func_id;
@@ -58,7 +87,7 @@ public:
     {
         uint8_t magic = MAGIC_NUMBER;
         uint8_t version = VERSION_NUMBER;
-        uint8_t serialize_type = SERIALIZE_TYPE;
+        uint8_t serialize_type = static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT);  // 默认使用 StructPack
         uint8_t err_code;
         uint8_t msg_type;
         uint32_t seq_num;
@@ -79,19 +108,27 @@ public:
     {
         static_assert(std::is_same_v<T, ReqHeader> || std::is_same_v<T, RespHeader>, 
                   "T must be either ReqHeader or RespHeader");
-        if(header.serialize_type == SERIALIZE_TYPE)
+        if(header.serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_PROTOBUF))
         {
             return ProtobufProtocol();
+        }else if(header.serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT))
+        {
+            return StructPackProtocol();
         }else {
+            // 未知的序列化类型
             return std::nullopt;
         }
     }
     static std::optional<supported_serialize_protocols> GetSerializeProtocolByType(uint8_t serialize_type)
     {
-        if(serialize_type == SERIALIZE_TYPE)
+        if(serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_PROTOBUF))
         {
             return ProtobufProtocol();
+        }else if(serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT))
+        {
+            return StructPackProtocol();
         }else {
+            // 未知的序列化类型
             return std::nullopt;
         }
     }
@@ -103,11 +140,12 @@ public:
         using param_type = typename traits_type::parameters_type;
         
         if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
-            return ProtobufProtocol();
+            // 无参数函数使用 StructPackProtocol，更轻量级
+            return StructPackProtocol();
         }
         else {
             using first_arg_type = std::tuple_element_t<0, param_type>;
-            if constexpr (std::is_base_of_v<::google::protobuf::Message, std::remove_cvref_t<first_arg_type>>) {
+            if constexpr (IsProtobufMessage<first_arg_type>) {
                 return ProtobufProtocol();
             }
             else {
@@ -177,29 +215,19 @@ public:
         return Errc::SUCCESS;
     }
 
-    // template <auto func>
-    // struct HasGenRegisterKey {
-    //     template <typename T>
-    //     static constexpr bool check(T*) {
-    //         return requires { T::template HasGenRegisterKey<func>(); };
-    //     }
-    // };
-
-
-
     static bool PrepareResponseHeader(std::string &response_buf, const std::string& rpc_result, const ReqHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
     {
-        std::string err_msg_buf;
         std::string& header_buf = response_buf;
-        if(header_buf.capacity() < RESP_HEAD_LEN)
+        // 确保缓冲区有足够空间
+        if(header_buf.size() < RESP_HEAD_LEN)
         {
-            RpcLogError("[CoroRpcProtocol] PrepareResponseHeader: response buffer is too small, size: %zu, expected: %zu", header_buf.size(), RESP_HEAD_LEN);
-            return false;
+            header_buf.resize(RESP_HEAD_LEN);
         }
-        auto& resp_head = *(RespHeader*)header_buf.data();
+        auto& resp_head = *reinterpret_cast<RespHeader*>(header_buf.data());
         resp_head.magic = MAGIC_NUMBER;
         resp_head.version = VERSION_NUMBER;
-        resp_head.serialize_type = SERIALIZE_TYPE;
+        // 响应使用与请求相同的序列化类型
+        resp_head.serialize_type = req_header.serialize_type;
         resp_head.seq_num = req_header.seq_num;
         resp_head.attach_length = attachment_len; 
         resp_head.length = rpc_result.size();
