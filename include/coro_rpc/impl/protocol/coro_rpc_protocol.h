@@ -89,11 +89,12 @@ public:
         uint32_t seq_num;
         uint32_t func_id;
         uint32_t length;
+        uint64_t client_id;
         uint32_t attach_length;
         std::string ToString() const
         {
-            return std::format("magic: {}, version: {}, serialize_type: {}, msg_type: {}, seq_num: {}, func_id: {}, length: {}, attach_length: {}",
-                            magic, version, serialize_type, msg_type, seq_num, func_id, length, attach_length);
+            return std::format("magic: {}, version: {}, serialize_type: {}, msg_type: {}, seq_num: {}, func_id: {}, client_id:{}, length: {}, attach_length: {}",
+                            magic, version, serialize_type, msg_type, seq_num, func_id, client_id, length, attach_length);
         }
     };
 
@@ -105,12 +106,13 @@ public:
         uint8_t err_code;
         uint8_t msg_type;
         uint32_t seq_num;
+        uint64_t client_id;
         uint32_t length;
         uint32_t attach_length;
         std::string ToString() const
         {
-            return std::format("magic: {}, version: {}, serialize_type: {}, err_code: {}, msg_type: {}, seq_num: {}, length: {}, attach_length: {}",
-                            magic, version, serialize_type, err_code, msg_type, seq_num, length, attach_length);
+            return std::format("magic: {}, version: {}, serialize_type: {}, err_code: {}, msg_type: {}, seq_num: {}, client_id:{}, length: {}, attach_length: {}",
+                            magic, version, serialize_type, err_code, msg_type, seq_num, client_id, length, attach_length);
         }
     };
 
@@ -259,6 +261,7 @@ public:
         // 响应使用与请求相同的序列化类型
         resp_head.serialize_type = req_header.serialize_type;
         resp_head.seq_num = req_header.seq_num;
+        resp_head.client_id = req_header.client_id;
         resp_head.attach_length = attachment_len; 
         resp_head.length = rpc_result.size();
 
@@ -274,9 +277,9 @@ public:
     }
 
     static constexpr inline auto REQ_HEAD_LEN = sizeof(ReqHeader);
-    static_assert(REQ_HEAD_LEN == 20);
+    static_assert(REQ_HEAD_LEN == 32);
     static constexpr inline auto RESP_HEAD_LEN = sizeof(RespHeader);
-    static_assert(RESP_HEAD_LEN == 20);
+    static_assert(RESP_HEAD_LEN == 32);
 
 }; // namespace ToolBox::CoroRpc::CoroRpcProtocol
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <future>
 #include <variant>
 #include <unordered_map>
@@ -157,6 +158,7 @@ public:
     const Config &get_config() const { return config_; }
 
     uint32_t get_client_id() const { return config_.client_id; }
+    void set_client_id(uint32_t client_id) const { config_.client_id = client_id; }
 
     // Call RPC with default Timeout_(5s)
     template <auto func, typename... Args>
@@ -456,6 +458,7 @@ private:
                 .seq_num = ++request_id_,
                 .func_id = key,
                 .length = body_length,
+                .client_id = config_.client_id,
                 .attach_length = static_cast<uint32_t>(attachment_size)
             };
             

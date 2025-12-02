@@ -1218,9 +1218,9 @@ CASE(TestCompatibility_HeaderFormat)
     using namespace ToolBox::CoroRpc;
     
     // 验证头部格式符合预期
-    static_assert(sizeof(CoroRpcProtocol::ReqHeader) == 20, 
+    static_assert(sizeof(CoroRpcProtocol::ReqHeader) == 32, 
                   "请求头大小应该是 20 字节");
-    static_assert(sizeof(CoroRpcProtocol::RespHeader) == 20, 
+    static_assert(sizeof(CoroRpcProtocol::RespHeader) == 32, 
                   "响应头大小应该是 20 字节");
     
     // 验证常量值
