@@ -347,6 +347,8 @@ CASE(TestCoroRpcClient_Construction)
         SetError("客户端 ID 设置失败");
         return;
     }
+    client1.set_client_id(1000);
+    client2.set_client_id(2000);
 }
 
 CASE(TestCoroRpcClient_SetReqAttachment)
