@@ -78,18 +78,16 @@ public:
     }
     template <auto func>
     void SetRespAttachmentFunc(std::function<std::string_view()> &&resp_attachment_func) {
-        // 编译期静态存储（零查找开销）
-        static auto& storage = [&]() -> auto& {
-            if constexpr(ServerHasGenRegisterKey<rpc_protocol, func>) {
-                constexpr auto key = rpc_protocol::template GenRegisterKey<func>();
-                return resp_attachment_func_map_[key]; // 直接返回引用
+        static const rpc_func_key key = [] {
+            if constexpr (ServerHasGenRegisterKey<rpc_protocol, func>) {
+                return rpc_protocol::template GenRegisterKey<func>();
             } else {
-                constexpr auto key = CoroRpcTools::AutoGenRegisterKey<func>();
-                return resp_attachment_func_map_[key]; // 直接返回引用
+                return CoroRpcTools::AutoGenRegisterKey<func>();
             }
         }();
-        
-        storage = std::move(resp_attachment_func);
+
+        // 每次调用时，用 key 在当前 this 的 map 上访问
+        resp_attachment_func_map_[key] = std::move(resp_attachment_func);
     }
     
     std::string_view GetReqAttachment() const noexcept { return req_attachment_; }

@@ -440,11 +440,6 @@ CASE(TestCoroRpcServer_RegisterService_NonMemberFunction)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 因为服务器在注册时会尝试实例化所有协议类型（包括 ProtobufProtocol）
-    // 而 ProtobufProtocol 不能序列化基本类型
-    // 这个测试暂时注释掉，等待实现修复
-    /*
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     server.RegisterService<add>();
@@ -456,16 +451,14 @@ CASE(TestCoroRpcServer_RegisterService_NonMemberFunction)
         SetError("注册的服务数量不正确");
         return;
     }
-    */
+    
 }
 
 CASE(TestCoroRpcServer_RegisterService_MemberFunction)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     TestService service;
     
@@ -478,16 +471,14 @@ CASE(TestCoroRpcServer_RegisterService_MemberFunction)
         SetError("注册的成员函数服务数量不正确");
         return;
     }
-    */
+    
 }
 
 CASE(TestCoroRpcServer_RegisterService_CoroutineFunction)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的协程函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     server.RegisterService<async_add>();
@@ -499,16 +490,14 @@ CASE(TestCoroRpcServer_RegisterService_CoroutineFunction)
         SetError("注册的协程服务数量不正确");
         return;
     }
-    */
+    
 }
 
 CASE(TestCoroRpcServer_GetFunctionKeyName)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     server.RegisterService<add>();
@@ -522,7 +511,7 @@ CASE(TestCoroRpcServer_GetFunctionKeyName)
     const std::string& name = server.GetFunctionKeyName(keys[0]);
     // 名称可能为空，取决于实现
     (void)name;  // 避免未使用变量警告
-    */
+
 }
 
 CASE(TestCoroRpcServer_SetSendCallback)
@@ -546,9 +535,7 @@ CASE(TestCoroRpcServer_SetRespAttachmentFunc)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     server.RegisterService<add>();
@@ -558,7 +545,7 @@ CASE(TestCoroRpcServer_SetRespAttachmentFunc)
     });
     
     // 测试设置成功（无异常）
-    */
+    
 }
 
 CASE(TestCoroRpcServer_OnRecvReq_InvalidHeader)
@@ -611,9 +598,7 @@ CASE(TestClientServer_Integration_BasicCall)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     CoroRpcClient<CoroRpcProtocol> client;
     
@@ -638,16 +623,14 @@ CASE(TestClientServer_Integration_BasicCall)
     
     // 注意：这是一个简化的测试，实际需要协程执行器来运行
     // 完整的集成测试需要实际的网络层或模拟的协程执行环境
-    */
+    
 }
 
 CASE(TestClientServer_Integration_WithAttachment)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     CoroRpcClient<CoroRpcProtocol> client;
     
@@ -674,16 +657,14 @@ CASE(TestClientServer_Integration_WithAttachment)
     client.SetReqAttachment(sent_attachment);
     
     // 注意：需要协程执行器来完整测试
-    */
+
 }
 
 CASE(TestClientServer_Integration_AsyncFunction)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的协程函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     CoroRpcClient<CoroRpcProtocol> client;
     
@@ -699,7 +680,7 @@ CASE(TestClientServer_Integration_AsyncFunction)
     });
     
     // 注意：需要协程执行器来完整测试
-    */
+    
 }
 
 // ========== 错误处理测试 ==========
@@ -778,9 +759,7 @@ CASE(TestConcurrency_MultipleServices)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     // 注册多个服务
@@ -808,7 +787,7 @@ CASE(TestConcurrency_MultipleServices)
             }
         }
     }
-    */
+    
 }
 
 // ========== 边界条件测试 ==========
@@ -872,9 +851,6 @@ CASE(TestCoroutineFunction_Registration)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的协程函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     server.RegisterService<async_add>();
@@ -888,7 +864,7 @@ CASE(TestCoroutineFunction_Registration)
         SetError("协程函数注册失败");
         return;
     }
-    */
+
 }
 
 // ========== 工具函数测试 ==========
@@ -1055,9 +1031,7 @@ CASE(TestStress_ManyServices)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     // 注册大量服务
@@ -1082,7 +1056,7 @@ CASE(TestStress_ManyServices)
         SetError("服务键存在重复");
         return;
     }
-    */
+    
 }
 
 CASE(TestStress_LargeAttachment)
@@ -1176,9 +1150,7 @@ CASE(TestThreadSafety_ConcurrentRegistration)
 {
     using namespace ToolBox::CoroRpc;
     
-    // 注意：由于当前实现的问题，基本类型的函数注册会导致编译错误
-    // 这个测试暂时注释掉，等待实现修复
-    /*
+
     CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
     
     std::vector<std::thread> threads;
@@ -1210,7 +1182,7 @@ CASE(TestThreadSafety_ConcurrentRegistration)
         SetError("并发注册可能导致服务丢失");
         return;
     }
-    */
+    
 }
 
 // ========== 兼容性测试 ==========
