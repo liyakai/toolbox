@@ -197,6 +197,12 @@ public:
     {
         return header.func_id;
     }
+
+    static uint64_t GetClientID(const ReqHeader &header)
+    {
+        return header.client_id;
+    }
+
     template<typename T>
     static Errc ReadHeader(std::string_view data, T &header)
     {
