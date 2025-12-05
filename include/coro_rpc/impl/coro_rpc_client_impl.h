@@ -12,7 +12,7 @@
 #include "tools/cpp20_coroutine.h"
 #include "tools/timer.h"
 #include "tools/function_traits.h"
-#include "protocol/coro_rpc_protocol.h"
+#include "protocol/coro_rpc_protocol.h" // IWYU pragma: keep
 #include "protocol/serialize_adapter.h"
 
 namespace ToolBox {
@@ -38,6 +38,19 @@ template<>
 struct rpc_return_type<void>{
     using type = std::monostate;
 };
+
+template<typename T>
+struct unwrap_task_return_type {
+    using type = T;
+};
+
+template<typename R, typename Executor>
+struct unwrap_task_return_type<ToolBox::coro::Task<R, Executor>> {
+    using type = R;
+};
+
+template<typename T>
+using rpc_async_return_value_t = typename rpc_return_type<typename unwrap_task_return_type<T>::type>::type;
 
 struct resp_body{
     uint8_t serialize_type_;  // 与协议头中的 serialize_type 类型保持一致
@@ -162,7 +175,7 @@ public:
 
     // Call RPC with default Timeout_(5s)
     template <auto func, typename... Args>
-    auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>, coro::SharedLooperExecutor> 
+    auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<rpc_async_return_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>>, coro::SharedLooperExecutor> 
     {
         return CallFor_<func>(std::chrono::seconds(5), std::forward<Args>(args)...);
     }
@@ -203,7 +216,7 @@ private:
     // Call RPC with Timeout_
   template <auto func, typename... Args>
   auto CallFor_(auto duration, Args &&...args) 
-  -> ToolBox::coro::Task<async_rpc_result_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>, coro::SharedLooperExecutor> 
+  -> ToolBox::coro::Task<async_rpc_result_value_t<rpc_async_return_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>>, coro::SharedLooperExecutor> 
   {
         using return_type = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
         auto async_result = co_await co_await SendRequestForWithAttachment<func, Args...>(
@@ -223,10 +236,11 @@ private:
   auto SendRequestForWithAttachment(auto time_out_duration,
                                     std::string_view request_attachment,
                                     Args &&...args)
-      -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<typename ToolBox::FunctionTraits<decltype(func)>::return_type>, coro::SharedLooperExecutor>, coro::SharedLooperExecutor> 
+      -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<rpc_async_return_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>>, coro::SharedLooperExecutor>, coro::SharedLooperExecutor> 
       {
         req_attachment_ = {};   // 及时释放,防止混乱.
         using return_type = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
+        using rpc_value_type = rpc_async_return_value_t<return_type>;
         RecvingGuard guard(control_.get());
         uint32_t id;
         std::function<void()> promise_callback;
@@ -269,13 +283,13 @@ private:
             if (!is_ok) [[unlikely]]
             {
                 RpcLogError("[rpc][client] response handler table insert failed, id: {}", id);
-                co_return BuildFailedRpcResult_<return_type>(CoroRpc::Errc::ERR_SERIAL_NUMBER_CONFLICT);
+                co_return BuildFailedRpcResult_<rpc_value_type>(CoroRpc::Errc::ERR_SERIAL_NUMBER_CONFLICT);
             }else{
                 guard.release();
-                co_return DeserializeRpcResult_<return_type>(std::move(future), std::move(future_callback), std::weak_ptr<control_t>{control_});
+                co_return DeserializeRpcResult_<rpc_value_type>(std::move(future), std::move(future_callback), std::weak_ptr<control_t>{control_});
             }
         }else {
-            co_return BuildFailedRpcResult_<return_type>(std::move(result));
+            co_return BuildFailedRpcResult_<rpc_value_type>(std::move(result));
         }
   }
 
