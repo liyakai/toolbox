@@ -58,13 +58,25 @@ class CoroRpcServer;
 struct CoroRpcProtocol
 {
 public:
-    constexpr static inline uint8_t MAGIC_NUMBER = 0xde;
-    constexpr static inline uint8_t VERSION_NUMBER = 1;
+    static constexpr uint8_t kMagicNumber = 0xde;
+    static constexpr uint8_t kVersionNumber = 1;
     
     // 序列化类型枚举
     enum class SerializeType : uint8_t {
-        SERIALIZE_TYPE_STRUCT = 0,    // StructPack 序列化方式（用于基本类型）
-        SERIALIZE_TYPE_PROTOBUF = 1   // Protobuf 序列化方式（用于 protobuf message）
+        kSerializeTypeStruct = 0,    // StructPack 序列化方式（用于基本类型）
+        kSerializeTypeProtobuf = 1   // Protobuf 序列化方式（用于 protobuf message）
+    };
+    
+    // 消息类型枚举（用于区分普通RPC和流式RPC）
+    enum class MsgType : uint8_t {
+        kMsgTypeNormal = 0,          // 普通RPC请求/响应
+        kMsgTypeStreamStart = 1,     // 流式RPC开始（初始请求）
+        kMsgTypeStreamData = 2,      // 流式RPC数据包
+        kMsgTypeStreamEnd = 3,       // 流式RPC结束标记
+        kMsgTypeStreamError = 4,     // 流式RPC错误
+        kMsgTypeStreamCancel = 5,    // 流式RPC取消（客户端主动取消）
+        kMsgTypeStreamPause = 6,     // 流式RPC暂停（背压控制：客户端缓冲区满）
+        kMsgTypeStreamResume = 7     // 流式RPC恢复（背压控制：客户端缓冲区有空间）
     };
 /*
 * RPC header
@@ -82,9 +94,9 @@ public:
 */
     struct ReqHeader
     {
-        uint8_t magic = MAGIC_NUMBER;
-        uint8_t version = VERSION_NUMBER;
-        uint8_t serialize_type = static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT);  // 默认使用 StructPack
+        uint8_t magic = kMagicNumber;
+        uint8_t version = kVersionNumber;
+        uint8_t serialize_type = static_cast<uint8_t>(SerializeType::kSerializeTypeStruct);  // 默认使用 StructPack
         uint8_t msg_type;
         uint32_t seq_num;
         uint32_t func_id;
@@ -100,9 +112,9 @@ public:
 
     struct RespHeader
     {
-        uint8_t magic = MAGIC_NUMBER;
-        uint8_t version = VERSION_NUMBER;
-        uint8_t serialize_type = static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT);  // 默认使用 StructPack
+        uint8_t magic = kMagicNumber;
+        uint8_t version = kVersionNumber;
+        uint8_t serialize_type = static_cast<uint8_t>(SerializeType::kSerializeTypeStruct);  // 默认使用 StructPack
         uint8_t err_code;
         uint8_t msg_type;
         uint32_t seq_num;
@@ -124,10 +136,10 @@ public:
     {
         static_assert(std::is_same_v<T, ReqHeader> || std::is_same_v<T, RespHeader>, 
                   "T must be either ReqHeader or RespHeader");
-        if(header.serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_PROTOBUF))
+        if(header.serialize_type == static_cast<uint8_t>(SerializeType::kSerializeTypeProtobuf))
         {
             return ProtobufProtocol();
-        }else if(header.serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT))
+        }else if(header.serialize_type == static_cast<uint8_t>(SerializeType::kSerializeTypeStruct))
         {
             return StructPackProtocol();
         }else {
@@ -137,10 +149,10 @@ public:
     }
     static std::optional<supported_serialize_protocols> GetSerializeProtocolByType(uint8_t serialize_type)
     {
-        if(serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_PROTOBUF))
+        if(serialize_type == static_cast<uint8_t>(SerializeType::kSerializeTypeProtobuf))
         {
             return ProtobufProtocol();
-        }else if(serialize_type == static_cast<uint8_t>(SerializeType::SERIALIZE_TYPE_STRUCT))
+        }else if(serialize_type == static_cast<uint8_t>(SerializeType::kSerializeTypeStruct))
         {
             return StructPackProtocol();
         }else {
@@ -225,12 +237,12 @@ public:
             RpcLogError("[CoroRpcProtocol] ReadHeader: length is too large");
             return Errc::ERR_PROTOCOL;
         }
-        if (header.magic != MAGIC_NUMBER) {
-            RpcLogError("[CoroRpcProtocol] ReadHeader: magic number is invalid, magic: %d, expected: %d", header.magic, MAGIC_NUMBER);
+        if (header.magic != kMagicNumber) {
+            RpcLogError("[CoroRpcProtocol] ReadHeader: magic number is invalid, magic: %d, expected: %d", header.magic, kMagicNumber);
             return Errc::ERR_PROTOCOL;
         }
-        if (header.version != VERSION_NUMBER) {
-            RpcLogError("[CoroRpcProtocol] ReadHeader: version number is invalid, version: %d, expected: %d", header.version, VERSION_NUMBER);
+        if (header.version != kVersionNumber) {
+            RpcLogError("[CoroRpcProtocol] ReadHeader: version number is invalid, version: %d, expected: %d", header.version, kVersionNumber);
             return Errc::ERR_PROTOCOL;
         }
 
@@ -255,6 +267,12 @@ public:
 
     static bool PrepareResponseHeader(std::string &response_buf, const std::string& rpc_result, const ReqHeader& req_header, std::size_t attachment_len, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
     {
+        return PrepareResponseHeader(response_buf, rpc_result, req_header, attachment_len, 
+                                    static_cast<uint8_t>(MsgType::kMsgTypeNormal), err_code, err_msg);
+    }
+    
+    static bool PrepareResponseHeader(std::string &response_buf, const std::string& rpc_result, const ReqHeader& req_header, std::size_t attachment_len, uint8_t msg_type, CoroRpc::Errc err_code = {}, std::string_view err_msg = {})
+    {
         std::string& header_buf = response_buf;
         // 确保缓冲区有足够空间
         if(header_buf.size() < RESP_HEAD_LEN)
@@ -262,14 +280,15 @@ public:
             header_buf.resize(RESP_HEAD_LEN);
         }
         auto& resp_head = *reinterpret_cast<RespHeader*>(header_buf.data());
-        resp_head.magic = MAGIC_NUMBER;
-        resp_head.version = VERSION_NUMBER;
+        resp_head.magic = kMagicNumber;
+        resp_head.version = kVersionNumber;
         // 响应使用与请求相同的序列化类型
         resp_head.serialize_type = req_header.serialize_type;
         resp_head.seq_num = req_header.seq_num;
         resp_head.client_id = req_header.client_id;
         resp_head.attach_length = attachment_len; 
         resp_head.length = rpc_result.size();
+        resp_head.msg_type = msg_type;
 
         if (attachment_len > UINT32_MAX) 
         [[unlikely]] {

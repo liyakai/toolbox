@@ -14,6 +14,7 @@
 #include "tools/function_traits.h"
 #include "protocol/coro_rpc_protocol.h" // IWYU pragma: keep
 #include "protocol/serialize_adapter.h"
+#include "stream_rpc.h"
 
 namespace ToolBox {
 namespace CoroRpc {
@@ -146,7 +147,22 @@ private:
                 callback_();
             }
         };
+        // 流式响应处理器：stream_id -> StreamReader
+        struct stream_handler_t {
+            std::shared_ptr<StreamReader<std::string>> reader;
+            uint32_t stream_id;
+            uint64_t timeout_timer = 0;  // 超时定时器ID
+            std::chrono::steady_clock::time_point start_time;  // 流开始时间
+            std::chrono::milliseconds timeout_duration;  // 超时时长
+            
+            stream_handler_t(uint32_t id, std::chrono::milliseconds timeout) 
+                : reader(std::make_shared<StreamReader<std::string>>()), 
+                  stream_id(id),
+                  start_time(std::chrono::steady_clock::now()),
+                  timeout_duration(timeout) {}
+        };
         std::unordered_map<uint32_t, handler_t> response_handler_table_;
+        std::unordered_map<uint32_t, stream_handler_t> stream_handler_table_;  // stream_id -> stream_handler
         std::atomic<uint32_t> recving_cnt_ = 0;
     };
 
@@ -178,6 +194,20 @@ public:
     auto Call(Args &&...args) -> ToolBox::coro::Task<async_rpc_result_value_t<rpc_async_return_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>>, coro::SharedLooperExecutor> 
     {
         return CallFor_<func>(std::chrono::seconds(5), std::forward<Args>(args)...);
+    }
+    
+    // Call Stream RPC - 返回StreamReader用于接收流式数据
+    template <auto func, typename... Args>
+    auto CallStream(Args &&...args) -> ToolBox::coro::Task<std::shared_ptr<StreamReader<std::string>>, coro::SharedLooperExecutor>
+    {
+        return CallStreamFor_<func>(std::chrono::seconds(30), std::forward<Args>(args)...);
+    }
+    
+    // 取消流式RPC
+    // stream_id: 流的ID（从StreamReader获取，需要通过其他方式传递）
+    // 或者通过StreamReader的Cancel()方法直接取消
+    bool CancelStream(uint32_t stream_id) {
+        return CancelStream_(stream_id);
     }
 
     bool SetReqAttachment(std::string_view attachment) {
@@ -230,6 +260,55 @@ private:
         } else {
             co_return {};
         }
+  }
+  
+  // Call Stream RPC with Timeout_
+  template <auto func, typename... Args>
+  auto CallStreamFor_(auto duration, Args &&...args)
+  -> ToolBox::coro::Task<std::shared_ptr<StreamReader<std::string>>, coro::SharedLooperExecutor>
+  {
+        RecvingGuard guard(control_.get());
+        uint32_t stream_id;
+        auto err = co_await SendStreamRequestImpl_<func>(stream_id, req_attachment_, std::forward<Args>(args)...);
+        req_attachment_ = {};  // 及时释放
+        
+        if (err != CoroRpc::Errc::SUCCESS) {
+            RpcLogError("[rpc][client] CallStreamFor_: send stream request failed, err: %d", err);
+            co_return nullptr;
+        }
+        
+        // 转换超时时间
+        auto timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+        
+        // 创建StreamReader并注册到stream_handler_table_
+        auto stream_reader = std::make_shared<StreamReader<std::string>>();
+        auto [iter, inserted] = control_->stream_handler_table_.try_emplace(stream_id, stream_id, timeout_ms);
+        if (!inserted) {
+            RpcLogError("[rpc][client] CallStreamFor_: stream_id conflict, id: %u", stream_id);
+            co_return nullptr;
+        }
+        iter->second.reader = stream_reader;
+        
+        // 设置流ID和背压回调
+        stream_reader->SetStreamId(stream_id);
+        stream_reader->SetBackpressureCallback([this, stream_id](uint32_t id, bool pause) {
+            // 发送背压控制消息
+            SendStreamControlMessage_(id, pause ? 
+                static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamPause) :
+                static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamResume));
+        });
+        
+        // 设置超时定时器
+        if (timeout_ms.count() > 0) {
+            auto timeout_handler = [this, stream_id]() {
+                RpcLogWarn("[rpc][client] CallStreamFor_: stream timeout, stream_id: %u", stream_id);
+                CancelStream_(stream_id);
+            };
+            iter->second.timeout_timer = ToolBox::TimerMgr->AddTimer(timeout_ms.count(), timeout_handler, false);
+        }
+        
+        guard.release();
+        co_return stream_reader;
   }
 
   template <auto func, typename... Args>
@@ -396,7 +475,7 @@ private:
     SendImpl_(uint32_t &id, std::string_view attachment, Args &&...args)
     {
         std::string send_buffer;
-        auto errc = PrepareSendBuffer_<func>(id, attachment.size(), send_buffer, std::forward<Args>(args)...);
+        auto errc = PrepareSendBuffer_<func>(id, attachment.size(), send_buffer, false, std::forward<Args>(args)...);
         if (errc != CoroRpc::Errc::SUCCESS) {
             RpcLogError("[rpc][client] SendImpl_ PrepareSendBuffer_ failed, rpc_errc: %d", errc);
             co_return errc;
@@ -425,10 +504,41 @@ private:
         // send buffer
         co_return CoroRpc::Errc::SUCCESS;
     }
+    
+    // 发送流式RPC请求
+    template <auto func, typename... Args>
+    ToolBox::coro::Task<CoroRpc::Errc, coro::SharedLooperExecutor>
+    SendStreamRequestImpl_(uint32_t &id, std::string_view attachment, Args &&...args)
+    {
+        std::string send_buffer;
+        auto errc = PrepareSendBuffer_<func>(id, attachment.size(), send_buffer, true, std::forward<Args>(args)...);
+        if (errc != CoroRpc::Errc::SUCCESS) {
+            RpcLogError("[rpc][client] SendStreamRequestImpl_ PrepareSendBuffer_ failed, rpc_errc: %d", errc);
+            co_return errc;
+        }
+        if (!attachment.empty()) 
+        {
+            size_t expected_buffer_size = rpc_protocol::REQ_HEAD_LEN + (send_buffer.size() - rpc_protocol::REQ_HEAD_LEN - attachment.size()) + attachment.size();
+            if (send_buffer.size() < expected_buffer_size || send_buffer.size() < attachment.size()) {
+                RpcLogError("[rpc][client] SendStreamRequestImpl_: buffer too small for attachment, buffer size: %zu, attachment size: %zu", 
+                           send_buffer.size(), attachment.size());
+                co_return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
+            }
+            std::memcpy(send_buffer.data() + send_buffer.size() - attachment.size(), 
+                       attachment.data(), attachment.size());
+        }
+        if(!send_callback_)
+        {
+            RpcLogError("[rpc][client] SendStreamRequestImpl_: send_callback_ not set");
+            co_return CoroRpc::Errc::ERR_SEND_CALLBACK_NOT_SET;
+        }
+        send_callback_(std::move(send_buffer));
+        co_return CoroRpc::Errc::SUCCESS;
+    }
 
 
     template<auto func, typename... Args>
-    auto PrepareSendBuffer_(uint32_t &id, std::size_t attachment_size, std::string & buffer, Args &&...args) -> CoroRpc::Errc
+    auto PrepareSendBuffer_(uint32_t &id, std::size_t attachment_size, std::string & buffer, bool is_stream, Args &&...args) -> CoroRpc::Errc
     {
         // 编译期计算唯一key（无运行时开销）
         static constexpr rpc_func_key key = [](){
@@ -464,11 +574,12 @@ private:
             buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
             
             // 初始化请求头
+            uint8_t msg_type = is_stream ? static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamStart) : 0;
             new (buffer.data()) rpc_protocol::ReqHeader{
-                .magic = rpc_protocol::MAGIC_NUMBER,
-                .version = rpc_protocol::VERSION_NUMBER,
+                .magic = rpc_protocol::kMagicNumber,
+                .version = rpc_protocol::kVersionNumber,
                 .serialize_type = adapter::get_serialize_type(),
-                .msg_type = 0,
+                .msg_type = msg_type,
                 .seq_num = ++request_id_,
                 .func_id = key,
                 .length = body_length,
@@ -503,14 +614,103 @@ private:
             RpcLogError("[rpc][client] OnRecvResp_ read payload failed, err:%d", err);
             return err;
         }
+        
+        // 检查是否是流式响应
+        bool is_stream_response = (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamStart) ||
+                                   header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamData) ||
+                                   header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamEnd) ||
+                                   header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError));
+        
+        if (is_stream_response) {
+            // 处理流式响应
+            auto stream_iter = control_->stream_handler_table_.find(header.seq_num);
+            if (stream_iter != control_->stream_handler_table_.end()) {
+                auto& stream_handler = stream_iter->second;
+                if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamEnd)) {
+                    // 流结束
+                    stream_handler.reader->Finish();
+                    // 清理超时定时器
+                    if (stream_handler.timeout_timer != 0) {
+                        ToolBox::TimerMgr->KillTimer(stream_handler.timeout_timer);
+                    }
+                    control_->stream_handler_table_.erase(stream_iter);
+                } else if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError)) {
+                    // 流错误
+                    stream_handler.reader->SetError(static_cast<Errc>(header.err_code));
+                    // 清理超时定时器
+                    if (stream_handler.timeout_timer != 0) {
+                        ToolBox::TimerMgr->KillTimer(stream_handler.timeout_timer);
+                    }
+                    control_->stream_handler_table_.erase(stream_iter);
+                } else {
+                    // 流数据
+                    std::string body_str(body.data(), body.size());
+                    bool pushed = stream_handler.reader->PushValue(std::move(body_str));
+                    if (!pushed) {
+                        // 缓冲区满，背压已经在PushValue中处理
+                        RpcLogWarn("[rpc][client] OnRecvResp_: stream buffer full, backpressure triggered, stream_id: %u", header.seq_num);
+                    }
+                }
+            } else {
+                RpcLogWarn("[rpc][client] OnRecvResp_: stream handler not found for stream_id: %u", header.seq_num);
+            }
+            return CoroRpc::Errc::SUCCESS;
+        }
+        
+        // 普通RPC响应
         if(auto iter = control_->response_handler_table_.find(header.seq_num); iter != control_->response_handler_table_.end())
         {
             iter->second(resp_body(header.serialize_type, std::move(body), std::move(attachment)), header.err_code);
         }
         return CoroRpc::Errc::SUCCESS;
     }
-
-
+    
+    // 取消流（私有函数）
+    bool CancelStream_(uint32_t stream_id) {
+        auto iter = control_->stream_handler_table_.find(stream_id);
+        if (iter != control_->stream_handler_table_.end()) {
+            // 取消StreamReader
+            iter->second.reader->Cancel();
+            
+            // 清理超时定时器
+            if (iter->second.timeout_timer != 0) {
+                ToolBox::TimerMgr->KillTimer(iter->second.timeout_timer);
+            }
+            
+            // 发送取消消息到服务器
+            SendStreamControlMessage_(stream_id, static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamCancel));
+            
+            // 从表中移除
+            control_->stream_handler_table_.erase(iter);
+            return true;
+        }
+        return false;
+    }
+    
+    // 发送流控制消息（暂停/恢复/取消）
+    void SendStreamControlMessage_(uint32_t stream_id, uint8_t msg_type) {
+        if (!send_callback_) {
+            RpcLogError("[rpc][client] SendStreamControlMessage_: send_callback_ not set");
+            return;
+        }
+        
+        // 构造控制消息（只有头部，没有body）
+        std::string control_buf;
+        control_buf.resize(rpc_protocol::REQ_HEAD_LEN);
+        
+        auto& req_header = *reinterpret_cast<rpc_protocol::ReqHeader*>(control_buf.data());
+        req_header.magic = rpc_protocol::kMagicNumber;
+        req_header.version = rpc_protocol::kVersionNumber;
+        req_header.serialize_type = static_cast<uint8_t>(rpc_protocol::SerializeType::kSerializeTypeStruct);
+        req_header.msg_type = msg_type;
+        req_header.seq_num = stream_id;  // 使用stream_id作为seq_num
+        req_header.func_id = 0;  // 控制消息不需要func_id
+        req_header.length = 0;  // 没有body
+        req_header.attach_length = 0;
+        req_header.client_id = config_.client_id;
+        
+        send_callback_(std::move(control_buf));
+    }
 
 private:
     

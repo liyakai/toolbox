@@ -84,9 +84,9 @@ CASE(TestCoroRpcProtocol_ReadHeader_Valid)
     using namespace ToolBox::CoroRpc;
     
     CoroRpcProtocol::ReqHeader header;
-    header.magic = CoroRpcProtocol::MAGIC_NUMBER;
-    header.version = CoroRpcProtocol::VERSION_NUMBER;
-    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);
+    header.magic = CoroRpcProtocol::kMagicNumber;
+    header.version = CoroRpcProtocol::kVersionNumber;
+    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf);
     header.msg_type = 0;
     header.seq_num = 12345;
     header.func_id = 67890;
@@ -119,7 +119,7 @@ CASE(TestCoroRpcProtocol_ReadHeader_InvalidMagic)
     
     CoroRpcProtocol::ReqHeader header;
     header.magic = 0x00;  // 无效的 magic
-    header.version = CoroRpcProtocol::VERSION_NUMBER;
+    header.version = CoroRpcProtocol::kVersionNumber;
     
     std::string buffer(reinterpret_cast<const char*>(&header), sizeof(header));
     std::string_view data(buffer);
@@ -138,7 +138,7 @@ CASE(TestCoroRpcProtocol_ReadHeader_InvalidVersion)
     using namespace ToolBox::CoroRpc;
     
     CoroRpcProtocol::ReqHeader header;
-    header.magic = CoroRpcProtocol::MAGIC_NUMBER;
+    header.magic = CoroRpcProtocol::kMagicNumber;
     header.version = 99;  // 无效的版本
     
     std::string buffer(reinterpret_cast<const char*>(&header), sizeof(header));
@@ -206,7 +206,7 @@ CASE(TestCoroRpcProtocol_PrepareResponseHeader)
     
     CoroRpcProtocol::ReqHeader req_header;
     req_header.seq_num = 12345;
-    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
+    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf);;
     
     std::string rpc_result = "test result";
     std::string response_buf;
@@ -223,7 +223,7 @@ CASE(TestCoroRpcProtocol_PrepareResponseHeader)
     CoroRpcProtocol::RespHeader* resp_header = 
         reinterpret_cast<CoroRpcProtocol::RespHeader*>(response_buf.data());
     
-    if (resp_header->magic != CoroRpcProtocol::MAGIC_NUMBER ||
+    if (resp_header->magic != CoroRpcProtocol::kMagicNumber ||
         resp_header->seq_num != req_header.seq_num ||
         resp_header->length != rpc_result.size()) {
         SetError("响应头数据不正确");
@@ -398,9 +398,9 @@ CASE(TestCoroRpcClient_OnRecvResp_Valid)
     
     // 构造一个有效的响应
     CoroRpcProtocol::RespHeader resp_header;
-    resp_header.magic = CoroRpcProtocol::MAGIC_NUMBER;
-    resp_header.version = CoroRpcProtocol::VERSION_NUMBER;
-    resp_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
+    resp_header.magic = CoroRpcProtocol::kMagicNumber;
+    resp_header.version = CoroRpcProtocol::kVersionNumber;
+    resp_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf);;
     resp_header.seq_num = 9528;  // 使用默认的 request_id + 1
     resp_header.err_code = static_cast<uint8_t>(Errc::SUCCESS);
     resp_header.length = 0;
@@ -571,9 +571,9 @@ CASE(TestCoroRpcServer_OnRecvReq_UnregisteredFunction)
     
     // 构造一个未注册函数的请求
     CoroRpcProtocol::ReqHeader req_header;
-    req_header.magic = CoroRpcProtocol::MAGIC_NUMBER;
-    req_header.version = CoroRpcProtocol::VERSION_NUMBER;
-    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
+    req_header.magic = CoroRpcProtocol::kMagicNumber;
+    req_header.version = CoroRpcProtocol::kVersionNumber;
+    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf);;
     req_header.seq_num = 1;
     req_header.func_id = 99999;  // 未注册的函数 ID
     req_header.length = 0;
@@ -708,8 +708,8 @@ CASE(TestErrorHandling_InvalidProtocol)
     
     // 构造无效协议的请求
     CoroRpcProtocol::ReqHeader req_header;
-    req_header.magic = CoroRpcProtocol::MAGIC_NUMBER;
-    req_header.version = CoroRpcProtocol::VERSION_NUMBER;
+    req_header.magic = CoroRpcProtocol::kMagicNumber;
+    req_header.version = CoroRpcProtocol::kVersionNumber;
     req_header.serialize_type = 99;  // 无效的序列化类型
     req_header.seq_num = 1;
     req_header.func_id = 1;
@@ -929,7 +929,7 @@ CASE(TestProtocolSelection_GetSerializeProtocolByType)
     using namespace ToolBox::CoroRpc;
     
     // 测试通过类型获取协议
-    auto protocol1 = CoroRpcProtocol::GetSerializeProtocolByType(static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF));
+    auto protocol1 = CoroRpcProtocol::GetSerializeProtocolByType(static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf));
     
     if (!protocol1.has_value()) {
         SetError("应该能够获取有效的协议");
@@ -998,9 +998,9 @@ CASE(TestPerformance_HeaderParsing)
     const int iterations = 100000;
     
     CoroRpcProtocol::ReqHeader header;
-    header.magic = CoroRpcProtocol::MAGIC_NUMBER;
-    header.version = CoroRpcProtocol::VERSION_NUMBER;
-    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);;
+    header.magic = CoroRpcProtocol::kMagicNumber;
+    header.version = CoroRpcProtocol::kVersionNumber;
+    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf);;
     header.seq_num = 12345;
     header.func_id = 67890;
     header.length = 100;
@@ -1198,12 +1198,12 @@ CASE(TestCompatibility_HeaderFormat)
                   "响应头大小应该是 20 字节");
     
     // 验证常量值
-    if (CoroRpcProtocol::MAGIC_NUMBER != 0xde) {
+    if (CoroRpcProtocol::kMagicNumber != 0xde) {
         SetError("Magic number 不正确");
         return;
     }
     
-    if (CoroRpcProtocol::VERSION_NUMBER != 1) {
+    if (CoroRpcProtocol::kVersionNumber != 1) {
         SetError("Version number 不正确");
         return;
     }
@@ -1240,9 +1240,9 @@ CASE(TestMemoryAlignment_ReadHeader)
     
     // 测试非对齐内存的读取
     CoroRpcProtocol::ReqHeader header;
-    header.magic = CoroRpcProtocol::MAGIC_NUMBER;
-    header.version = CoroRpcProtocol::VERSION_NUMBER;
-    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);
+    header.magic = CoroRpcProtocol::kMagicNumber;
+    header.version = CoroRpcProtocol::kVersionNumber;
+    header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf);
     header.seq_num = 12345;
     header.func_id = 67890;
     header.length = 100;

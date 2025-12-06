@@ -84,7 +84,7 @@ public:
         };
 
         (deserialize_one(args), ...);
-        return true;
+        return success;  // 修复：返回实际的成功状态，而不是总是返回 true
     }
 };
 

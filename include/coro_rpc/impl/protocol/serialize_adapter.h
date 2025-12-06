@@ -18,9 +18,9 @@ struct SerializeAdapter {
     // 获取序列化类型枚举值
     static constexpr uint8_t get_serialize_type() {
         if constexpr (std::is_same_v<serialize_protocol, ProtobufProtocol>) {
-            return static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_PROTOBUF);
+            return static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeProtobuf);
         } else if constexpr (std::is_same_v<serialize_protocol, StructPackProtocol>) {
-            return static_cast<uint8_t>(CoroRpcProtocol::SerializeType::SERIALIZE_TYPE_STRUCT);
+            return static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeStruct);
         } else {
             // 未来扩展其他协议类型时可以在这里添加
             // 使用 std::false_type 来避免在 C++20 中立即触发 static_assert
