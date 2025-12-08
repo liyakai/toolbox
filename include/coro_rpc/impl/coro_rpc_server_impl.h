@@ -177,8 +177,7 @@ private:
         {
             // 流式RPC处理
             using StreamValueType = typename ReturnType::value_type;
-            auto serialize_proto = rpc_protocol::template GetSerializeProtocol<func>();
-            auto iter = stream_handler_map_.emplace(key, [&, self, serialize_proto](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> StreamGenerator<std::string> {
+            auto iter = stream_handler_map_.emplace(key, [&, self](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> StreamGenerator<std::string> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> StreamGenerator<std::string> {
                     if constexpr (std::is_void_v<typename ToolBox::FunctionTraits<decltype(func)>::class_type>) {
                         return ExecuteStream_<serialize_protocol, func, StreamValueType>(data, attachment, nullptr);

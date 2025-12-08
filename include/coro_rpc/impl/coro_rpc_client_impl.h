@@ -212,8 +212,7 @@ public:
 
     bool SetReqAttachment(std::string_view attachment) {
         if (attachment.size() > UINT32_MAX) {
-        RpcLogError("[rpc][client] attachment is too long, max length is {}",
-                    UINT32_MAX);
+        RpcLogError("[rpc][client] attachment is too long, max length is UINT32_MAX");
         return false;
         }
         req_attachment_ = attachment;
@@ -300,11 +299,12 @@ private:
         
         // 设置超时定时器
         if (timeout_ms.count() > 0) {
-            auto timeout_handler = [this, stream_id]() {
+            auto timeout_handler = [this, stream_id](int times) {
+                (void)times;  // 未使用的参数
                 RpcLogWarn("[rpc][client] CallStreamFor_: stream timeout, stream_id: %u", stream_id);
                 CancelStream_(stream_id);
             };
-            iter->second.timeout_timer = ToolBox::TimerMgr->AddTimer(timeout_ms.count(), timeout_handler, false);
+            iter->second.timeout_timer = ToolBox::TimerMgr->AddTimer(timeout_handler, timeout_ms.count(), 1, __FILE__, __LINE__);
         }
         
         guard.release();
