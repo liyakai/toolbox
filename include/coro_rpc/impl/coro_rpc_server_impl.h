@@ -133,6 +133,11 @@ public:
         {
             keys.push_back(iter.first);
         }
+        for(auto &iter : stream_handler_map_)
+        {
+            keys.push_back(iter.first);
+        }
+
         return keys;
     }
 private:
