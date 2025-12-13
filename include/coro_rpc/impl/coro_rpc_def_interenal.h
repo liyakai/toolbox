@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include "tools/function_name.h"
 #include "tools/md5.h"
+#include "tools/cpp20_coroutine.h"
 
 #define RpcLogTrace(LogFormat, ...)     LogTrace(LogFormat, ## __VA_ARGS__)
 #define RpcLogDebug(LogFormat, ...)     LogDebug(LogFormat, ## __VA_ARGS__)
@@ -126,6 +127,28 @@ struct is_tuple_like<T, std::void_t<decltype(std::tuple_size<T>::value)>>
 
 template<typename T>
 inline constexpr bool is_tuple_like_v = is_tuple_like<T>::value;
+// ---------------------------------------------
+
+// --------- 从 Task<T> 或 StreamGenerator<T> 中提取内部类型 T ---------
+template<typename T>
+struct unwrap_task_return_type {
+    using type = T;
+};
+
+template<typename R, typename Executor>
+struct unwrap_task_return_type<ToolBox::coro::Task<R, Executor>> {
+    using type = R;
+};
+
+// 前向声明 StreamGenerator
+template<typename T>
+class StreamGenerator;
+
+// 特化：从 StreamGenerator<T> 中提取 T（在命名空间内部，可以直接使用 StreamGenerator）
+template<typename T>
+struct unwrap_task_return_type<StreamGenerator<T>> {
+    using type = T;
+};
 // ---------------------------------------------
 
 

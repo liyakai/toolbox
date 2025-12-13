@@ -41,16 +41,6 @@ struct rpc_return_type<void>{
 };
 
 template<typename T>
-struct unwrap_task_return_type {
-    using type = T;
-};
-
-template<typename R, typename Executor>
-struct unwrap_task_return_type<ToolBox::coro::Task<R, Executor>> {
-    using type = R;
-};
-
-template<typename T>
 using rpc_async_return_value_t = typename rpc_return_type<typename unwrap_task_return_type<T>::type>::type;
 
 struct resp_body{
