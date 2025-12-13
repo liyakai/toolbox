@@ -149,7 +149,7 @@ public:
     // 推送一个值到流中
     // 返回: true表示成功，false表示缓冲区已满（需要背压控制）
     bool PushValue(T value) {
-        std::coroutine_handle<> h_to_resume = {};
+        std::coroutine_handle<> h_to_resume;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             
@@ -177,12 +177,13 @@ public:
                 }
             }
             
+            // 保存 continuation 并在释放锁后 resume，避免死锁
             if (continuation_) {
                 h_to_resume = continuation_;
                 continuation_ = {};
             }
         }
-        // 在释放锁之后恢复协程，避免死锁
+        // 在锁释放后 resume 协程，避免死锁
         if (h_to_resume) {
             h_to_resume.resume();
         }
@@ -191,7 +192,7 @@ public:
     
     // 标记流结束
     void Finish() {
-        std::coroutine_handle<> h_to_resume = {};
+        std::coroutine_handle<> h_to_resume;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             finished_ = true;
@@ -200,7 +201,7 @@ public:
                 continuation_ = {};
             }
         }
-        // 在释放锁之后恢复协程，避免死锁
+        // 在锁释放后 resume 协程，避免死锁
         if (h_to_resume) {
             h_to_resume.resume();
         }
@@ -208,7 +209,7 @@ public:
     
     // 标记流错误
     void SetError(Errc err) {
-        std::coroutine_handle<> h_to_resume = {};
+        std::coroutine_handle<> h_to_resume;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             error_ = err;
@@ -218,7 +219,7 @@ public:
                 continuation_ = {};
             }
         }
-        // 在释放锁之后恢复协程，避免死锁
+        // 在锁释放后 resume 协程，避免死锁
         if (h_to_resume) {
             h_to_resume.resume();
         }
@@ -268,7 +269,7 @@ public:
                 should_resume = true;
             }
         }
-        // 在释放锁之后恢复协程，避免死锁
+        // 在锁释放后 resume 协程，避免死锁
         if (should_resume) {
             h.resume();
         }
@@ -308,7 +309,7 @@ public:
     // 取消流（客户端主动取消）
     // 注意：这个方法只标记流为取消状态，实际的取消消息应该由客户端通过CancelStream发送
     void Cancel() {
-        std::coroutine_handle<> h_to_resume = {};
+        std::coroutine_handle<> h_to_resume;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             if (!finished_ && !cancelled_) {
@@ -320,7 +321,7 @@ public:
                 }
             }
         }
-        // 在释放锁之后恢复协程，避免死锁
+        // 在锁释放后 resume 协程，避免死锁
         if (h_to_resume) {
             h_to_resume.resume();
         }
