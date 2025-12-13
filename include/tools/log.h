@@ -3,6 +3,8 @@
 #include <functional>
 #include <stdarg.h>
 #include <cstdio>
+#include <mutex>
+#include <vector>
 // 实现日志模块
 namespace ToolBox
 {
@@ -70,14 +72,17 @@ namespace ToolBox
             }
             va_list ap;
             va_start(ap, fmt);
-            vsprintf(log_buffer_, fmt, ap);
-            if (log_callback_)
-            {
-                log_callback_(ToolBox::LogLevel::LOG_TRACE, log_buffer_);
-            }
-            fprintf(stderr, "%s", log_buffer_);
-            fprintf(stderr, "\n");
+            char* log_buffer = GetThreadLocalBuffer();
+            vsnprintf(log_buffer, log_buffer_size_, fmt, ap);
             va_end(ap);
+            {
+                std::lock_guard<std::mutex> lock(print_mutex_);
+                if (log_callback_)
+                {
+                    log_callback_(ToolBox::LogLevel::LOG_TRACE, log_buffer);
+                }
+                fprintf(stderr, "%s\n", log_buffer);
+            }
             return true;
         }
 
@@ -89,14 +94,17 @@ namespace ToolBox
             }
             va_list ap;
             va_start(ap, fmt);
-            vsprintf(log_buffer_, fmt, ap);
-            if (log_callback_)
-            {
-                log_callback_(ToolBox::LogLevel::LOG_DEBUG, log_buffer_);
-            }
-            fprintf(stderr, "%s", log_buffer_);
-            fprintf(stderr, "\n");
+            char* log_buffer = GetThreadLocalBuffer();
+            vsnprintf(log_buffer, log_buffer_size_, fmt, ap);
             va_end(ap);
+            {
+                std::lock_guard<std::mutex> lock(print_mutex_);
+                if (log_callback_)
+                {
+                    log_callback_(ToolBox::LogLevel::LOG_DEBUG, log_buffer);
+                }
+                fprintf(stderr, "%s\n", log_buffer);
+            }
             return true;
         }
 
@@ -109,14 +117,17 @@ namespace ToolBox
             }
             va_list ap;
             va_start(ap, fmt);
-            vsprintf(log_buffer_, fmt, ap);
-            if (log_callback_)
-            {
-                log_callback_(ToolBox::LogLevel::LOG_INFO, log_buffer_);
-            }
-            fprintf(stderr, "%s", log_buffer_);
-            fprintf(stderr, "\n");
+            char* log_buffer = GetThreadLocalBuffer();
+            vsnprintf(log_buffer, log_buffer_size_, fmt, ap);
             va_end(ap);
+            {
+                std::lock_guard<std::mutex> lock(print_mutex_);
+                if (log_callback_)
+                {
+                    log_callback_(ToolBox::LogLevel::LOG_INFO, log_buffer);
+                }
+                fprintf(stderr, "%s\n", log_buffer);
+            }
             return true;
         }
 
@@ -129,14 +140,17 @@ namespace ToolBox
             }
             va_list ap;
             va_start(ap, fmt);
-            vsprintf(log_buffer_, fmt, ap);
-            if (log_callback_)
-            {
-                log_callback_(ToolBox::LogLevel::LOG_WARN, log_buffer_);
-            }
-            fprintf(stderr, "%s", log_buffer_);
-            fprintf(stderr, "\n");
+            char* log_buffer = GetThreadLocalBuffer();
+            vsnprintf(log_buffer, log_buffer_size_, fmt, ap);
             va_end(ap);
+            {
+                std::lock_guard<std::mutex> lock(print_mutex_);
+                if (log_callback_)
+                {
+                    log_callback_(ToolBox::LogLevel::LOG_WARN, log_buffer);
+                }
+                fprintf(stderr, "%s\n", log_buffer);
+            }
             return true;
         }
 
@@ -149,14 +163,17 @@ namespace ToolBox
             }
             va_list ap;
             va_start(ap, fmt);
-            vsprintf(log_buffer_, fmt, ap);
-            if (log_callback_)
-            {
-                log_callback_(ToolBox::LogLevel::LOG_ERROR, log_buffer_);
-            }
-            fprintf(stderr, "%s", log_buffer_);
-            fprintf(stderr, "\n");
+            char* log_buffer = GetThreadLocalBuffer();
+            vsnprintf(log_buffer, log_buffer_size_, fmt, ap);
             va_end(ap);
+            {
+                std::lock_guard<std::mutex> lock(print_mutex_);
+                if (log_callback_)
+                {
+                    log_callback_(ToolBox::LogLevel::LOG_ERROR, log_buffer);
+                }
+                fprintf(stderr, "%s\n", log_buffer);
+            }
             return true;
         }
 
@@ -170,21 +187,31 @@ namespace ToolBox
             }
             va_list ap;
             va_start(ap, fmt);
-            vsprintf(log_buffer_, fmt, ap);
-            if (log_callback_)
-            {
-                log_callback_(ToolBox::LogLevel::LOG_FATAL, log_buffer_);
-            }
-            fprintf(stderr, "%s", log_buffer_);
-            fprintf(stderr, "\n");
+            char* log_buffer = GetThreadLocalBuffer();
+            vsnprintf(log_buffer, log_buffer_size_, fmt, ap);
             va_end(ap);
+            {
+                std::lock_guard<std::mutex> lock(print_mutex_);
+                if (log_callback_)
+                {
+                    log_callback_(ToolBox::LogLevel::LOG_FATAL, log_buffer);
+                }
+                fprintf(stderr, "%s\n", log_buffer);
+            }
             return true;
         }
     private:
         LogLevel log_level_ = LogLevel::LOG_DEBUG;    // 全局日志等级
-        const static int log_buffer_size_ = 5 * 1024 * 1024;
-        char log_buffer_[log_buffer_size_];
+        const static int log_buffer_size_ = 8 * 1024;  // 8KB 缓冲区，避免栈溢出
         LogCallback log_callback_;
+        mutable std::mutex print_mutex_;  // 保护 fprintf 和 log_callback_ 的互斥锁
+        
+        // 获取线程本地缓冲区（使用动态分配避免栈溢出）
+        static char* GetThreadLocalBuffer()
+        {
+            thread_local static std::vector<char> buffer(log_buffer_size_);
+            return buffer.data();
+        }
     };
 
 #define LogMgr ToolBox::Singleton<ToolBox::LogManager>::Instance()
