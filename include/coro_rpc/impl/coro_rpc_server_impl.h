@@ -528,8 +528,13 @@ private:
             // 3. 遍历流式数据并序列化
             while (stream_gen.Next()) {
                 auto& value = stream_gen.value();
-                std::string serialized = adapter::serialize(value);
-                co_yield std::move(serialized);
+                // 如果 StreamValueType 是 std::string，直接使用字符串内容，不需要再次序列化
+                if constexpr (std::is_same_v<StreamValueType, std::string>) {
+                    co_yield value;
+                } else {
+                    std::string serialized = adapter::serialize(value);
+                    co_yield std::move(serialized);
+                }
             }
         } else {
             // 无参数函数
@@ -538,8 +543,13 @@ private:
             // 遍历流式数据并序列化
             while (stream_gen.Next()) {
                 auto& value = stream_gen.value();
-                std::string serialized = adapter::serialize(value);
-                co_yield std::move(serialized);
+                // 如果 StreamValueType 是 std::string，直接使用字符串内容，不需要再次序列化
+                if constexpr (std::is_same_v<StreamValueType, std::string>) {
+                    co_yield value;
+                } else {
+                    std::string serialized = adapter::serialize(value);
+                    co_yield std::move(serialized);
+                }
             }
         }
     }
@@ -573,8 +583,13 @@ private:
             // 3. 遍历流式数据并序列化
             while (stream_gen.Next()) {
                 auto& value = stream_gen.value();
-                std::string serialized = adapter::serialize(value);
-                co_yield std::move(serialized);
+                // 如果 StreamValueType 是 std::string，直接使用字符串内容，不需要再次序列化
+                if constexpr (std::is_same_v<StreamValueType, std::string>) {
+                    co_yield value;
+                } else {
+                    std::string serialized = adapter::serialize(value);
+                    co_yield std::move(serialized);
+                }
             }
         } else {
             // 无参数函数
@@ -583,8 +598,13 @@ private:
             // 遍历流式数据并序列化
             while (stream_gen.Next()) {
                 auto& value = stream_gen.value();
-                std::string serialized = adapter::serialize(value);
-                co_yield std::move(serialized);
+                // 如果 StreamValueType 是 std::string，直接使用字符串内容，不需要再次序列化
+                if constexpr (std::is_same_v<StreamValueType, std::string>) {
+                    co_yield value;
+                } else {
+                    std::string serialized = adapter::serialize(value);
+                    co_yield std::move(serialized);
+                }
             }
         }
     }
