@@ -21,17 +21,19 @@ namespace ToolBox::CoroRpc
     concept IsProtobufMessage = std::is_base_of_v<::google::protobuf::Message, std::remove_cvref_t<T>>;
     
     // 检查函数是否适用于 ProtobufProtocol
+    // 注意：unwrap_task_return_type 在 coro_rpc_def_interenal.h 中定义
     template<auto func>
     struct IsProtobufCompatible {
         using func_type = decltype(func);
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
         using return_type = typename traits_type::return_type;
+        using unwrapped_return_type = typename unwrap_task_return_type<return_type>::type;
         
         static constexpr bool value = []() {
-            // 检查返回值类型
-            if constexpr (!std::is_void_v<return_type>) {
-                if constexpr (!IsProtobufMessage<return_type>) {
+            // 检查返回值类型（支持 Task<T> 类型）
+            if constexpr (!std::is_void_v<unwrapped_return_type>) {
+                if constexpr (!IsProtobufMessage<unwrapped_return_type>) {
                     return false;
                 }
             }
@@ -39,13 +41,13 @@ namespace ToolBox::CoroRpc
             // 检查所有参数类型
             if constexpr (std::is_void_v<param_type> || std::tuple_size_v<param_type> == 0) {
                 // 无参数函数，只检查返回值
-                return std::is_void_v<return_type> || IsProtobufMessage<return_type>;
+                return std::is_void_v<unwrapped_return_type> || IsProtobufMessage<unwrapped_return_type>;
             } else {
                 // 检查所有参数是否都是 protobuf 消息类型
                 return []<std::size_t... I>(std::index_sequence<I...>) {
                     return (IsProtobufMessage<std::tuple_element_t<I, param_type>> && ...);
                 }(std::make_index_sequence<std::tuple_size_v<param_type>>{}) 
-                    && (std::is_void_v<return_type> || IsProtobufMessage<return_type>);
+                    && (std::is_void_v<unwrapped_return_type> || IsProtobufMessage<unwrapped_return_type>);
             }
         }();
     };
@@ -160,6 +162,7 @@ public:
             return std::nullopt;
         }
     }
+    
     template<auto func>
     static supported_serialize_protocols GetSerializeProtocol()
     {
@@ -167,13 +170,14 @@ public:
         using traits_type = ToolBox::FunctionTraits<func_type>;
         using param_type = typename traits_type::parameters_type;
         using return_type = typename traits_type::return_type;
+        using unwrapped_return_type = typename unwrap_task_return_type<return_type>::type;
         
-        // 检查返回值类型
+        // 检查返回值类型（支持 Task<T> 类型）
         constexpr bool return_type_is_protobuf = []() {
-            if constexpr (std::is_void_v<return_type>) {
+            if constexpr (std::is_void_v<unwrapped_return_type>) {
                 return true;  // void 返回值视为兼容
             } else {
-                return IsProtobufMessage<return_type>;
+                return IsProtobufMessage<unwrapped_return_type>;
             }
         }();
         
