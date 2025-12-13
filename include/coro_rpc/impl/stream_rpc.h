@@ -149,60 +149,78 @@ public:
     // 推送一个值到流中
     // 返回: true表示成功，false表示缓冲区已满（需要背压控制）
     bool PushValue(T value) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        
-        // 检查缓冲区是否已满
-        if (values_.size() >= max_buffer_size_ && !finished_) {
-            // 缓冲区满，需要触发背压
-            if (!paused_) {
-                paused_ = true;
+        std::coroutine_handle<> h_to_resume = {};
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            
+            // 检查缓冲区是否已满
+            if (values_.size() >= max_buffer_size_ && !finished_) {
+                // 缓冲区满，需要触发背压
+                if (!paused_) {
+                    paused_ = true;
+                    if (backpressure_callback_) {
+                        // 通知服务器暂停发送
+                        backpressure_callback_(stream_id_, true);
+                    }
+                }
+                return false;  // 缓冲区满，无法接收
+            }
+            
+            values_.push(std::move(value));
+            
+            // 如果之前是暂停状态，现在有空间了，可以恢复
+            if (paused_ && values_.size() < max_buffer_size_ / 2) {
+                paused_ = false;
                 if (backpressure_callback_) {
-                    // 通知服务器暂停发送
-                    backpressure_callback_(stream_id_, true);
+                    // 通知服务器恢复发送
+                    backpressure_callback_(stream_id_, false);
                 }
             }
-            return false;  // 缓冲区满，无法接收
-        }
-        
-        values_.push(std::move(value));
-        
-        // 如果之前是暂停状态，现在有空间了，可以恢复
-        if (paused_ && values_.size() < max_buffer_size_ / 2) {
-            paused_ = false;
-            if (backpressure_callback_) {
-                // 通知服务器恢复发送
-                backpressure_callback_(stream_id_, false);
+            
+            if (continuation_) {
+                h_to_resume = continuation_;
+                continuation_ = {};
             }
         }
-        
-        if (continuation_) {
-            auto h = continuation_;
-            continuation_ = {};
-            h.resume();
+        // 在释放锁之后恢复协程，避免死锁
+        if (h_to_resume) {
+            h_to_resume.resume();
         }
         return true;
     }
     
     // 标记流结束
     void Finish() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        finished_ = true;
-        if (continuation_) {
-            auto h = continuation_;
-            continuation_ = {};
-            h.resume();
+        std::coroutine_handle<> h_to_resume = {};
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            finished_ = true;
+            if (continuation_) {
+                h_to_resume = continuation_;
+                continuation_ = {};
+            }
+        }
+        // 在释放锁之后恢复协程，避免死锁
+        if (h_to_resume) {
+            h_to_resume.resume();
         }
     }
     
     // 标记流错误
     void SetError(Errc err) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        error_ = err;
-        finished_ = true;
-        if (continuation_) {
-            auto h = continuation_;
-            continuation_ = {};
-            h.resume();
+        std::coroutine_handle<> h_to_resume = {};
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            error_ = err;
+            finished_ = true;
+            if (continuation_) {
+                h_to_resume = continuation_;
+                continuation_ = {};
+            }
+        }
+        // 在释放锁之后恢复协程，避免死锁
+        if (h_to_resume) {
+            h_to_resume.resume();
         }
     }
     
@@ -241,10 +259,17 @@ public:
     
     // 设置协程继续点
     void SetContinuation(std::coroutine_handle<> h) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        continuation_ = h;
-        if (!values_.empty() || finished_) {
-            continuation_ = {};
+        bool should_resume = false;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            continuation_ = h;
+            if (!values_.empty() || finished_) {
+                continuation_ = {};
+                should_resume = true;
+            }
+        }
+        // 在释放锁之后恢复协程，避免死锁
+        if (should_resume) {
             h.resume();
         }
     }
@@ -283,15 +308,21 @@ public:
     // 取消流（客户端主动取消）
     // 注意：这个方法只标记流为取消状态，实际的取消消息应该由客户端通过CancelStream发送
     void Cancel() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!finished_ && !cancelled_) {
-            cancelled_ = true;
-            finished_ = true;
-            if (continuation_) {
-                auto h = continuation_;
-                continuation_ = {};
-                h.resume();
+        std::coroutine_handle<> h_to_resume = {};
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (!finished_ && !cancelled_) {
+                cancelled_ = true;
+                finished_ = true;
+                if (continuation_) {
+                    h_to_resume = continuation_;
+                    continuation_ = {};
+                }
             }
+        }
+        // 在释放锁之后恢复协程，避免死锁
+        if (h_to_resume) {
+            h_to_resume.resume();
         }
     }
     
