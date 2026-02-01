@@ -40,6 +40,13 @@
     #include <thread>
     #include <mutex>
     #include <atomic>
+    #include <cstdlib>
+    #include <execinfo.h>
+    #include <cxxabi.h>
+    #include <cstring>
+    #include <dlfcn.h>
+    #include <cstdio>
+    #define SAFECALL_HAVE_BACKTRACE 1
 #endif
 
 namespace ToolBox {
@@ -121,6 +128,11 @@ public:
      */
     const std::string& GetContext() const { return context_; }
 
+    /**
+     * @brief 获取信号发生时保存的调用栈（仅当因信号 longjmp 返回后有效，用于仅凭日志定位崩溃）
+     */
+    static std::string GetCaughtBacktrace();
+
 private:
     /**
      * @brief 确保全局信号处理已设置（只设置一次，线程安全）
@@ -165,6 +177,10 @@ private:
         
         // 通过线程局部存储找到当前线程的 SignalGuard 实例
         if (thread_local_signal_caught_ && thread_local_context_ && thread_local_jump_buffer_) {
+#if defined(SAFECALL_HAVE_BACKTRACE)
+            // 在 longjmp 前采集调用栈（栈仍为崩溃现场），便于仅凭日志定位崩溃位置
+            bt_count_ = backtrace(bt_buffer_, kBacktraceMaxFrames);
+#endif
             *thread_local_signal_caught_ = true;
             // 跳回安全点
             siglongjmp(*thread_local_jump_buffer_, 1);
@@ -178,6 +194,12 @@ private:
     static thread_local std::string* thread_local_context_;
     static thread_local bool* thread_local_signal_caught_;
     static thread_local bool thread_local_ready_;  // 标记 sigsetjmp 是否已完成
+
+#if defined(SAFECALL_HAVE_BACKTRACE)
+    static constexpr int kBacktraceMaxFrames = 64;
+    static thread_local void* bt_buffer_[kBacktraceMaxFrames];
+    static thread_local int bt_count_;
+#endif
 
     // 全局状态：信号处理是否已初始化
     static std::atomic<bool> signal_handler_initialized_;
@@ -199,6 +221,92 @@ thread_local sigjmp_buf* SignalGuard::thread_local_jump_buffer_ = nullptr;
 thread_local std::string* SignalGuard::thread_local_context_ = nullptr;
 thread_local bool* SignalGuard::thread_local_signal_caught_ = nullptr;
 thread_local bool SignalGuard::thread_local_ready_ = false;
+
+#if defined(SAFECALL_HAVE_BACKTRACE)
+thread_local void* SignalGuard::bt_buffer_[SignalGuard::kBacktraceMaxFrames];
+thread_local int SignalGuard::bt_count_ = 0;
+
+// 将 C++ 修饰名反混淆为可读形式，失败则返回原串
+static inline std::string DemangleOne(const char* mangled) {
+    if (!mangled || mangled[0] != '_' || mangled[1] != 'Z') return mangled ? mangled : "";
+    int status = 0;
+    char* demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);
+    if (status == 0 && demangled) {
+        std::string s(demangled);
+        std::free(demangled);
+        return s;
+    }
+    if (demangled) std::free(demangled);
+    return mangled;
+}
+
+// 解析 backtrace_symbols 的一行 "path(symbol+0xoff) [addr]"，把 symbol 反混淆后重组
+static inline std::string DemangleBacktraceLine(const char* line) {
+    if (!line || !*line) return "";
+    const char* lp = std::strchr(line, '(');
+    const char* rp = line ? std::strrchr(line, ')') : nullptr;
+    if (!lp || !rp || rp <= lp) return line;
+    std::string prefix(line, lp - line + 1);  // "path("
+    std::string in(lp + 1, rp - lp - 1);       // "symbol+0xoff" or "symbol"
+    std::string suffix(rp);                    // ") [0x...]"
+    if (in.empty()) return line;
+    size_t plus = in.find('+');
+    std::string sym = plus == std::string::npos ? in : in.substr(0, plus);
+    std::string rest = plus == std::string::npos ? "" : in.substr(plus);  // "+0x..."
+    std::string demangled = DemangleOne(sym.c_str());
+    return prefix + demangled + rest + suffix;
+}
+
+// 用 addr2line 解析地址得到 文件名:行号，失败或无调试信息返回空串
+static inline std::string Addr2Line(void* pc, const char* image_path, void* base) {
+    if (!image_path || !*image_path) return {};
+    unsigned long offset = (unsigned long)pc - (unsigned long)base;
+    char cmd[1024];
+    std::snprintf(cmd, sizeof(cmd), "addr2line -e \"%s\" -f -C -i 0x%lx 2>/dev/null", image_path, offset);
+    std::FILE* fp = popen(cmd, "r");
+    if (!fp) return {};
+    char func[512] = {};
+    char fileline[1024] = {};
+    if (!std::fgets(func, sizeof(func), fp)) { pclose(fp); return {}; }
+    if (!std::fgets(fileline, sizeof(fileline), fp)) { pclose(fp); return {}; }
+    pclose(fp);
+    // 去掉末尾换行；若为 ?? 或 ??:0 视为无效
+    std::string s(fileline);
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+    if (s.empty() || s.find("??") != std::string::npos) return {};
+    return s;
+}
+
+std::string SignalGuard::GetCaughtBacktrace() {
+    if (bt_count_ <= 0) return {};
+    char** syms = backtrace_symbols(bt_buffer_, bt_count_);
+    if (!syms) return {};
+    std::string out;
+    out += "Crash call stack (innermost first):\n";
+    for (int i = 0; i < bt_count_; ++i) {
+        if (syms[i]) {
+            out += "#";
+            out += std::to_string(i);
+            out += " ";
+            out += DemangleBacktraceLine(syms[i]);
+            // 附加 文件名:行号（需带 -g 编译且系统有 addr2line）
+            Dl_info info = {};
+            if (dladdr(bt_buffer_[i], &info) && info.dli_fname && info.dli_fbase) {
+                std::string fileline = Addr2Line(bt_buffer_[i], info.dli_fname, info.dli_fbase);
+                if (!fileline.empty()) {
+                    out += "  at ";
+                    out += fileline;
+                }
+            }
+        }
+        out += '\n';
+    }
+    std::free(syms);
+    return out;
+}
+#else
+std::string SignalGuard::GetCaughtBacktrace() { return {}; }
+#endif
 
 // 全局状态（线程安全初始化）
 std::atomic<bool> SignalGuard::signal_handler_initialized_(false);
@@ -281,7 +389,10 @@ auto SafeCall(Func&& func,
             // 但如果 siglongjmp 没有跳转（不应该发生），在这里检查作为后备
             if (guard.SignalCaught()) {
                 if (error_callback) {
-                    error_callback(context, "caught signal (SIGSEGV/SIGFPE)");
+                    std::string msg = "caught signal (SIGSEGV/SIGFPE)";
+                    std::string bt = SignalGuard::GetCaughtBacktrace();
+                    if (!bt.empty()) msg += "\nBacktrace:\n" + bt;
+                    error_callback(context, msg);
                 }
                 return {false, std::monostate{}};
             }
@@ -302,7 +413,10 @@ auto SafeCall(Func&& func,
     } else {
         guard.Restore();
         if (error_callback) {
-            error_callback(context, "caught signal (SIGSEGV/SIGFPE)");
+            std::string msg = "caught signal (SIGSEGV/SIGFPE)";
+            std::string bt = SignalGuard::GetCaughtBacktrace();
+            if (!bt.empty()) msg += "\nBacktrace:\n" + bt;
+            error_callback(context, msg);
         }
         return {false, std::monostate{}};
     }
@@ -349,7 +463,10 @@ auto SafeCall(Func&& func,
             // 但如果 siglongjmp 没有跳转（不应该发生），在这里检查作为后备
             if (guard.SignalCaught()) {
                 if (error_callback) {
-                    error_callback(context, "caught signal (SIGSEGV/SIGFPE)");
+                    std::string msg = "caught signal (SIGSEGV/SIGFPE)";
+                    std::string bt = SignalGuard::GetCaughtBacktrace();
+                    if (!bt.empty()) msg += "\nBacktrace:\n" + bt;
+                    error_callback(context, msg);
                 }
                 return {false, std::move(result)};
             }
@@ -370,7 +487,10 @@ auto SafeCall(Func&& func,
     } else {
         guard.Restore();
         if (error_callback) {
-            error_callback(context, "caught signal (SIGSEGV/SIGFPE)");
+            std::string msg = "caught signal (SIGSEGV/SIGFPE)";
+            std::string bt = SignalGuard::GetCaughtBacktrace();
+            if (!bt.empty()) msg += "\nBacktrace:\n" + bt;
+            error_callback(context, msg);
         }
         return {false, ReturnType{}};
     }

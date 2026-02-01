@@ -180,9 +180,9 @@ CASE(TestSIGSEGVHandling)
     auto result = ToolBox::SafeCall(TriggerSIGSEGV, "sigsegv_test", CustomErrorCallback);
     assert(result.first == false);
     
-    // 验证错误回调被调用且只调用一次
+    // 验证错误回调被调用且只调用一次；消息可能包含追加的 Backtrace，故只检查前缀
     assert(g_error_callback_count == 1);
-    assert(g_last_error_msg == "caught signal (SIGSEGV/SIGFPE)");
+    assert(g_last_error_msg.find("caught signal (SIGSEGV/SIGFPE)") == 0);
     fprintf(stderr, "[safe_call] SIGSEGV 信号捕获成功\n");
 }
 
@@ -197,9 +197,9 @@ CASE(TestSIGFPEHandling)
     auto result = ToolBox::SafeCall(TriggerSIGFPE, "sigfpe_test", CustomErrorCallback);
     assert(result.first == false);
     
-    // 验证错误回调被调用且只调用一次
+    // 验证错误回调被调用且只调用一次；消息可能包含追加的 Backtrace，故只检查前缀
     assert(g_error_callback_count == 1);
-    assert(g_last_error_msg == "caught signal (SIGSEGV/SIGFPE)");
+    assert(g_last_error_msg.find("caught signal (SIGSEGV/SIGFPE)") == 0);
     fprintf(stderr, "[safe_call] SIGFPE 信号捕获成功\n");
 }
 
@@ -213,9 +213,9 @@ CASE(TestVoidSIGSEGVHandling)
     auto result = ToolBox::SafeCall(VoidTriggerSIGSEGV, "void_sigsegv_test", CustomErrorCallback);
     assert(result.first == false);
     
-    // 验证错误回调被调用且只调用一次
+    // 验证错误回调被调用且只调用一次；消息可能包含追加的 Backtrace，故只检查前缀
     assert(g_error_callback_count == 1);
-    assert(g_last_error_msg == "caught signal (SIGSEGV/SIGFPE)");
+    assert(g_last_error_msg.find("caught signal (SIGSEGV/SIGFPE)") == 0);
     fprintf(stderr, "[safe_call] void 函数 SIGSEGV 捕获成功\n");
 }
 #endif
