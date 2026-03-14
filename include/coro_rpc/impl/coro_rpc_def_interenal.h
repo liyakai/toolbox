@@ -2,6 +2,9 @@
 
 #include "tools/log.h"
 #include <cstdint>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 #include <string>
 #include <string_view>
 #include <stdexcept>
@@ -151,5 +154,131 @@ struct unwrap_task_return_type<StreamGenerator<T>> {
 };
 // ---------------------------------------------
 
+
+// ==================== 线程安全策略 ====================
+// 
+// 用于将锁类型模板化：单线程场景使用 NullMutex（零开销），
+// 多线程场景使用 std::mutex（真正的互斥）。
+//
+// 使用方式：
+//   CoroRpcClient<Protocol, ThreadUnsafe>  // 单线程，无锁（默认）
+//   CoroRpcClient<Protocol, ThreadSafe>    // 多线程，有锁
+//   CoroRpcServer<Protocol, map_t, ThreadUnsafe>  // 单线程，无锁（默认）
+//   CoroRpcServer<Protocol, map_t, ThreadSafe>    // 多线程，有锁
+// ===========================================================
+
+/// 空互斥锁：满足 C++ Lockable 要求，所有操作为 no-op
+struct NullMutex {
+    void lock() noexcept {}
+    void unlock() noexcept {}
+    bool try_lock() noexcept { return true; }
+};
+
+/// 空条件变量：默认与无锁互斥配合使用，所有操作为 no-op
+struct NullConditionVariable {
+    void notify_one() noexcept {}
+    void notify_all() noexcept {}
+
+    template<typename LockType>
+    void wait(std::unique_lock<LockType>&) noexcept {}
+
+    template<typename LockType, typename Pred>
+    void wait(std::unique_lock<LockType>&, Pred pred) noexcept(noexcept(pred())) {
+        // 单线程策略下不真正阻塞，但仍应执行一次谓词，
+        // 以尽量贴近 std::condition_variable::wait(lock, pred) 的语义。
+        (void)pred();
+    }
+};
+
+/// 非原子 bool：单线程下替代 std::atomic<bool>，零开销
+/// 仅实现代码中实际使用到的接口子集
+struct NullAtomicBool {
+    bool value_ = false;
+
+    NullAtomicBool() noexcept = default;
+    NullAtomicBool(bool v) noexcept : value_(v) {}   // NOLINT: 允许隐式转换以兼容 std::atomic<bool> 的接口
+    NullAtomicBool& operator=(bool v) noexcept { value_ = v; return *this; }
+
+    operator bool() const noexcept { return value_; }   // NOLINT: 故意允许隐式转换
+    bool load(std::memory_order = std::memory_order_seq_cst) const noexcept { return value_; }
+    void store(bool v, std::memory_order = std::memory_order_seq_cst) noexcept { value_ = v; }
+    bool compare_exchange_strong(bool& expected, bool desired,
+                                  std::memory_order = std::memory_order_seq_cst) noexcept {
+        if (value_ == expected) { value_ = desired; return true; }
+        expected = value_;
+        return false;
+    }
+};
+
+/// 非原子 uint32_t：单线程下替代 std::atomic<uint32_t>
+struct NullAtomicUint32 {
+    uint32_t value_ = 0;
+
+    NullAtomicUint32() noexcept = default;
+    NullAtomicUint32(uint32_t v) noexcept : value_(v) {}   // NOLINT: 允许隐式转换以兼容 std::atomic<uint32_t> 的接口
+    NullAtomicUint32& operator=(uint32_t v) noexcept { value_ = v; return *this; }
+
+    operator uint32_t() const noexcept { return value_; }   // NOLINT
+    uint32_t load(std::memory_order = std::memory_order_seq_cst) const noexcept { return value_; }
+    void store(uint32_t v, std::memory_order = std::memory_order_seq_cst) noexcept { value_ = v; }
+    uint32_t fetch_add(uint32_t v, std::memory_order = std::memory_order_seq_cst) noexcept {
+        uint32_t old = value_; value_ += v; return old;
+    }
+    uint32_t operator++() noexcept { return ++value_; }
+    uint32_t operator++(int) noexcept { return value_++; }
+    uint32_t operator--() noexcept { return --value_; }
+    uint32_t operator--(int) noexcept { return value_--; }
+};
+
+/// 非原子 size_t：单线程下替代 std::atomic<size_t>
+struct NullAtomicSize {
+    size_t value_ = 0;
+
+    NullAtomicSize() noexcept = default;
+    NullAtomicSize(size_t v) noexcept : value_(v) {}
+    NullAtomicSize& operator=(size_t v) noexcept { value_ = v; return *this; }
+
+    operator size_t() const noexcept { return value_; }
+    size_t load(std::memory_order = std::memory_order_seq_cst) const noexcept { return value_; }
+    void store(size_t v, std::memory_order = std::memory_order_seq_cst) noexcept { value_ = v; }
+    size_t fetch_add(size_t v, std::memory_order = std::memory_order_seq_cst) noexcept {
+        size_t old = value_; value_ += v; return old;
+    }
+    size_t fetch_sub(size_t v, std::memory_order = std::memory_order_seq_cst) noexcept {
+        size_t old = value_; value_ -= v; return old;
+    }
+};
+
+/// 通用线程策略：把锁/条件变量/原子类型都做成模板参数。
+template <typename MutexType,
+          typename ConditionVariableType,
+          typename AtomicBoolType,
+          typename AtomicUint32Type,
+          typename AtomicSizeType,
+          bool EnableAsyncPumpWorker>
+struct ThreadPolicy {
+    using mutex_type = MutexType;
+    using condition_variable_type = ConditionVariableType;
+    using atomic_bool_type = AtomicBoolType;
+    using atomic_uint32_type = AtomicUint32Type;
+    using atomic_size_type = AtomicSizeType;
+    static constexpr bool enable_async_pump_worker = EnableAsyncPumpWorker;
+};
+
+/// 线程安全策略：真正的互斥锁
+using ThreadSafe = ThreadPolicy<std::mutex,
+                                std::condition_variable,
+                                std::atomic<bool>,
+                                std::atomic<uint32_t>,
+                                std::atomic<size_t>,
+                                true>;
+
+/// 线程不安全策略（默认）：空锁，零开销
+using ThreadUnsafe = ThreadPolicy<NullMutex,
+                                  NullConditionVariable,
+                                  NullAtomicBool,
+                                  NullAtomicUint32,
+                                  NullAtomicSize,
+                                  false>;
 
 }   // namespace ToolBox::CoroRpc

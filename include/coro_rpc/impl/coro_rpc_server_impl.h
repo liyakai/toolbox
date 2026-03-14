@@ -1,7 +1,14 @@
 #pragma once
 
-#include <mutex>
+#include <atomic>
+#include <condition_variable>
 #include <chrono>
+#include <deque>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 #include "coro_rpc_def_interenal.h"
 #include "protocol/coro_rpc_protocol.h"
@@ -28,13 +35,21 @@ struct IsStreamGenerator<StreamGenerator<T>> : std::true_type {};
 template<typename T>
 inline constexpr bool kIsStreamGeneratorV = IsStreamGenerator<T>::value;
 
-template <typename rpc_protocol, template<typename...> typename map_t>
+template <typename rpc_protocol, template<typename...> typename map_t, typename ThreadSafetyPolicy>
 class CoroRpcServer {
 private:
+    using mutex_type = typename ThreadSafetyPolicy::mutex_type;
+    using condition_variable_type = typename ThreadSafetyPolicy::condition_variable_type;
+    using atomic_bool_type = typename ThreadSafetyPolicy::atomic_bool_type;
+    using atomic_size_type = typename ThreadSafetyPolicy::atomic_size_type;
+
+    struct RequestContext;
+    using request_context_ptr = std::shared_ptr<RequestContext>;
+
     using handler_t = std::function<std::pair<Errc, std::string>(std::string_view, std::string_view, typename rpc_protocol::supported_serialize_protocols)>;
-    using core_handler_t = std::function<ToolBox::coro::Task<std::pair<Errc, std::string>>(std::string_view, std::string_view, typename rpc_protocol::supported_serialize_protocols protocols)>;
+    using core_handler_t = std::function<ToolBox::coro::Task<std::pair<Errc, std::string>>(std::string, std::string, typename rpc_protocol::supported_serialize_protocols protocols, request_context_ptr)>;
     // 流式处理器类型：返回StreamGenerator<std::string>（已序列化的数据）
-    using stream_handler_t = std::function<StreamGenerator<std::string>(std::string_view, std::string_view, typename rpc_protocol::supported_serialize_protocols protocols)>;
+    using stream_handler_t = std::function<StreamGenerator<std::string>(std::string, std::string, typename rpc_protocol::supported_serialize_protocols protocols)>;
     using rpc_func_key = typename CoroRpcTools::rpc_func_key_t;
     using SendCallback = std::function<void(uint64_t opaque, std::string &&)>;
 
@@ -45,21 +60,375 @@ private:
     map_t<rpc_func_key, stream_handler_t> stream_handler_map_;
     map_t<rpc_func_key, std::string> func_key2name_map_;
     map_t<std::string, rpc_func_key> name2func_key_map_;
-    std::string_view req_attachment_;
+
+    // ---------- per-request context ----------
+    // 请求级上下文：每次 OnRecvReq 时创建一份 owned snapshot，避免 attachment 指向外部 buffer
+    struct RequestContext {
+        std::string req_attachment;      // 当前请求的 attachment（owned，避免悬空）
+        std::string resp_attachment;     // handler 设置的响应附件（owned，避免悬空）
+        bool has_resp_attachment = false;
+    };
+    static inline thread_local RequestContext* current_request_ctx_ = nullptr;
+
+    static void InstallRequestContext_(void* ctx) noexcept {
+        current_request_ctx_ = static_cast<RequestContext*>(ctx);
+    }
+
+    static ToolBox::coro::ResumeContext MakeResumeContext_(const request_context_ptr& ctx) noexcept {
+        return ToolBox::coro::ResumeContext{ctx.get(), &CoroRpcServer::InstallRequestContext_};
+    }
+
+    // WARNING: RequestContextBinder_ 使用 RAII 管理 thread_local 请求上下文，
+    // 同时把上下文挂到 ToolBox::coro 的恢复链路上，使当前请求内创建/恢复的 Task
+    // 能自动重新安装对应 request context。
+    class RequestContextBinder_ {
+    public:
+        explicit RequestContextBinder_(const request_context_ptr& ctx)
+            : resume_scope_(MakeResumeContext_(ctx)) {}
+    private:
+        ToolBox::coro::ResumeContextScope resume_scope_;
+    };
+
+    static request_context_ptr CreateRequestContext_(std::string_view attachment) {
+        auto ctx = std::make_shared<RequestContext>();
+        ctx->req_attachment.assign(attachment.data(), attachment.size());
+        return ctx;
+    }
+
+    // 兼容旧接口：函数级全局 resp_attachment 回调（优先级低于 per-request 版本）
     map_t<rpc_func_key, std::function<std::string_view()>> resp_attachment_func_map_;
     
-    // 流状态管理：stream_id -> 流状态
-    struct StreamState {
-        bool paused = false;      // 是否暂停（背压）
-        bool cancelled = false;   // 是否已取消
-        uint64_t opaque = 0;      // 连接标识
-        rpc_func_key key = 0;    // 函数key
+    // 托管 fire-and-forget 的 Task，防止协程 frame 泄漏
+    mutex_type detached_tasks_mutex_;
+    std::list<ToolBox::coro::Task<std::pair<Errc, std::string>>> detached_coro_tasks_;
+    // 已完成的 coro task 迭代器（惰性 GC：回调中只标记，SweepDetachedTasks_ 统一 erase）
+    std::vector<typename std::list<ToolBox::coro::Task<std::pair<Errc, std::string>>>::iterator> finished_coro_tasks_;
+    atomic_size_type outstanding_detached_tasks_{0};
+    mutex_type detached_shutdown_mutex_;
+    condition_variable_type detached_shutdown_cv_;
+
+    // 统一清理所有已标记完成的 detached task
+    // 调用时机：OnRecvReq_ 入口、析构
+    // 此时协程已经走过 final_suspend (suspend_always)，h.done()==true，
+    // ~Task() 可以正确调用 h.destroy()
+    void SweepDetachedTasks_() {
+        std::lock_guard<mutex_type> lock(detached_tasks_mutex_);
+        for (auto& it : finished_coro_tasks_) {
+            detached_coro_tasks_.erase(it);
+        }
+        finished_coro_tasks_.clear();
+    }
+
+    template<typename OnComplete>
+    void DetachCoroTask_(ToolBox::coro::Task<std::pair<Errc, std::string>>&& task, OnComplete&& on_complete) {
+        outstanding_detached_tasks_.fetch_add(1, std::memory_order_relaxed);
+        // 第一步：在锁内把 task 挂到列表上，拿到迭代器
+        typename std::list<ToolBox::coro::Task<std::pair<Errc, std::string>>>::iterator it;
+        {
+            std::lock_guard<mutex_type> lock(detached_tasks_mutex_);
+            detached_coro_tasks_.push_back(std::move(task));
+            it = std::prev(detached_coro_tasks_.end());
+        }
+        // 第二步：在锁外注册回调，避免 task 已完成时同步回调造成自锁
+        it->then([on_complete = std::forward<OnComplete>(on_complete)](std::pair<Errc, std::string> result) mutable {
+            on_complete(std::move(result));
+        });
+        // 只标记完成，不立即 erase（此时 h.done() 可能还是 false）
+        it->finally([this, it]() {
+            {
+                std::lock_guard<mutex_type> lock2(detached_tasks_mutex_);
+                finished_coro_tasks_.push_back(it);
+            }
+            outstanding_detached_tasks_.fetch_sub(1, std::memory_order_relaxed);
+            detached_shutdown_cv_.notify_all();
+        });
+    }
+    
+    // ====== 流式 RPC 状态机 ======
+    // 替代原来的 StreamState + cv.wait + detached_stream_tasks_ 协程方案。
+    // 改为事件驱动的分段发送：PumpStream_() 在锁外推进 generator，并用 pumping 标志防止重入。
+    //
+    // [KNOWN LIMITATION] 流键当前仅使用 seq_num（uint32_t），不包含 client_id。
+    // 如果未来需要多个 CoroRpcClient 共享同一个 CoroRpcServer 实例，
+    // 不同客户端的 seq_num 可能重叠，导致串流。
+    // 届时需要将流键升级为 (client_id, seq_num) 复合键。
+    // 目前每个连接使用独立的 server 实例，此问题不存在。
+
+    struct ActiveStream_ {
+        StreamGenerator<std::string> generator;
+        request_context_ptr request_ctx;
+        uint64_t opaque = 0;
+        rpc_func_key key = 0;
+        typename rpc_protocol::ReqHeader req_header;
+        bool started = false;       // 是否已发过 StreamStart
+        bool paused = false;        // 背压暂停
+        bool cancelled = false;     // 已取消
+        bool finished = false;      // 生成器已耗尽或发送完毕
+        bool pumping = false;       // 是否已有 pump 正在推进，避免同步重入
     };
-    std::mutex stream_state_mutex_;  // 保护流状态表的互斥锁
-    map_t<uint32_t, StreamState> stream_state_map_;  // stream_id -> StreamState
+    using active_stream_ptr = std::shared_ptr<ActiveStream_>;
+    mutex_type stream_state_mutex_;  // 保护流状态表的互斥锁
+    map_t<uint32_t, active_stream_ptr> active_streams_;  // stream_id -> ActiveStream_
+
+    // 单次 pump 的批量阈值：达到阈值后必须真正跳出当前调用栈，避免霸占请求/IO 线程。
+    static constexpr size_t kMaxChunksPerPump = 64;
+    static constexpr bool kUseAsyncPumpWorker_ = ThreadSafetyPolicy::enable_async_pump_worker;
+
+    mutex_type pump_queue_mutex_;
+    condition_variable_type pump_queue_cv_;
+    std::deque<std::pair<uint32_t, active_stream_ptr>> pending_pump_queue_;
+    atomic_bool_type stop_pump_worker_{false};
+    std::thread pump_worker_;
+
+    void PumpWorkerLoop_() {
+        while (true) {
+            std::pair<uint32_t, active_stream_ptr> next_job;
+            {
+                std::unique_lock<mutex_type> lock(pump_queue_mutex_);
+                pump_queue_cv_.wait(lock, [this]() {
+                    return stop_pump_worker_.load(std::memory_order_relaxed) || !pending_pump_queue_.empty();
+                });
+                if (stop_pump_worker_.load(std::memory_order_relaxed) && pending_pump_queue_.empty()) {
+                    return;
+                }
+                next_job = std::move(pending_pump_queue_.front());
+                pending_pump_queue_.pop_front();
+            }
+            PumpStream_(next_job.first, std::move(next_job.second));
+        }
+    }
+
+    void StopPumpWorker_() {
+        if constexpr (kUseAsyncPumpWorker_) {
+            stop_pump_worker_.store(true, std::memory_order_relaxed);
+            {
+                std::lock_guard<mutex_type> lock(pump_queue_mutex_);
+                pending_pump_queue_.clear();
+            }
+            pump_queue_cv_.notify_all();
+            if (pump_worker_.joinable()) {
+                pump_worker_.join();
+            }
+        }
+        // TODO [FUTURE] 停机时应遍历 active_streams_ 向未完成流的客户端发送
+        // StreamError(ERR_OPERATION_CANCELED)，让客户端能区分"正常结束"和"服务端中断"。
+        // 当前客户端只能靠超时发现流中断。
+        {
+            std::lock_guard<mutex_type> lock(stream_state_mutex_);
+            if (!active_streams_.empty()) {
+                RpcLogWarn("[CoroRpcServer] StopPumpWorker_: %zu active streams will be silently dropped during shutdown", active_streams_.size());
+            }
+            active_streams_.clear();
+        }
+    }
+
+    void SchedulePumpStream_(uint32_t stream_id, active_stream_ptr stream) {
+        if constexpr (kUseAsyncPumpWorker_) {
+            if (stop_pump_worker_.load(std::memory_order_relaxed)) {
+                return;
+            }
+            {
+                std::lock_guard<mutex_type> lock(pump_queue_mutex_);
+                pending_pump_queue_.emplace_back(stream_id, std::move(stream));
+            }
+            pump_queue_cv_.notify_one();
+        } else {
+            PumpStream_(stream_id, std::move(stream));
+        }
+    }
+
+    bool TryStartPump_(uint32_t stream_id, active_stream_ptr& stream) {
+        std::lock_guard<mutex_type> lock(stream_state_mutex_);
+        auto iter = active_streams_.find(stream_id);
+        if (iter == active_streams_.end()) {
+            return false;
+        }
+        stream = iter->second;
+        if (!stream || stream->pumping || stream->paused || stream->cancelled || stream->finished) {
+            return false;
+        }
+        stream->pumping = true;
+        return true;
+    }
+
+    bool RemoveActiveStream_(uint32_t stream_id, const active_stream_ptr& stream) {
+        std::lock_guard<mutex_type> lock(stream_state_mutex_);
+        auto iter = active_streams_.find(stream_id);
+        if (iter == active_streams_.end() || !stream || iter->second.get() != stream.get()) {
+            return false;
+        }
+        stream->pumping = false;
+        stream->finished = true;
+        active_streams_.erase(iter);
+        return true;
+    }
+
+    // 锁外推进流，避免 send_callback_ 同步重入时与 stream_state_mutex_ 形成自锁。
+    void PumpStream_(uint32_t stream_id, active_stream_ptr stream) {
+        while (true) {
+            {
+                std::lock_guard<mutex_type> lock(stream_state_mutex_);
+                auto iter = active_streams_.find(stream_id);
+                if (iter == active_streams_.end() || !stream || iter->second.get() != stream.get()) {
+                    return;
+                }
+                if constexpr (kUseAsyncPumpWorker_) {
+                    if (stop_pump_worker_.load(std::memory_order_relaxed)) {
+                        stream->pumping = false;
+                        stream->finished = true;
+                        active_streams_.erase(iter);
+                        return;
+                    }
+                }
+                if (stream->cancelled) {
+                    RpcLogInfo("[CoroRpcServer] PumpStream_: stream cancelled, stream_id: %u", stream_id);
+                    stream->pumping = false;
+                    stream->finished = true;
+                    active_streams_.erase(iter);
+                    return;
+                }
+                if (stream->paused || stream->finished) {
+                    stream->pumping = false;
+                    return;
+                }
+            }
+
+            size_t chunks_sent = 0;
+            while (chunks_sent < kMaxChunksPerPump) {
+                {
+                    std::lock_guard<mutex_type> lock(stream_state_mutex_);
+                    auto iter = active_streams_.find(stream_id);
+                    if (iter == active_streams_.end() || !stream || iter->second.get() != stream.get()) {
+                        return;
+                    }
+                    if constexpr (kUseAsyncPumpWorker_) {
+                        if (stop_pump_worker_.load(std::memory_order_relaxed)) {
+                            stream->pumping = false;
+                            stream->finished = true;
+                            active_streams_.erase(iter);
+                            return;
+                        }
+                    }
+                    if (stream->cancelled) {
+                        RpcLogInfo("[CoroRpcServer] PumpStream_: stream cancelled during pump, stream_id: %u", stream_id);
+                        stream->pumping = false;
+                        stream->finished = true;
+                        active_streams_.erase(iter);
+                        return;
+                    }
+                    if (stream->paused || stream->finished) {
+                        stream->pumping = false;
+                        return;
+                    }
+                }
+
+                bool has_next = false;
+                try {
+                    RequestContextBinder_ request_ctx_guard(stream->request_ctx);
+                    has_next = stream->generator.Next();
+                } catch (const std::exception &e) {
+                    RpcLogError("[CoroRpcServer] PumpStream_: generator exception: %s, stream_id: %u", e.what(), stream_id);
+                    if (RemoveActiveStream_(stream_id, stream)) {
+                        SendStreamResponse_(stream->opaque, stream->key, stream->req_header, "",
+                            static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError), Errc::ERR_HANDLER_THROW_EXCEPTION);
+                    }
+                    return;
+                } catch (...) {
+                    RpcLogError("[CoroRpcServer] PumpStream_: generator unknown exception, stream_id: %u", stream_id);
+                    if (RemoveActiveStream_(stream_id, stream)) {
+                        SendStreamResponse_(stream->opaque, stream->key, stream->req_header, "",
+                            static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError), Errc::ERR_HANDLER_THROW_EXCEPTION);
+                    }
+                    return;
+                }
+
+                if (!has_next) {
+                    bool should_send_end = false;
+                    {
+                        std::lock_guard<mutex_type> lock(stream_state_mutex_);
+                        auto iter = active_streams_.find(stream_id);
+                        if (iter == active_streams_.end() || !stream || iter->second.get() != stream.get()) {
+                            return;
+                        }
+                        if (!stream->cancelled) {
+                            stream->pumping = false;
+                            stream->finished = true;
+                            active_streams_.erase(iter);
+                            should_send_end = true;
+                        } else {
+                            stream->pumping = false;
+                            stream->finished = true;
+                            active_streams_.erase(iter);
+                        }
+                    }
+                    if (should_send_end) {
+                        SendStreamResponse_(stream->opaque, stream->key, stream->req_header, "",
+                            static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamEnd));
+                    }
+                    return;
+                }
+
+                std::string data = std::move(stream->generator.value());
+                uint8_t msg_type = static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamData);
+                {
+                    std::lock_guard<mutex_type> lock(stream_state_mutex_);
+                    auto iter = active_streams_.find(stream_id);
+                    if (iter == active_streams_.end() || !stream || iter->second.get() != stream.get()) {
+                        return;
+                    }
+                    if (stream->cancelled) {
+                        RpcLogInfo("[CoroRpcServer] PumpStream_: stream cancelled before send, stream_id: %u", stream_id);
+                        stream->pumping = false;
+                        stream->finished = true;
+                        active_streams_.erase(iter);
+                        return;
+                    }
+                    if (!stream->started) {
+                        msg_type = static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamStart);
+                        stream->started = true;
+                    }
+                }
+
+                Errc err = SendStreamResponse_(stream->opaque, stream->key, stream->req_header, std::move(data), msg_type);
+                if (err != Errc::SUCCESS) {
+                    RpcLogError("[CoroRpcServer] PumpStream_: send failed, err: %d, stream_id: %u", err, stream_id);
+                    RemoveActiveStream_(stream_id, stream);
+                    return;
+                }
+                ++chunks_sent;
+            }
+
+            if constexpr (kUseAsyncPumpWorker_) {
+                // 关键修复：真正 return，把后续 batch 交给后台队列，而不是在当前调用栈里忙让 CPU。
+                SchedulePumpStream_(stream_id, stream);
+                return;
+            } else {
+                // ThreadUnsafe 模式仍保持历史上的同步推进语义。
+                std::this_thread::yield();
+            }
+        }
+    }
+
 public:
-    CoroRpcServer() = default;
-    ~CoroRpcServer() = default;
+    CoroRpcServer() {
+        if constexpr (kUseAsyncPumpWorker_) {
+            pump_worker_ = std::thread([this]() {
+                PumpWorkerLoop_();
+            });
+        }
+    }
+    ~CoroRpcServer() {
+        StopPumpWorker_();
+        {
+            std::unique_lock<mutex_type> lock(detached_shutdown_mutex_);
+            detached_shutdown_cv_.wait(lock, [this]() {
+                return outstanding_detached_tasks_.load(std::memory_order_relaxed) == 0;
+            });
+        }
+        // 析构前清理所有已完成的 detached coro tasks
+        SweepDetachedTasks_();
+        // active_streams_ 中剩余的流在 map 析构时自动清理（shared_ptr + StreamGenerator::~析构会 destroy 协程）
+    }
 
     /*
     * @brief Register RPC service functions(member function)
@@ -119,7 +488,33 @@ public:
         resp_attachment_func_map_[key] = std::move(resp_attachment_func);
     }
     
-    std::string_view GetReqAttachment() const noexcept { return req_attachment_; }
+    /**
+     * @brief 获取当前请求的附件数据（请求级安全）
+     * @note  返回当前绑定请求上下文里的 owned attachment；若当前没有活跃请求，则返回空。
+     * @warning 当前实现会为库内 `ToolBox::coro::Task`、回调 awaitor 和 future awaitor
+     *          传播请求上下文；若用户引入第三方 awaitable 并直接恢复 coroutine handle，
+     *          则需在其恢复点接入同样的 ResumeContext 绑定逻辑。
+     */
+    std::string_view GetReqAttachment() const noexcept {
+        if (!current_request_ctx_) {
+            return {};
+        }
+        return current_request_ctx_->req_attachment;
+    }
+
+    /**
+     * @brief 设置当前请求的响应附件（请求级，handler 函数体内调用）
+     * @note  此方法设置的 resp_attachment 仅对当前请求生效，优先级高于 SetRespAttachmentFunc。
+     *        若当前没有活跃请求，则忽略本次设置，避免把"游离附件"泄露到后续请求。
+     * @warning 同 GetReqAttachment()，若使用第三方 awaitable，需确保其恢复点也安装请求上下文。
+     */
+    void SetRespAttachment(std::string_view attachment) {
+        if (!current_request_ctx_) {
+            return;
+        }
+        current_request_ctx_->resp_attachment.assign(attachment.data(), attachment.size());
+        current_request_ctx_->has_resp_attachment = true;
+    }
 
     std::vector<rpc_func_key> GetAllServiceHandlerKeys()
     {
@@ -159,6 +554,13 @@ private:
 
         RpcLogDebug("[rpc][server] RegisterOneHandler.class: key: %u, func: %.*s", key, static_cast<int>(ToolBox::GetFuncName<func>().size()), ToolBox::GetFuncName<func>().data());
 
+        // 自动填充函数名映射，用于日志和可观测性
+        {
+            constexpr auto fname = ToolBox::GetFuncNameWithClass<func>();
+            func_key2name_map_[key] = std::string(fname.data(), fname.size());
+            name2func_key_map_[std::string(fname.data(), fname.size())] = key;
+        }
+
         RegistOneHandlerImpl<func>(self,key);
     }
 
@@ -182,12 +584,12 @@ private:
         {
             // 流式RPC处理
             using StreamValueType = typename ReturnType::value_type;
-            auto iter = stream_handler_map_.emplace(key, [&, self](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> StreamGenerator<std::string> {
+            auto iter = stream_handler_map_.emplace(key, [&, self](std::string data, std::string attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> StreamGenerator<std::string> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> StreamGenerator<std::string> {
                     if constexpr (std::is_void_v<typename ToolBox::FunctionTraits<decltype(func)>::class_type>) {
-                        return ExecuteStream_<serialize_protocol, func, StreamValueType>(data, attachment, nullptr);
+                        return ExecuteStream_<serialize_protocol, func, StreamValueType>(std::move(data), std::move(attachment), nullptr);
                     } else {
-                        return ExecuteStream_<serialize_protocol, func, StreamValueType>(data, attachment, self);
+                        return ExecuteStream_<serialize_protocol, func, StreamValueType>(std::move(data), std::move(attachment), self);
                     }
                 }, protocols);
             });
@@ -200,9 +602,9 @@ private:
         }
         else if constexpr(ToolBox::is_specialization_v<ReturnType, ToolBox::coro::Task>)
         {
-            auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
+            auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string data, std::string attachment, typename rpc_protocol::supported_serialize_protocols protocols, request_context_ptr request_ctx) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
-                    co_return co_await ExecuteCoro_<serialize_protocol, func>(data, attachment, self);
+                    return ExecuteCoro_<serialize_protocol, func>(std::move(data), std::move(attachment), request_ctx, self);
                 }, protocols);
             });
             if (!iter.second) [[unlikely]]
@@ -236,6 +638,14 @@ private:
             key = CoroRpcTools::AutoGenRegisterKey<func>();
         }
         RpcLogDebug("[rpc][server] RegisterOneHandler.normal: key: %u, func: %s", key, ToolBox::GetFuncName<func>().data());
+
+        // 自动填充函数名映射，用于日志和可观测性
+        {
+            constexpr auto fname = ToolBox::GetFuncName<func>();
+            func_key2name_map_[key] = std::string(fname.data(), fname.size());
+            name2func_key_map_[std::string(fname.data(), fname.size())] = key;
+        }
+
         RegistOneHandlerImpl<func>(key);
     }
 
@@ -244,11 +654,26 @@ private:
     {
         static_assert(!std::is_member_function_pointer_v<decltype(func)>, "RegistOneHandlerImpl: func is not a valid function");
         using ReturnType = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
-        if constexpr(ToolBox::is_specialization_v<ReturnType, ToolBox::coro::Task>)
+        if constexpr (kIsStreamGeneratorV<ReturnType>)
         {
-            auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
+            using StreamValueType = typename ReturnType::value_type;
+            auto iter = stream_handler_map_.emplace(key, [&](std::string data, std::string attachment, typename rpc_protocol::supported_serialize_protocols protocols) -> StreamGenerator<std::string> {
+                return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> StreamGenerator<std::string> {
+                    return ExecuteStream_<serialize_protocol, func, StreamValueType>(std::move(data), std::move(attachment), nullptr);
+                }, protocols);
+            });
+            if (!iter.second) [[unlikely]]
+            {
+                RpcLogError("[CoroRpcServer] RegistOneHandlerImpl: stream handler key already exists");
+                return;
+            }
+            RpcLogInfo("[CoroRpcServer] Registered stream handler for key: %u", key);
+        }
+        else if constexpr(ToolBox::is_specialization_v<ReturnType, ToolBox::coro::Task>)
+        {
+            auto iter = rpc_server_core_handler_map_.emplace(key, [&](std::string data, std::string attachment, typename rpc_protocol::supported_serialize_protocols protocols, request_context_ptr request_ctx) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
                 return std::visit([&]<typename serialize_protocol>(const serialize_protocol& obj) -> ToolBox::coro::Task<std::pair<Errc, std::string>> {
-                    co_return co_await ExecuteCoro_<serialize_protocol, func>(data, attachment);
+                    return ExecuteCoro_<serialize_protocol, func>(std::move(data), std::move(attachment), request_ctx);
                 }, protocols);
             });
             if (!iter.second) [[unlikely]]
@@ -290,13 +715,18 @@ private:
         return iter->second;
     }
 
-    ToolBox::coro::Task<std::pair<Errc, std::string>> HandleCoro(auto handler, std::string_view data, std::string_view attachment, typename rpc_protocol::supported_serialize_protocols protocols, const typename CoroRpcTools::rpc_func_key_t &key)
+    ToolBox::coro::Task<std::pair<Errc, std::string>> HandleCoro(auto handler, std::string data, std::string attachment, typename rpc_protocol::supported_serialize_protocols protocols, const typename CoroRpcTools::rpc_func_key_t &key, request_context_ptr request_ctx)
     {
         using namespace std::string_literals;
+        (void)key;
         if(handler) [[likely]]
         {
             try {
-                co_return co_await handler(data, attachment, protocols);
+                auto pending = [&]() {
+                    RequestContextBinder_ request_ctx_guard(request_ctx);
+                    return handler(std::move(data), std::move(attachment), protocols, request_ctx);
+                }();
+                co_return co_await std::move(pending);
             } catch(Errc &err)
             {
                 RpcLogError("[CoroRpcServer] HandleCoro: handler error, err:%d", err);
@@ -394,7 +824,7 @@ private:
         using ReturnType = typename traits_type::return_type;
         using adapter = SerializeAdapter<func, serialize_proto>;
 
-        req_attachment_ = attachment;
+        (void)attachment;
         
         // 1. 反序列化参数（如果有）
         if constexpr(!std::is_void_v<param_type> && std::tuple_size_v<param_type> > 0)
@@ -442,7 +872,7 @@ private:
     }
 
     template<typename serialize_proto, auto func, typename Self = void>
-    inline coro::Task<std::pair<Errc, std::string>> ExecuteCoro_(std::string_view data, std::string_view attachment, Self *self = nullptr)
+    inline coro::Task<std::pair<Errc, std::string>> ExecuteCoro_(std::string data, std::string attachment, request_context_ptr request_ctx, Self *self = nullptr)
     {
         using namespace std::string_literals;
         using func_type = decltype(func);
@@ -451,8 +881,6 @@ private:
         using ReturnType = typename traits_type::return_type;
         using adapter = SerializeAdapter<func, serialize_proto>;
 
-        req_attachment_ = attachment;
-        
         // 1. 反序列化参数（如果有）
         if constexpr(!std::is_void_v<param_type> && std::tuple_size_v<param_type> > 0)
         {
@@ -472,10 +900,18 @@ private:
             // 3. 调用函数并序列化返回值
             if constexpr (std::is_void_v<ReturnType>)
             {
-                co_await invoke_with_params_coro<func>(self, std::move(args));
+                auto pending = [&]() {
+                    RequestContextBinder_ request_ctx_guard(request_ctx);
+                    return invoke_with_params_coro<func>(self, std::move(args));
+                }();
+                co_await std::move(pending);
                 co_return std::make_pair(Errc::SUCCESS, adapter::serialize());
             } else {
-                auto result = co_await invoke_with_params_coro<func>(self, std::move(args));
+                auto pending = [&]() {
+                    RequestContextBinder_ request_ctx_guard(request_ctx);
+                    return invoke_with_params_coro<func>(self, std::move(args));
+                }();
+                auto result = co_await std::move(pending);
                 co_return std::make_pair(Errc::SUCCESS, adapter::serialize(result));
             }
         } else {
@@ -489,10 +925,18 @@ private:
             // 3. 调用函数并序列化返回值
             if constexpr (std::is_void_v<ReturnType>)
             {
-                co_await invoke_with_params_coro<func>(self);
+                auto pending = [&]() {
+                    RequestContextBinder_ request_ctx_guard(request_ctx);
+                    return invoke_with_params_coro<func>(self);
+                }();
+                co_await std::move(pending);
                 co_return std::make_pair(Errc::SUCCESS, adapter::serialize());
             } else {
-                auto result = co_await invoke_with_params_coro<func>(self);
+                auto pending = [&]() {
+                    RequestContextBinder_ request_ctx_guard(request_ctx);
+                    return invoke_with_params_coro<func>(self);
+                }();
+                auto result = co_await std::move(pending);
                 co_return std::make_pair(Errc::SUCCESS, adapter::serialize(result));
             }
         }
@@ -501,7 +945,7 @@ private:
     // 执行流式RPC（成员函数版本）
     template<typename serialize_proto, auto func, typename StreamValueType, typename Self>
     requires (!std::is_void_v<Self>)
-    inline StreamGenerator<std::string> ExecuteStream_(std::string_view data, std::string_view attachment, Self *self)
+    inline StreamGenerator<std::string> ExecuteStream_(std::string data, std::string attachment, Self *self)
     {
         using namespace std::string_literals;
         using func_type = decltype(func);
@@ -509,7 +953,7 @@ private:
         using param_type = typename traits_type::parameters_type;
         using adapter = SerializeAdapter<func, serialize_proto>;
 
-        req_attachment_ = attachment;
+        (void)attachment;
         
         // 1. 反序列化参数（如果有）
         if constexpr(!std::is_void_v<param_type> && std::tuple_size_v<param_type> > 0)
@@ -556,7 +1000,7 @@ private:
     
     // 执行流式RPC（非成员函数版本）
     template<typename serialize_proto, auto func, typename StreamValueType>
-    inline StreamGenerator<std::string> ExecuteStream_(std::string_view data, std::string_view attachment, std::nullptr_t)
+    inline StreamGenerator<std::string> ExecuteStream_(std::string data, std::string attachment, std::nullptr_t)
     {
         using namespace std::string_literals;
         using func_type = decltype(func);
@@ -564,8 +1008,6 @@ private:
         using param_type = typename traits_type::parameters_type;
         using adapter = SerializeAdapter<func, serialize_proto>;
 
-        req_attachment_ = attachment;
-        
         // 1. 反序列化参数（如果有）
         if constexpr(!std::is_void_v<param_type> && std::tuple_size_v<param_type> > 0)
         {
@@ -609,100 +1051,49 @@ private:
         }
     }
     
-    // 处理流式请求：持续发送流式数据
-    void HandleStreamRequest_(uint64_t opaque, rpc_func_key key, const typename rpc_protocol::ReqHeader& req_header, StreamGenerator<std::string>&& generator)
+    // 处理流式请求：注册活跃流并启动事件驱动发送
+    void HandleStreamRequest_(uint64_t opaque, rpc_func_key key, const typename rpc_protocol::ReqHeader& req_header, StreamGenerator<std::string>&& generator, request_context_ptr request_ctx)
     {
         uint32_t stream_id = req_header.seq_num;
-        
-        // 注册流状态
+
+        // [DEFENSIVE] 防护性检测：如果 stream_id 已经存在于 active_streams_ 中，
+        // 说明可能有多个客户端共享同一个 server 实例且 seq_num 冲突。
+        // 当前架构下不应发生，如果触发此日志，说明需要升级为 (client_id, seq_num) 复合键。
         {
-            std::lock_guard<std::mutex> lock(stream_state_mutex_);
-            stream_state_map_[stream_id] = StreamState{false, false, opaque, key};
+            std::lock_guard<mutex_type> lock(stream_state_mutex_);
+            if (active_streams_.count(stream_id) > 0) {
+                RpcLogError("[CoroRpcServer] HandleStreamRequest_: STREAM ID CONFLICT! stream_id: %u, client_id: %lu. "
+                            "This indicates multiple clients sharing a single server instance with overlapping seq_num. "
+                            "Consider upgrading to composite key (client_id, seq_num).",
+                            stream_id, static_cast<unsigned long>(req_header.client_id));
+            }
         }
-        
-        // 在后台协程中处理流式响应
-        auto stream_task = [this, opaque, key, req_header, stream_id, gen = std::move(generator)]() mutable -> ToolBox::coro::Task<std::monostate> {
-            bool is_first = true;
-            while (gen.Next()) {
-                // 检查流是否已取消
-                {
-                    std::lock_guard<std::mutex> lock(stream_state_mutex_);
-                    auto iter = stream_state_map_.find(stream_id);
-                    if (iter != stream_state_map_.end() && iter->second.cancelled) {
-                        RpcLogInfo("[CoroRpcServer] HandleStreamRequest_: stream cancelled, stream_id: %u", stream_id);
-                        break;
-                    }
-                }
-                
-                // 检查是否需要暂停（背压控制）
-                bool need_pause = false;
-                {
-                    std::lock_guard<std::mutex> lock(stream_state_mutex_);
-                    auto iter = stream_state_map_.find(stream_id);
-                    if (iter != stream_state_map_.end()) {
-                        need_pause = iter->second.paused;
-                        // 如果已取消，直接退出
-                        if (iter->second.cancelled) {
-                            RpcLogInfo("[CoroRpcServer] HandleStreamRequest_: stream cancelled, stream_id: %u", stream_id);
-                            break;
-                        }
-                    }
-                }
-                
-                // 如果暂停，跳过这次发送，让协程让出执行权
-                if (need_pause) {
-                    // 使用简单的延迟：让协程让出执行权，等待下一次调度
-                    // 通过 continue 跳过这次数据发送，协程会自然让出执行权
-                    continue;
-                }
-                
-                std::string data = std::move(gen.value());
-                uint8_t msg_type;
-                if (is_first) {
-                    msg_type = static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamStart);
-                    is_first = false;
-                } else {
-                    msg_type = static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamData);
-                }
-                
-                // 发送流式数据包
-                Errc err = SendStreamResponse_(opaque, key, req_header, std::move(data), msg_type);
-                if (err != Errc::SUCCESS) {
-                    RpcLogError("[CoroRpcServer] HandleStreamRequest_: send stream response failed, err: %d", err);
-                    break;
-                }
-            }
-            
-            // 检查是否已取消，然后清理流状态并发送结束标记
-            bool was_cancelled = false;
-            {
-                std::lock_guard<std::mutex> lock(stream_state_mutex_);
-                auto iter = stream_state_map_.find(stream_id);
-                if (iter != stream_state_map_.end()) {
-                    was_cancelled = iter->second.cancelled;
-                    stream_state_map_.erase(iter);
-                }
-            }
-            
-            // 发送流结束标记（如果未取消）
-            if (!was_cancelled) {
-                SendStreamResponse_(opaque, key, req_header, "", static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamEnd));
-            }
-            
-            co_return std::monostate{};
-        }();
-        stream_task.then([](auto) {
-            // 流式响应处理完成
+
+        active_stream_ptr stream = std::make_shared<ActiveStream_>(ActiveStream_{
+            std::move(generator), std::move(request_ctx),
+            opaque, key, req_header,
+            false, false, false, false, false
         });
+        
+        {
+            std::lock_guard<mutex_type> lock(stream_state_mutex_);
+            active_streams_[stream_id] = stream;
+        }
+
+        active_stream_ptr stream_to_pump;
+        if (TryStartPump_(stream_id, stream_to_pump)) {
+            SchedulePumpStream_(stream_id, std::move(stream_to_pump));
+        }
     }
     
     // 发送流式响应
-    Errc SendStreamResponse_(uint64_t opaque, rpc_func_key key, const typename rpc_protocol::ReqHeader& req_header, std::string&& data, uint8_t msg_type)
+    Errc SendStreamResponse_(uint64_t opaque, rpc_func_key key, const typename rpc_protocol::ReqHeader& req_header, std::string&& data, uint8_t msg_type, Errc resp_err = Errc::SUCCESS)
     {
+        (void)key;
         std::string resp_buf;
         resp_buf.resize(rpc_protocol::RESP_HEAD_LEN + data.size());
         
-        bool prepare_ret = rpc_protocol::PrepareResponseHeader(resp_buf, data, req_header, 0, msg_type, Errc::SUCCESS);
+        bool prepare_ret = rpc_protocol::PrepareResponseHeader(resp_buf, data, req_header, 0, msg_type, resp_err);
         if (!prepare_ret) {
             RpcLogError("[CoroRpcServer] SendStreamResponse_: prepare response header failed");
             return Errc::ERR_SERVER_PREPARE_HEADER_FAILED;
@@ -721,6 +1112,8 @@ private:
     
     Errc OnRecvReq_(uint64_t opaque, std::string_view data)
     {
+        // 主动清理已完成的 detached coro tasks（惰性 GC）
+        SweepDetachedTasks_();
         typename rpc_protocol::ReqHeader header;
         auto err = rpc_protocol::ReadHeader(data, header);
         if(err != Errc::SUCCESS)
@@ -752,34 +1145,53 @@ private:
         
         // 检查是否是流式RPC控制消息（取消、暂停、恢复）
         if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamCancel)) {
-            // 处理流取消请求
-            std::lock_guard<std::mutex> lock(stream_state_mutex_);
-            auto iter = stream_state_map_.find(stream_id);
-            if (iter != stream_state_map_.end()) {
-                iter->second.cancelled = true;
-                RpcLogInfo("[CoroRpcServer] OnRecvReq: stream cancelled by client, stream_id: %u", stream_id);
+            // 处理流取消请求：若当前无人 pump，直接摘表；否则只打标记，由正在运行的 pump 清理
+            {
+                std::lock_guard<mutex_type> lock(stream_state_mutex_);
+                auto iter = active_streams_.find(stream_id);
+                if (iter != active_streams_.end() && iter->second) {
+                    auto& stream = iter->second;
+                    stream->cancelled = true;
+                    RpcLogInfo("[CoroRpcServer] OnRecvReq: stream cancelled by client, stream_id: %u", stream_id);
+                    if (!stream->pumping) {
+                        stream->finished = true;
+                        active_streams_.erase(iter);
+                    }
+                }
             }
             return Errc::SUCCESS;
         } else if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamPause)) {
-            // 处理流暂停请求（背压控制）
-            std::lock_guard<std::mutex> lock(stream_state_mutex_);
-            auto iter = stream_state_map_.find(stream_id);
-            if (iter != stream_state_map_.end()) {
-                iter->second.paused = true;
+            // 处理流暂停请求（背压控制）—— 只改状态，不阻塞线程
+            std::lock_guard<mutex_type> lock(stream_state_mutex_);
+            auto iter = active_streams_.find(stream_id);
+            if (iter != active_streams_.end() && iter->second) {
+                iter->second->paused = true;
                 RpcLogInfo("[CoroRpcServer] OnRecvReq: stream paused (backpressure), stream_id: %u", stream_id);
             }
             return Errc::SUCCESS;
         } else if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamResume)) {
-            // 处理流恢复请求（背压控制）
-            std::lock_guard<std::mutex> lock(stream_state_mutex_);
-            auto iter = stream_state_map_.find(stream_id);
-            if (iter != stream_state_map_.end()) {
-                iter->second.paused = false;
-                RpcLogInfo("[CoroRpcServer] OnRecvReq: stream resumed (backpressure), stream_id: %u", stream_id);
+            // 处理流恢复请求（背压控制）—— 取消暂停并在锁外继续推进
+            active_stream_ptr stream_to_pump;
+            {
+                std::lock_guard<mutex_type> lock(stream_state_mutex_);
+                auto iter = active_streams_.find(stream_id);
+                if (iter != active_streams_.end() && iter->second) {
+                    iter->second->paused = false;
+                    RpcLogInfo("[CoroRpcServer] OnRecvReq: stream resumed (backpressure), stream_id: %u", stream_id);
+                    if (!iter->second->pumping && !iter->second->cancelled && !iter->second->finished) {
+                        iter->second->pumping = true;
+                        stream_to_pump = iter->second;
+                    }
+                }
+            }
+            if (stream_to_pump) {
+                SchedulePumpStream_(stream_id, std::move(stream_to_pump));
             }
             return Errc::SUCCESS;
         }
         
+        auto request_ctx = CreateRequestContext_(attachment);
+
         // 检查是否是流式RPC请求
         bool is_stream_request = (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamStart));
         
@@ -788,14 +1200,17 @@ private:
             auto stream_iter = stream_handler_map_.find(key);
             if (stream_iter != stream_handler_map_.end()) {
                 // 执行流式RPC，获取StreamGenerator
-                auto stream_gen = stream_iter->second(payload, attachment, serialize_protocol.value());
+                RequestContextBinder_ request_ctx_guard(request_ctx);
+                auto stream_gen = stream_iter->second(std::string(payload), std::string(attachment), serialize_protocol.value());
                 
                 // 启动流式响应处理（在后台协程中）
-                HandleStreamRequest_(opaque, key, header, std::move(stream_gen));
+                HandleStreamRequest_(opaque, key, header, std::move(stream_gen), request_ctx);
                 return Errc::SUCCESS;
             } else {
                 RpcLogError("[CoroRpcServer] OnRecvReq: stream handler not found for key: %u", key);
-                return Errc::ERR_FUNC_NOT_REGISTERED;
+                // 回错误包而非仅返回错误码
+                SendStreamResponse_(opaque, key, header, "", static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError), Errc::ERR_FUNC_NOT_REGISTERED);
+                return Errc::SUCCESS;
             }
         }
         
@@ -804,23 +1219,30 @@ private:
         if(handler == nullptr)
         {
             auto core_handler = GetCoreHandler(key);
-            auto handler_ret = HandleCoro(core_handler, payload, attachment, serialize_protocol.value(), key);
-            handler_ret.then([this, opaque, key, header](std::pair<Errc, std::string> &&result) {
+            if (!core_handler) {
+                // 函数未注册 → 回错误包而不是仅返回错误码
+                RpcLogError("[CoroRpcServer] OnRecvReq: handler not found for key: %u", key);
+                ResponseMsgAttachment_(opaque, key, Errc::ERR_FUNC_NOT_REGISTERED, std::string{}, header);
+                return Errc::SUCCESS;
+            }
+            auto handler_ret = HandleCoro(core_handler, std::string(payload), std::string(attachment), serialize_protocol.value(), key, request_ctx);
+            DetachCoroTask_(std::move(handler_ret), [this, opaque, key, header, request_ctx](std::pair<Errc, std::string> result) mutable {
+                RequestContextBinder_ request_ctx_guard(request_ctx);
+                // 无论成功还是失败，都回包（不再吞错只打日志）
                 if(result.first != Errc::SUCCESS)
                 {
-                    RpcLogError("[CoroRpcServer] OnRecvReq: handler error, err:%d", result.first);
-                    return result.first;
+                    RpcLogError("[CoroRpcServer] OnRecvReq: coro handler error, err:%d", result.first);
                 }
                 ResponseMsgAttachment_(opaque, key, result.first, result.second, header);
-                return Errc::SUCCESS;
             });
             return Errc::SUCCESS;
         }else {
+            RequestContextBinder_ request_ctx_guard(request_ctx);
             std::tie(resp_err, rpc_result) = Handle(handler, payload, attachment, serialize_protocol.value());
             if(resp_err != Errc::SUCCESS)
             {
                 RpcLogError("[CoroRpcServer] OnRecvReq: handler error, err:%d", resp_err);
-                return resp_err;
+                // 出错时也回错误响应包，而不是仅返回错误码
             }
             return ResponseMsgAttachment_(opaque, key, resp_err, rpc_result, header);
         }
@@ -829,13 +1251,23 @@ private:
         const typename rpc_protocol::ReqHeader &req_header)
     {
         Errc ret = Errc::SUCCESS;
-        auto resp_attachment_func_iter = resp_attachment_func_map_.find(key);
-        if(resp_attachment_func_iter != resp_attachment_func_map_.end())
-        {
-            ret = DirectResponseMsg(opaque, resp_err, rpc_result, req_header, std::move(resp_attachment_func_iter->second));
-            // resp_attachment_func_map_.erase(resp_attachment_func_iter);
+        // 优先使用 per-request context 中 handler 设置的 resp_attachment
+        if (current_request_ctx_ && current_request_ctx_->has_resp_attachment) {
+            std::string owned_attachment = std::move(current_request_ctx_->resp_attachment);
+            current_request_ctx_->resp_attachment.clear();
+            current_request_ctx_->has_resp_attachment = false;
+            ret = DirectResponseMsg(opaque, resp_err, rpc_result, req_header, 
+                [&owned_attachment](){ return std::string_view{owned_attachment}; });
         } else {
-            ret = DirectResponseMsg(opaque, resp_err, rpc_result, req_header);
+            // 降级：使用函数级全局 SetRespAttachmentFunc 注册的回调
+            // 注意：不能 move 出 map 中的回调，否则后续请求会触发 bad_function_call
+            auto resp_attachment_func_iter = resp_attachment_func_map_.find(key);
+            if(resp_attachment_func_iter != resp_attachment_func_map_.end())
+            {
+                ret = DirectResponseMsg(opaque, resp_err, rpc_result, req_header, resp_attachment_func_iter->second);
+            } else {
+                ret = DirectResponseMsg(opaque, resp_err, rpc_result, req_header);
+            }
         }
         if(ret != Errc::SUCCESS)
         {
@@ -851,7 +1283,7 @@ private:
     }
     Errc DirectResponseMsg(uint64_t opaque, Errc resp_err, const std::string & rpc_result, 
         const typename rpc_protocol::ReqHeader &req_head,
-        std::function<std::string_view()> &&attachment_func)
+        std::function<std::string_view()> attachment_func)
     {
         std::string resp_error_msg;
         if(resp_err != Errc::SUCCESS)

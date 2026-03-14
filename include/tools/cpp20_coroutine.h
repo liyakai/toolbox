@@ -34,6 +34,52 @@ public:
   virtual void execute(std::function<void()> &&func) = 0;
 };
 
+struct ResumeContext {
+    void* data = nullptr;
+    void (*install)(void*) = nullptr;
+
+    explicit operator bool() const noexcept {
+        return install != nullptr;
+    }
+};
+
+inline thread_local ResumeContext g_current_resume_context{};
+
+inline ResumeContext GetCurrentResumeContext() noexcept {
+    return g_current_resume_context;
+}
+
+class ResumeContextScope {
+public:
+    explicit ResumeContextScope(ResumeContext context) noexcept
+        : previous_(g_current_resume_context), current_(context) {
+        g_current_resume_context = current_;
+        if (current_.install) {
+            current_.install(current_.data);
+        }
+    }
+
+    ~ResumeContextScope() {
+        g_current_resume_context = previous_;
+        if (previous_.install) {
+            previous_.install(previous_.data);
+        } else if (current_.install) {
+            current_.install(nullptr);
+        }
+    }
+
+private:
+    ResumeContext previous_;
+    ResumeContext current_;
+};
+
+template<typename Fn>
+decltype(auto) RunWithResumeContext(ResumeContext context, Fn&& fn) {
+    ResumeContextScope scope(context);
+    return std::forward<Fn>(fn)();
+}
+
+
 template <typename T> 
 struct Result 
 {
@@ -62,31 +108,40 @@ private:
 };
 
 struct DispatchAwaiter {
-    explicit DispatchAwaiter(IExecutor &executor) noexcept
-        : executor_(executor) {}
+    explicit DispatchAwaiter(IExecutor &executor, ResumeContext resume_context = {}) noexcept
+        : executor_(executor), resume_context_(resume_context) {}
 
     bool await_ready() const { return false; }
     // coroutine_handle 类型的参数。这是一个由编译器生成的变量。在此函数中调用
     // handle.resume()，就可以恢复协程。
     void await_suspend(std::coroutine_handle<> handle) const {
         // 调度到协程对应的调度器上
-        executor_.execute([handle]() { handle.resume(); });
+        executor_.execute([handle, resume_context = resume_context_]() mutable {
+            RunWithResumeContext(resume_context, [handle]() mutable {
+                handle.resume();
+            });
+        });
     }
 
     void await_resume() {}
 
 private:
     IExecutor &executor_;
+    ResumeContext resume_context_;
 };
+
 
 template <typename Result, typename Executor> 
 struct TaskAwaiter 
 {
     explicit TaskAwaiter(IExecutor &executor,
-                        Task<Result, Executor> &&task) noexcept
-        : executor_(executor), task_(std::move(task)) {}
+                        Task<Result, Executor> &&task,
+                        ResumeContext resume_context = {}) noexcept
+        : executor_(executor), task_(std::move(task)), resume_context_(resume_context) {}
     TaskAwaiter(TaskAwaiter &&completion) noexcept
-        : task_(std::exchange(completion.task, {})) {}
+        : executor_(completion.executor_)
+        , task_(std::exchange(completion.task_, {}))
+        , resume_context_(completion.resume_context_) {}
     TaskAwaiter(TaskAwaiter &) = delete;
     TaskAwaiter &operator=(TaskAwaiter &) = delete;
     // 必要的法定函数.
@@ -98,7 +153,11 @@ struct TaskAwaiter
         // 当 task 执行完之后调用 resume
         task_.finally([handle, this]() {
             // 将 resume 函数的调用交给调度器执行
-            executor_.execute([handle]() { handle.resume(); });
+            executor_.execute([handle, resume_context = resume_context_]() mutable {
+                RunWithResumeContext(resume_context, [handle]() mutable {
+                    handle.resume();
+                });
+            });
         });
     }
     // 协程恢复执行时,被等待的Task 已经执行完,调用 get_result 来获取结果
@@ -108,7 +167,9 @@ struct TaskAwaiter
 private:
     IExecutor &executor_;
     Task<Result, Executor> task_; // 二阶Task,即协程体内部的 co_await 获得的 task.
+    ResumeContext resume_context_;
 };
+
 
 template <typename ResultType, typename Executor = SharedLooperExecutor>
 struct Task {
@@ -175,19 +236,23 @@ struct TaskPromise {
     // 协程体执行的第一步是调用 co_await
     // promise.initial_suspend()，initial_suspend
     // 的返回值就是一个等待对象（awaiter） 写成启动时也需要在恢复时实现调度
-    DispatchAwaiter initial_suspend() { return DispatchAwaiter{executor_}; }
+    DispatchAwaiter initial_suspend() { return DispatchAwaiter{executor_, resume_context_}; }
+
 
     // 法定函数. 执行结束后挂起,等待外部销毁,该逻辑与前面的 Generator 类似
     std::suspend_always final_suspend() noexcept { return {}; }
 
     // 法定函数.
     void unhandled_exception() {
-        std::lock_guard lock(completion_lock);
-        // 将异常存入 result
-        result.emplace(Result<ResultType>(std::current_exception()));
-        // 通知 get_result 当中的 wait
-        completion.notify_all();
-        // 调用回调
+        {
+            std::lock_guard lock(completion_lock);
+            // 将异常存入 result
+            result.emplace(Result<ResultType>(std::current_exception()));
+            // 通知 get_result 当中的 wait
+            completion.notify_all();
+        }
+        // 在锁释放后再调用回调，避免回调同步恢复外层协程时
+        // 外层 get_result() 再次获取 completion_lock 导致死锁
         notify_callbacks();
     }
 
@@ -210,10 +275,8 @@ struct TaskPromise {
     ResultType get_result() {
         // 如果 result 没有值, 说明协程还没有运行完,等待值被写入再返回.
         std::unique_lock lock(completion_lock);
-        if (!result.has_value()) {
-            // 等待写入值之后调用 notify_all
-            completion.wait(lock);
-        }
+        // 使用带谓词的 wait，防止伪唤醒
+        completion.wait(lock, [this]() { return result.has_value(); });
         return result->get_or_throw();
     }
 
@@ -222,8 +285,9 @@ struct TaskPromise {
     template <typename _ResultType, typename _Executor>
     TaskAwaiter<_ResultType, _Executor>
     await_transform(Task<_ResultType, _Executor> &&task) {
-        return TaskAwaiter<_ResultType, _Executor>(executor_, std::move(task));
+        return TaskAwaiter<_ResultType, _Executor>(executor_, std::move(task), resume_context_);
     }
+
 
 
 
@@ -268,7 +332,9 @@ private:
         completion_callbacks.clear();
     }
     Executor executor_;
+    ResumeContext resume_context_ = GetCurrentResumeContext();
 };
+
 
 // ----------------------------------------------------------------------------
 // 调度器实现
@@ -471,8 +537,10 @@ private:
             constexpr bool await_ready() const noexcept{ return false;}
             void await_suspend(std::coroutine_handle<> handle) noexcept{
                 awaitor_.core_handle_ = handle;
+                awaitor_.resume_context_ = GetCurrentResumeContext();
                 op_(AwaitorHandler{&awaitor_});
             }
+
             auto coAwait(IExecutor* executor) const noexcept{
                 return *this;
             }
@@ -507,7 +575,12 @@ public:
                 obj_->arg_ = {std::forward<Args>(args)...};
             }
         }
-        void resume() const{ obj_->core_handle_.resume();}
+        void resume() const{
+            RunWithResumeContext(obj_->resume_context_, [this]() {
+                obj_->core_handle_.resume();
+            });
+        }
+
     private:
         Derived *obj_;
     };
@@ -518,8 +591,10 @@ public:
 
 private:
     std::coroutine_handle<> core_handle_;
+    ResumeContext resume_context_{};
   
 };
+
 
 template <typename Arg>
 class CallBackAwaitor: public CallbackAwaitroBase<Arg, CallBackAwaitor<Arg>>{
@@ -543,18 +618,22 @@ public:
     }
     void await_suspend(std::coroutine_handle<> handle) noexcept{
         future_.wait_for(std::chrono::milliseconds(0));
-        auto resume_func = [handle]() { 
-            handle.resume(); 
+        resume_context_ = GetCurrentResumeContext();
+        auto resume_func = [handle, resume_context = resume_context_]() mutable {
+            RunWithResumeContext(resume_context, [handle]() mutable {
+                handle.resume();
+            });
         };
 
         if(resume_callback_){
             resume_callback_(resume_func);
         } else if(executor_){  
-            executor_->execute(resume_func);
+            executor_->execute(std::move(resume_func));
         } else {
-            handle.resume();
+            resume_func();
         }
     }
+
     auto coAwait(IExecutor* executor) const noexcept{
         return *this;
     }
@@ -580,7 +659,9 @@ private:
     std::future<T> future_;
     IExecutor *executor_ = nullptr;
     FutureCallBack resume_callback_;
+    ResumeContext resume_context_{};
 };
+
 
 template <typename T>
 auto operator co_await(std::future<T> &&future){

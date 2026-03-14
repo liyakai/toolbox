@@ -5,6 +5,10 @@
 #include "coro_rpc/coro_rpc_server.h"
 #include "network/network_api.h"
 #include "test/protobuf/test_coro_rpc.pb.h"
+#include <cstring>
+#include <unordered_set>
+#include <vector>
+#include <memory>
 FIXTURE_BEGIN(CoroRpcForward)
 
 
@@ -149,6 +153,166 @@ CASE(CoroRpcForwardCase1)
     auto result = test_coro_rpc_forward();
     fprintf(stderr, "[CoroRpcForwardCase1] result: %s\n", result.data());
     
+}
+
+// ========== ThreadSafe/ThreadUnsafe 策略深度测试 ==========
+
+// ThreadSafe 策略下 Server + Client 转发链路可以正常实例化和注册
+CASE(TestThreadSafe_ForwardChainSetup)
+{
+    using namespace ToolBox::CoroRpc;
+    
+    // 转发服务器用 ThreadSafe 策略
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> ts_forward_server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> ts_client_for_echo;
+    
+    // 设置回调
+    ts_forward_server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        (void)buffer;
+    });
+    
+    ts_client_for_echo.SetSendCallback([&](std::string &&buffer) {
+        (void)buffer;
+    });
+    
+    // ThreadSafe 下也能注册 forward_func（协程函数）
+    ts_forward_server.RegisterService<forward_func>();
+    
+    auto keys = ts_forward_server.GetAllServiceHandlerKeys();
+    if (keys.empty()) {
+        SetError("ThreadSafe 策略下转发服务注册失败");
+        return;
+    }
+}
+
+// ThreadSafe 下 Client 附件设置和ID管理
+CASE(TestThreadSafe_ClientAttachmentAndId)
+{
+    using namespace ToolBox::CoroRpc;
+    
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> ts_client;
+    
+    // 设置附件
+    std::string attachment = "XXX ThreadSafe attachment XXX";
+    bool ret = ts_client.SetReqAttachment(attachment);
+    if (!ret) {
+        SetError("ThreadSafe 客户端设置附件失败");
+        return;
+    }
+    
+    // Client ID 管理
+    uint64_t original_id = ts_client.get_client_id();
+    ts_client.set_client_id(12345);
+    if (ts_client.get_client_id() != 12345) {
+        SetError("ThreadSafe 客户端设置 ID 失败");
+        return;
+    }
+    (void)original_id;
+}
+
+// ThreadSafe 和 ThreadUnsafe 的 Client 混合使用（模拟真实场景：内部调用用无锁，外部连接用有锁）
+CASE(TestMixedPolicy_ForwardScenario)
+{
+    using namespace ToolBox::CoroRpc;
+    
+    // 转发服务器：ThreadSafe（因为可能有多个连接并发处理）
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> ts_forward;
+    // 内部连接 echo 服务器的客户端：ThreadUnsafe（假设内部是单线程）
+    CoroRpcClient<CoroRpcProtocol, ThreadUnsafe> tu_internal_client;
+    // 外部客户端：ThreadSafe
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> ts_external_client;
+    
+    ts_forward.RegisterService<echo>();
+    
+    // 都能设置回调
+    ts_forward.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        // 根据 opaque 决定是外部还是内部
+        (void)opaque;
+        (void)buffer;
+    });
+    tu_internal_client.SetSendCallback([&](std::string &&buffer) {
+        (void)buffer;
+    });
+    ts_external_client.SetSendCallback([&](std::string &&buffer) {
+        (void)buffer;
+    });
+    
+    auto keys = ts_forward.GetAllServiceHandlerKeys();
+    if (keys.empty()) {
+        SetError("混合策略场景下服务注册失败");
+        return;
+    }
+}
+
+// ThreadSafe Server 处理无效请求（错误包回传）
+CASE(TestThreadSafe_ForwardServerInvalidRequest)
+{
+    using namespace ToolBox::CoroRpc;
+    
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> ts_server;
+    
+    // 不注册任何服务，直接发请求
+    CoroRpcProtocol::ReqHeader req_header{};
+    req_header.magic = CoroRpcProtocol::kMagicNumber;
+    req_header.version = CoroRpcProtocol::kVersionNumber;
+    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeStruct);
+    req_header.msg_type = 0;
+    req_header.seq_num = 1;
+    req_header.func_id = 88888;  // 未注册
+    req_header.length = 0;
+    req_header.attach_length = 0;
+    req_header.client_id = 1;
+    
+    std::string buffer;
+    buffer.resize(CoroRpcProtocol::REQ_HEAD_LEN);
+    std::memcpy(buffer.data(), &req_header, sizeof(req_header));
+    
+    bool got_error_response = false;
+    ts_server.SetSendCallback([&](uint64_t opaque, std::string &&resp) {
+        if (resp.size() >= CoroRpcProtocol::RESP_HEAD_LEN) {
+            CoroRpcProtocol::RespHeader resp_header;
+            std::memcpy(&resp_header, resp.data(), sizeof(resp_header));
+            if (resp_header.err_code == static_cast<uint8_t>(Errc::ERR_FUNC_NOT_REGISTERED)) {
+                got_error_response = true;
+            }
+        }
+    });
+    
+    Errc err = ts_server.OnRecvReq(1, buffer);
+    
+    if (err != Errc::SUCCESS) {
+        SetError("ThreadSafe Server OnRecvReq 对未注册函数应返回 SUCCESS（错误已回包）");
+        return;
+    }
+    if (!got_error_response) {
+        SetError("ThreadSafe Server 应回 ERR_FUNC_NOT_REGISTERED 错误包");
+        return;
+    }
+}
+
+// 多个 ThreadSafe Client 并发创建（验证全局 client_id 递增无冲突）
+CASE(TestThreadSafe_ConcurrentClientCreation)
+{
+    using namespace ToolBox::CoroRpc;
+    
+    const int N = 20;
+    std::vector<std::unique_ptr<CoroRpcClient<CoroRpcProtocol, ThreadSafe>>> clients;
+    clients.reserve(N);
+    
+    for (int i = 0; i < N; ++i) {
+        clients.push_back(std::make_unique<CoroRpcClient<CoroRpcProtocol, ThreadSafe>>());
+    }
+    
+    // 验证所有 ID 互不相同
+    std::unordered_set<uint64_t> ids;
+    for (auto &c : clients) {
+        ids.insert(c->get_client_id());
+    }
+    if (ids.size() != N) {
+        SetError("多个 ThreadSafe 客户端的 ID 应互不相同");
+        return;
+    }
 }
 
 FIXTURE_END()

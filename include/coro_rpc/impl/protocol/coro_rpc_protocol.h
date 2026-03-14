@@ -55,7 +55,7 @@ namespace ToolBox::CoroRpc
     template<auto func>
     inline constexpr bool IsProtobufCompatible_v = IsProtobufCompatible<func>::value;
     
-template <typename RpcProtocol, template<typename...> typename map_t = std::unordered_map>
+template <typename RpcProtocol, template<typename...> typename map_t = std::unordered_map, typename ThreadSafetyPolicy = ThreadUnsafe>
 class CoroRpcServer;
 struct CoroRpcProtocol
 {
@@ -228,13 +228,8 @@ public:
             RpcLogError("[CoroRpcProtocol] ReadHeader: data size is less than header length, data size: %zu, header length: %zu", data.size(), size);
             return Errc::ERR_PROTOCOL;
         }
-        // Check alignment for memcpy
-        if (reinterpret_cast<std::uintptr_t>(data.data()) % alignof(T) != 0) {
-            // If not aligned, use byte-by-byte copy
-            std::memcpy(&header, data.data(), size);
-        } else {
-            header = *reinterpret_cast<const T*>(data.data());
-        }
+        // 统一使用 memcpy 读取协议头，避免对齐/别名 UB
+        std::memcpy(&header, data.data(), size);
         
         if(header.length > UINT32_MAX || header.attach_length > UINT32_MAX)
         {
@@ -283,7 +278,8 @@ public:
         {
             header_buf.resize(RESP_HEAD_LEN);
         }
-        auto& resp_head = *reinterpret_cast<RespHeader*>(header_buf.data());
+        // 使用 memcpy 写入协议头，避免对齐/别名 UB
+        RespHeader resp_head{};
         resp_head.magic = kMagicNumber;
         resp_head.version = kVersionNumber;
         // 响应使用与请求相同的序列化类型
@@ -302,6 +298,7 @@ public:
             err_code = CoroRpc::Errc::ERR_MESSAGE_TOO_LARGE;
         }
         resp_head.err_code = static_cast<uint8_t>(err_code);
+        std::memcpy(header_buf.data(), &resp_head, sizeof(resp_head));
         return true;
     }
 

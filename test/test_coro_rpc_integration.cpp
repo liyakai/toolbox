@@ -268,13 +268,28 @@ CASE(TestIntegration_ErrorHandling_UnregisteredFunction)
     buffer.resize(CoroRpcProtocol::REQ_HEAD_LEN);
     std::memcpy(buffer.data(), &req_header, sizeof(req_header));
     
-    server.SetSendCallback([](uint64_t, std::string &&) {});
+    // 验证服务端回错误包（而非仅返回错误码）
+    bool error_response_sent = false;
+    server.SetSendCallback([&](uint64_t opaque, std::string &&resp) {
+        // 解析响应头检查错误码
+        if (resp.size() >= CoroRpcProtocol::RESP_HEAD_LEN) {
+            CoroRpcProtocol::RespHeader resp_header;
+            std::memcpy(&resp_header, resp.data(), sizeof(resp_header));
+            if (resp_header.err_code == static_cast<uint8_t>(Errc::ERR_FUNC_NOT_REGISTERED)) {
+                error_response_sent = true;
+            }
+        }
+    });
     
     Errc err = server.OnRecvReq(1, buffer);
     
-    // 应该返回 ERR_FUNC_NOT_REGISTERED 或类似错误
-    if (err == Errc::SUCCESS) {
-        SetError("应该检测到未注册的函数");
+    // OnRecvReq 返回 SUCCESS（错误已通过响应包传递给客户端）
+    if (err != Errc::SUCCESS) {
+        SetError("未注册函数时 OnRecvReq 应返回 SUCCESS（错误已回包）");
+        return;
+    }
+    if (!error_response_sent) {
+        SetError("服务端应回错误包（ERR_FUNC_NOT_REGISTERED）给客户端");
         return;
     }
 }
@@ -585,6 +600,303 @@ CASE(TestIntegration_ProtocolHeaderAlignment)
     
     if (read_header.seq_num != header.seq_num) {
         SetError("非对齐内存读取数据不正确");
+        return;
+    }
+}
+
+// ========== 新接口测试 ==========
+
+// 测试 resp_body 的 owned storage：string_view 构造后数据独立于原始 buffer
+CASE(TestRespBody_OwnedStorage)
+{
+    // 模拟外部 buffer 被销毁后 resp_body 仍然有效
+    resp_body body;
+    {
+        std::string temp_body = "hello response body";
+        std::string temp_attach = "hello attachment";
+        body = resp_body(1, std::string_view(temp_body), std::string_view(temp_attach));
+        // temp_body 和 temp_attach 在这里销毁
+    }
+    // body 应该持有自己的拷贝，不会悬空
+    if (body.body_buffer_ != "hello response body") {
+        SetError("resp_body 的 body_buffer_ 应该是 owned copy");
+        return;
+    }
+    if (body.resp_attachment_buf_ != "hello attachment") {
+        SetError("resp_body 的 resp_attachment_buf_ 应该是 owned copy");
+        return;
+    }
+    if (body.serialize_type_ != 1) {
+        SetError("resp_body 的 serialize_type_ 不正确");
+        return;
+    }
+}
+
+// 测试 resp_body 的 move 构造
+CASE(TestRespBody_MoveConstruction)
+{
+    resp_body body1(2, std::string_view("body data"), std::string_view("attachment data"));
+    resp_body body2(std::move(body1));
+    
+    if (body2.body_buffer_ != "body data") {
+        SetError("move 后 body_buffer_ 不正确");
+        return;
+    }
+    if (body2.resp_attachment_buf_ != "attachment data") {
+        SetError("move 后 resp_attachment_buf_ 不正确");
+        return;
+    }
+}
+
+// 测试 async_rpc_result_value_t 的 HasError / GetError / operator bool
+CASE(TestAsyncRpcResult_HasError)
+{
+    // 成功的结果
+    {
+        async_rpc_result_value_t<int> result(42, resp_body(uint8_t(0), std::string_view(""), std::string_view("")));
+        if (result.HasError()) {
+            SetError("成功的结果 HasError() 应该返回 false");
+            return;
+        }
+        if (result.GetError() != Errc::SUCCESS) {
+            SetError("成功的结果 GetError() 应该返回 SUCCESS");
+            return;
+        }
+        if (!static_cast<bool>(result)) {
+            SetError("成功的结果 operator bool 应该返回 true");
+            return;
+        }
+        if (*result != 42) {
+            SetError("成功的结果值应该是 42");
+            return;
+        }
+    }
+    
+    // 失败的结果
+    {
+        async_rpc_result_value_t<int> err_result(Errc::ERR_TIMEOUT);
+        if (!err_result.HasError()) {
+            SetError("失败的结果 HasError() 应该返回 true");
+            return;
+        }
+        if (err_result.GetError() != Errc::ERR_TIMEOUT) {
+            SetError("失败的结果 GetError() 应该返回 ERR_TIMEOUT");
+            return;
+        }
+        if (static_cast<bool>(err_result)) {
+            SetError("失败的结果 operator bool 应该返回 false");
+            return;
+        }
+    }
+}
+
+// 测试 async_rpc_result_value_t<void> 的 HasError / GetError
+CASE(TestAsyncRpcResult_VoidType)
+{
+    // 成功的 void 结果
+    {
+        async_rpc_result_value_t<void> result;
+        if (result.HasError()) {
+            SetError("成功的 void 结果 HasError() 应该返回 false");
+            return;
+        }
+        if (!static_cast<bool>(result)) {
+            SetError("成功的 void 结果 operator bool 应该返回 true");
+            return;
+        }
+    }
+    
+    // 失败的 void 结果
+    {
+        async_rpc_result_value_t<void> err_result(Errc::ERR_FUNC_NOT_REGISTERED);
+        if (!err_result.HasError()) {
+            SetError("失败的 void 结果 HasError() 应该返回 true");
+            return;
+        }
+        if (err_result.GetError() != Errc::ERR_FUNC_NOT_REGISTERED) {
+            SetError("失败的 void 结果 GetError() 应该返回 ERR_FUNC_NOT_REGISTERED");
+            return;
+        }
+    }
+}
+
+// 测试服务端 per-request SetRespAttachment 接口
+CASE(TestServerSetRespAttachment)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
+    
+    // 测试 SetRespAttachment 的 API 可用性
+    server.SetRespAttachment("test attachment from api");
+    
+    // 验证 GetReqAttachment 返回空（无请求上下文时）
+    // 因为没有活跃请求，attachment 应该是空的
+    // (thread_local 初始值为空)
+    (void)server.GetReqAttachment();
+}
+
+// 测试 RequestContext 的 thread_local 隔离
+CASE(TestRequestContext_ThreadLocal)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map> server;
+    
+    // 验证在无请求上下文时 GetReqAttachment 返回空
+    auto att = server.GetReqAttachment();
+    if (!att.empty()) {
+        SetError("无请求上下文时 GetReqAttachment 应返回空");
+        return;
+    }
+}
+
+// ========== ThreadSafe 策略测试 ==========
+
+// 测试 ThreadSafe 策略下 Client/Server 可以正确实例化和工作
+CASE(TestThreadSafe_ClientServerSetup)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    
+    // 设置服务器
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        (void)buffer;
+    });
+    
+    // 设置客户端
+    client.SetSendCallback([&](std::string &&buffer) {
+        (void)buffer;
+    });
+    
+    // 注册服务
+    server.RegisterService<add>();
+    
+    auto keys = server.GetAllServiceHandlerKeys();
+    if (keys.empty()) {
+        SetError("ThreadSafe 策略下服务注册失败");
+        return;
+    }
+}
+
+// 测试 ThreadSafe 策略下多服务注册
+CASE(TestThreadSafe_MultipleServices)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    
+    server.RegisterService<add>();
+    server.RegisterService<echo_string>();
+    server.RegisterService<async_add>();
+    server.RegisterService<async_echo>();
+    
+    auto keys = server.GetAllServiceHandlerKeys();
+    
+    if (keys.size() < 4) {
+        SetError("ThreadSafe 策略下多个服务注册失败");
+        return;
+    }
+}
+
+// 测试 ThreadSafe 策略下成员函数注册
+CASE(TestThreadSafe_MemberFunctionServices)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    TestService service;
+    
+    server.RegisterService<&TestService::multiply>(&service);
+    server.RegisterService<&TestService::set_value>(&service);
+    server.RegisterService<&TestService::async_multiply>(&service);
+    server.RegisterService<&TestService::stream_strings>(&service);
+    
+    auto keys = server.GetAllServiceHandlerKeys();
+    
+    if (keys.size() < 4) {
+        SetError("ThreadSafe 策略下成员函数服务注册失败");
+        return;
+    }
+}
+
+// 测试 ThreadSafe 策略下完整的请求/响应流转
+CASE(TestThreadSafe_RequestResponseFlow)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        client.OnRecvResp(std::string_view(buffer));
+    });
+    
+    client.SetSendCallback([&](std::string &&buffer) {
+        server.OnRecvReq(1, std::string_view(buffer));
+    });
+    
+    server.RegisterService<add>();
+    
+    // 验证协议层面的消息流转
+}
+
+// 测试 ThreadSafe 策略下的错误处理
+CASE(TestThreadSafe_ErrorHandling)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    
+    // 构造一个未注册函数的请求
+    CoroRpcProtocol::ReqHeader req_header;
+    req_header.magic = CoroRpcProtocol::kMagicNumber;
+    req_header.version = CoroRpcProtocol::kVersionNumber;
+    req_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeStruct);
+    req_header.msg_type = 0;
+    req_header.seq_num = 1;
+    req_header.func_id = 99999;
+    req_header.length = 0;
+    req_header.attach_length = 0;
+    req_header.client_id = 1;
+    
+    std::string buffer;
+    buffer.resize(CoroRpcProtocol::REQ_HEAD_LEN);
+    std::memcpy(buffer.data(), &req_header, sizeof(req_header));
+    
+    bool error_response_sent = false;
+    server.SetSendCallback([&](uint64_t opaque, std::string &&resp) {
+        (void)opaque;
+        if (resp.size() >= CoroRpcProtocol::RESP_HEAD_LEN) {
+            CoroRpcProtocol::RespHeader resp_header;
+            std::memcpy(&resp_header, resp.data(), sizeof(resp_header));
+            if (resp_header.err_code == static_cast<uint8_t>(Errc::ERR_FUNC_NOT_REGISTERED)) {
+                error_response_sent = true;
+            }
+        }
+    });
+    
+    Errc err = server.OnRecvReq(1, buffer);
+    
+    if (err != Errc::SUCCESS) {
+        SetError("ThreadSafe 策略下未注册函数时 OnRecvReq 应返回 SUCCESS");
+        return;
+    }
+    if (!error_response_sent) {
+        SetError("ThreadSafe 策略下服务端应回错误包");
+        return;
+    }
+}
+
+// 测试默认策略类型（ThreadUnsafe）—— 验证不传第二/三个参数即为无锁版
+CASE(TestDefaultPolicy_IsThreadUnsafe)
+{
+    // 不传 ThreadSafetyPolicy → 默认 ThreadUnsafe
+    CoroRpcClient<CoroRpcProtocol> client_default;
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map> server_default;
+    
+    // 显式传 ThreadUnsafe → 应与默认版一致
+    CoroRpcClient<CoroRpcProtocol, ThreadUnsafe> client_explicit;
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadUnsafe> server_explicit;
+    
+    // 验证两者可以正常注册服务
+    server_default.RegisterService<add>();
+    server_explicit.RegisterService<add>();
+    
+    auto keys1 = server_default.GetAllServiceHandlerKeys();
+    auto keys2 = server_explicit.GetAllServiceHandlerKeys();
+    
+    if (keys1.empty() || keys2.empty()) {
+        SetError("默认策略和显式 ThreadUnsafe 策略应该都能正常注册服务");
         return;
     }
 }

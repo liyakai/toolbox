@@ -45,8 +45,23 @@ using rpc_async_return_value_t = typename rpc_return_type<typename unwrap_task_r
 
 struct resp_body{
     uint8_t serialize_type_;  // 与协议头中的 serialize_type 类型保持一致
-    std::string_view body_buffer_;
-    std::string_view resp_attachment_buf_;
+    std::string body_buffer_;           // owned storage，防止引用外部 buffer 悬空
+    std::string resp_attachment_buf_;   // owned storage，防止引用外部 buffer 悬空
+
+    // 兼容旧代码：允许从 string_view 构造（执行拷贝）
+    resp_body() = default;
+    resp_body(uint8_t st, std::string_view body, std::string_view att)
+        : serialize_type_(st)
+        , body_buffer_(body.data(), body.size())
+        , resp_attachment_buf_(att.data(), att.size()) {}
+    resp_body(uint8_t st, std::string &&body, std::string &&att)
+        : serialize_type_(st)
+        , body_buffer_(std::move(body))
+        , resp_attachment_buf_(std::move(att)) {}
+    resp_body(resp_body&&) = default;
+    resp_body& operator=(resp_body&&) = default;
+    resp_body(const resp_body&) = default;
+    resp_body& operator=(const resp_body&) = default;
 };
 
 template<typename T>
@@ -54,9 +69,12 @@ struct async_rpc_result_value_t{
 public:
     async_rpc_result_value_t() = default;
     async_rpc_result_value_t(T &&result, resp_body &&buffer)
-    : result_(std::move(result)), buffer_(std::move(buffer)) {}
+    : result_(std::move(result)), buffer_(std::move(buffer)), errc_(CoroRpc::Errc::SUCCESS) {}
     async_rpc_result_value_t(T &&result)
-    : result_(std::move(result)) {}
+    : result_(std::move(result)), errc_(CoroRpc::Errc::SUCCESS) {}
+    // 从错误码构造（Call 失败时使用）
+    explicit async_rpc_result_value_t(CoroRpc::Errc ec)
+    : errc_(ec) {}
 
     // 允许直接访问value
     T& operator*() & { return result_; }
@@ -67,10 +85,17 @@ public:
     T* operator->() { return &result_; }
     const T* operator->() const { return &result_; }
     
-    // 隐式转换为T的引用
-    operator T&() & { return result_; }
-    operator const T&() const & { return result_; }
-    operator T&&() && { return std::move(result_); }
+    // 获取值的引用（替代原来的隐式转换，更安全）
+    T& value() & { return result_; }
+    const T& value() const & { return result_; }
+    T&& value() && { return std::move(result_); }
+
+    // 判断是否有错误 / 获取错误码
+    bool HasError() const noexcept { return errc_ != CoroRpc::Errc::SUCCESS; }
+    CoroRpc::Errc GetError() const noexcept { return errc_; }
+
+    // operator bool: true = 成功, false = 有错误
+    explicit operator bool() const noexcept { return !HasError(); }
 
     std::string_view GetRespAttachment() const noexcept { return buffer_.resp_attachment_buf_; }
     resp_body ReleaseBuffer() noexcept { return std::move(buffer_); }
@@ -78,12 +103,19 @@ public:
 private:
     T result_;
     resp_body buffer_;
+    CoroRpc::Errc errc_ = CoroRpc::Errc::SUCCESS;
 };
 
 template<>
 struct async_rpc_result_value_t<void>{
     async_rpc_result_value_t() = default;
+    explicit async_rpc_result_value_t(CoroRpc::Errc ec) : errc_(ec) {}
     resp_body buffer_;
+    CoroRpc::Errc errc_ = CoroRpc::Errc::SUCCESS;
+
+    bool HasError() const noexcept { return errc_ != CoroRpc::Errc::SUCCESS; }
+    CoroRpc::Errc GetError() const noexcept { return errc_; }
+    explicit operator bool() const noexcept { return !HasError(); }
 
     std::string_view GetRespAttachment() const noexcept { return buffer_.resp_attachment_buf_; }
     resp_body ReleaseBuffer() noexcept { return std::move(buffer_); }
@@ -98,9 +130,14 @@ using async_rpc_type_t = typename rpc_return_type<T>::type;
 template<typename T>
 using rpc_result = std::tuple<T, CoroRpc::Errc>;
 
-template <typename rpc_protocol>
+template <typename rpc_protocol, typename ThreadSafetyPolicy = ThreadUnsafe>
 class CoroRpcClient {
 private:
+    using mutex_type = typename ThreadSafetyPolicy::mutex_type;
+    using atomic_bool_type = typename ThreadSafetyPolicy::atomic_bool_type;
+    using atomic_uint32_type = typename ThreadSafetyPolicy::atomic_uint32_type;
+    using stream_reader_type = StreamReader<std::string, mutex_type>;
+
     using PromiseCallback = std::function<void()>;
     using SendCallback = std::function<void(std::string &&)>;
     using rpc_func_key = typename CoroRpcTools::rpc_func_key;
@@ -119,47 +156,59 @@ private:
         {
             ToolBox::HTIMER timer_;
             std::promise<async_rpc_raw_result> promise_;
-            const PromiseCallback &callback_;
+            PromiseCallback callback_;  // 值语义持有，避免悬空引用
+            atomic_bool_type completed_{false};  // 防止超时和正常响应竞争完成
             handler_t(ToolBox::HTIMER && timer,
                         std::promise<async_rpc_raw_result> && promise,
                         PromiseCallback &&callback)
                 : timer_(std::move(timer)), promise_(std::move(promise)), callback_(std::move(callback)) {}
             void operator()(resp_body &&buffer, uint8_t rpc_errc) {
-                // RpcLogDebug("[rpc][client] promise set value is called, rpc_errc: %d", rpc_errc);
+                // 防止与 local_error 竞争：只允许完成一次
+                bool expected = false;
+                if (!completed_.compare_exchange_strong(expected, true)) {
+                    return;
+                }
                 ToolBox::TimerMgr->KillTimer(timer_);
                 promise_.set_value(async_rpc_raw_result{async_rpc_raw_result_value_type{std::move(buffer), rpc_errc}});
-                callback_();
+                if (callback_) callback_();
             }
             void local_error(CoroRpc::Errc ec) {
+                // 防止与 operator() 竞争：只允许完成一次
+                bool expected = false;
+                if (!completed_.compare_exchange_strong(expected, true)) {
+                    return;
+                }
                 RpcLogError("[rpc][client] promise local_error is called, rpc_errc: %d", ec);
                 ToolBox::TimerMgr->KillTimer(timer_);
                 promise_.set_value(async_rpc_raw_result{ec});
-                callback_();
+                if (callback_) callback_();
             }
         };
+        using handler_ptr = std::shared_ptr<handler_t>;
         // 流式响应处理器：stream_id -> StreamReader
         struct stream_handler_t {
-            std::shared_ptr<StreamReader<std::string>> reader;
+            std::shared_ptr<stream_reader_type> reader;
             uint32_t stream_id;
             uint64_t timeout_timer = 0;  // 超时定时器ID
             std::chrono::steady_clock::time_point start_time;  // 流开始时间
             std::chrono::milliseconds timeout_duration;  // 超时时长
             
-            stream_handler_t(uint32_t id, std::chrono::milliseconds timeout) 
-                : reader(std::make_shared<StreamReader<std::string>>()), 
+            stream_handler_t(uint32_t id, std::chrono::milliseconds timeout)
+                : reader(std::make_shared<stream_reader_type>()),
                   stream_id(id),
                   start_time(std::chrono::steady_clock::now()),
                   timeout_duration(timeout) {}
         };
-        std::unordered_map<uint32_t, handler_t> response_handler_table_;
+        mutex_type handler_table_mutex_;  // 保护 response_handler_table_ 和 stream_handler_table_
+        std::unordered_map<uint32_t, handler_ptr> response_handler_table_;
         std::unordered_map<uint32_t, stream_handler_t> stream_handler_table_;  // stream_id -> stream_handler
-        std::atomic<uint32_t> recving_cnt_ = 0;
+        atomic_uint32_type recving_cnt_ = 0;
     };
 
     static constexpr uint32_t INITIAL_REQUEST_ID = 9527;
-    std::atomic<uint32_t> request_id_ = INITIAL_REQUEST_ID;
+    atomic_uint32_type request_id_ = INITIAL_REQUEST_ID;
     std::shared_ptr<control_t> control_;
-    std::string_view req_attachment_;
+    std::string req_attachment_storage_;  // owned storage，避免请求附件引用悬空
     Config config_;
     SendCallback send_callback_ = nullptr;
 public:
@@ -171,6 +220,12 @@ public:
      {
         config_.client_id = client_id;
     }
+    // [KNOWN LIMITATION] 当前析构函数不会显式取消活跃流或清理定时器。
+    // 如果 StreamReader 或超时定时器的生命周期超过 client 本身，
+    // 回调中捕获的 this/send_callback_ 可能悬空（UAF）。
+    // 当前使用模式下 client 始终活过所有 reader 和 timer，因此安全。
+    // 若未来改为"client 先析构、reader 后消费"的模式，需要在此处
+    // 显式遍历 stream_handler_table_ 并取消所有流/清理定时器。
     ~CoroRpcClient() = default;
 
     // 获取配置
@@ -188,7 +243,7 @@ public:
     
     // Call Stream RPC - 返回StreamReader用于接收流式数据
     template <auto func, typename... Args>
-    auto CallStream(Args &&...args) -> ToolBox::coro::Task<std::shared_ptr<StreamReader<std::string>>, coro::SharedLooperExecutor>
+    auto CallStream(Args &&...args) -> ToolBox::coro::Task<std::shared_ptr<stream_reader_type>, coro::SharedLooperExecutor>
     {
         return CallStreamFor_<func>(std::chrono::seconds(30), std::forward<Args>(args)...);
     }
@@ -205,7 +260,7 @@ public:
         RpcLogError("[rpc][client] attachment is too long, max length is UINT32_MAX");
         return false;
         }
-        req_attachment_ = attachment;
+        req_attachment_storage_.assign(attachment.data(), attachment.size());
         return true;
     }
     struct RecvingGuard 
@@ -232,55 +287,88 @@ public:
     }
 
 private:
+    std::string ConsumeReqAttachment_() {
+        std::string attachment = std::move(req_attachment_storage_);
+        req_attachment_storage_.clear();
+        return attachment;
+    }
+
     // Call RPC with Timeout_
   template <auto func, typename... Args>
   auto CallFor_(auto duration, Args &&...args) 
   -> ToolBox::coro::Task<async_rpc_result_value_t<rpc_async_return_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>>, coro::SharedLooperExecutor> 
   {
         using return_type = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
+        using result_value_type = async_rpc_result_value_t<rpc_async_return_value_t<return_type>>;
+        auto request_attachment = ConsumeReqAttachment_();
         auto async_result = co_await co_await SendRequestForWithAttachment<func, Args...>(
-                duration, req_attachment_, std::forward<Args>(args)...);
+                duration, request_attachment, std::forward<Args>(args)...);
         if (async_result.index() == 0) {
             if constexpr (std::is_void_v<return_type>) {
-                co_return {};
+                co_return result_value_type{};
             } else {
                 co_return std::move(std::get<0>(async_result));
             }
         } else {
-            co_return {};
+            // 错误时携带错误码，而不是返回默认空值
+            auto ec = std::get<1>(async_result);
+            co_return result_value_type{ec};
         }
   }
   
   // Call Stream RPC with Timeout_
   template <auto func, typename... Args>
   auto CallStreamFor_(auto duration, Args &&...args)
-  -> ToolBox::coro::Task<std::shared_ptr<StreamReader<std::string>>, coro::SharedLooperExecutor>
+  -> ToolBox::coro::Task<std::shared_ptr<stream_reader_type>, coro::SharedLooperExecutor>
   {
         RecvingGuard guard(control_.get());
-        uint32_t stream_id;
-        auto err = co_await SendStreamRequestImpl_<func>(stream_id, req_attachment_, std::forward<Args>(args)...);
-        req_attachment_ = {};  // 及时释放
-        
-        if (err != CoroRpc::Errc::SUCCESS) {
-            RpcLogError("[rpc][client] CallStreamFor_: send stream request failed, err: %d", err);
+        uint32_t stream_id = 0;
+        auto request_attachment = ConsumeReqAttachment_();
+
+        if (!send_callback_) {
+            RpcLogError("[rpc][client] CallStreamFor_: send_callback_ not set");
             co_return nullptr;
+        }
+
+        std::string send_buffer;
+        auto err = PrepareSendBuffer_<func>(stream_id, request_attachment.size(), send_buffer, true, std::forward<Args>(args)...);
+        if (err != CoroRpc::Errc::SUCCESS) {
+            RpcLogError("[rpc][client] CallStreamFor_: prepare stream request failed, err: %d", err);
+            co_return nullptr;
+        }
+
+        if (!request_attachment.empty()) {
+            size_t expected_buffer_size = rpc_protocol::REQ_HEAD_LEN + (send_buffer.size() - rpc_protocol::REQ_HEAD_LEN - request_attachment.size()) + request_attachment.size();
+            if (send_buffer.size() < expected_buffer_size || send_buffer.size() < request_attachment.size()) {
+                RpcLogError("[rpc][client] CallStreamFor_: buffer too small for attachment, buffer size: %zu, attachment size: %zu",
+                           send_buffer.size(), request_attachment.size());
+                co_return nullptr;
+            }
+            std::memcpy(send_buffer.data() + send_buffer.size() - request_attachment.size(),
+                       request_attachment.data(), request_attachment.size());
         }
         
         // 转换超时时间
         auto timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
         
-        // 创建StreamReader并注册到stream_handler_table_
-        auto stream_reader = std::make_shared<StreamReader<std::string>>();
-        auto [iter, inserted] = control_->stream_handler_table_.try_emplace(stream_id, stream_id, timeout_ms);
-        if (!inserted) {
-            RpcLogError("[rpc][client] CallStreamFor_: stream_id conflict, id: %u", stream_id);
-            co_return nullptr;
+        // 创建StreamReader并注册到stream_handler_table_（先注册，再发送，避免同步回环丢首包）
+        auto stream_reader = std::make_shared<stream_reader_type>();
+        {
+            std::lock_guard<mutex_type> lock(control_->handler_table_mutex_);
+            auto [iter, inserted] = control_->stream_handler_table_.try_emplace(stream_id, stream_id, timeout_ms);
+            if (!inserted) {
+                RpcLogError("[rpc][client] CallStreamFor_: stream_id conflict, id: %u", stream_id);
+                co_return nullptr;
+            }
+            iter->second.reader = stream_reader;
         }
-        iter->second.reader = stream_reader;
         
         // 设置流ID和背压回调
+        // [KNOWN LIMITATION] 背压回调捕获了裸 this 指针。
+        // 只要 client 的生命周期覆盖所有活跃流，这是安全的。
+        // 若未来 client 可能先析构，需改为 weak_ptr<control_t> 守护。
         stream_reader->SetStreamId(stream_id);
-        stream_reader->SetBackpressureCallback([this, stream_id](uint32_t id, bool pause) {
+        stream_reader->SetBackpressureCallback([this](uint32_t id, bool pause) {
             // 发送背压控制消息
             SendStreamControlMessage_(id, pause ? 
                 static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamPause) :
@@ -288,14 +376,24 @@ private:
         });
         
         // 设置超时定时器
+        // [KNOWN LIMITATION] 超时回调捕获了裸 this 指针，同上。
         if (timeout_ms.count() > 0) {
             auto timeout_handler = [this, stream_id](int times) {
                 (void)times;  // 未使用的参数
                 RpcLogWarn("[rpc][client] CallStreamFor_: stream timeout, stream_id: %u", stream_id);
                 CancelStream_(stream_id);
             };
-            iter->second.timeout_timer = ToolBox::TimerMgr->AddTimer(timeout_handler, timeout_ms.count(), 1, __FILE__, __LINE__);
+            auto timeout_timer_handle = ToolBox::TimerMgr->AddTimer(timeout_handler, timeout_ms.count(), 1, __FILE__, __LINE__);
+            {
+                std::lock_guard<mutex_type> lock(control_->handler_table_mutex_);
+                auto it = control_->stream_handler_table_.find(stream_id);
+                if (it != control_->stream_handler_table_.end()) {
+                    it->second.timeout_timer = timeout_timer_handle;
+                }
+            }
         }
+
+        send_callback_(std::move(send_buffer));
         
         guard.release();
         co_return stream_reader;
@@ -307,59 +405,84 @@ private:
                                     Args &&...args)
       -> ToolBox::coro::Task<ToolBox::coro::Task<async_rpc_result<rpc_async_return_value_t<typename ToolBox::FunctionTraits<decltype(func)>::return_type>>, coro::SharedLooperExecutor>, coro::SharedLooperExecutor> 
       {
-        req_attachment_ = {};   // 及时释放,防止混乱.
         using return_type = typename ToolBox::FunctionTraits<decltype(func)>::return_type;
         using rpc_value_type = rpc_async_return_value_t<return_type>;
         RecvingGuard guard(control_.get());
-        uint32_t id;
+        uint32_t id = 0;
         std::function<void()> promise_callback;
-        typename ToolBox::coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack &&future_callback = [&promise_callback](std::function<void()> &&handle) {
-            // RpcLogDebug("[rpc][client] future_callback is called");
+        typename ToolBox::coro::FutureAwaiter<async_rpc_raw_result>::FutureCallBack future_callback = [&promise_callback](std::function<void()> &&handle) {
             promise_callback = std::move(handle);
         };
-        auto timer = ToolBox::TimerMgr->AddTimer([&](int times) {
-            if(control_ == nullptr)
+
+        std::string send_buffer;
+        auto prepare_result = PrepareSendBuffer_<func>(id, request_attachment.size(), send_buffer, false, std::forward<Args>(args)...);
+        if (prepare_result != CoroRpc::Errc::SUCCESS) {
+            co_return BuildFailedRpcResult_<rpc_value_type>(prepare_result);
+        }
+
+        if (!request_attachment.empty())
+        {
+            size_t expected_buffer_size = rpc_protocol::REQ_HEAD_LEN + (send_buffer.size() - rpc_protocol::REQ_HEAD_LEN - request_attachment.size()) + request_attachment.size();
+            if (send_buffer.size() < expected_buffer_size || send_buffer.size() < request_attachment.size()) {
+                RpcLogError("[rpc][client] SendRequestForWithAttachment: buffer too small for attachment, buffer size: %zu, attachment size: %zu",
+                           send_buffer.size(), request_attachment.size());
+                co_return BuildFailedRpcResult_<rpc_value_type>(CoroRpc::Errc::ERR_BUFFER_TOO_SMALL);
+            }
+            std::memcpy(send_buffer.data() + send_buffer.size() - request_attachment.size(),
+                       request_attachment.data(), request_attachment.size());
+        }
+
+        if (!send_callback_) {
+            RpcLogError("[rpc][client] SendRequestForWithAttachment: send_callback_ not set");
+            co_return BuildFailedRpcResult_<rpc_value_type>(CoroRpc::Errc::ERR_SEND_CALLBACK_NOT_SET);
+        }
+
+        std::promise<async_rpc_raw_result> promise;
+        auto future = promise.get_future();
+
+        std::weak_ptr<control_t> weak_ctrl = control_;
+        uint32_t captured_id = id;
+        auto timer = ToolBox::TimerMgr->AddTimer([weak_ctrl, captured_id](int times) {
+            (void)times;
+            auto ctrl = weak_ctrl.lock();
+            if (!ctrl)
             {
                 RpcLogError("[rpc][client] control is nullptr");
                 return;
             }
-            RpcLogError("[rpc][client] rpc Timeout_, id: %d", id);
-            auto iter = control_->response_handler_table_.find(id);
-            if(iter == control_->response_handler_table_.end())
+            RpcLogError("[rpc][client] rpc Timeout_, id: %d", captured_id);
+            typename control_t::handler_ptr handler;
             {
-                RpcLogError("[rpc][client] response handler table not found, id: %d", id);
-                return;
+                std::lock_guard<mutex_type> lock(ctrl->handler_table_mutex_);
+                auto iter = ctrl->response_handler_table_.find(captured_id);
+                if(iter == ctrl->response_handler_table_.end())
+                {
+                    RpcLogError("[rpc][client] response handler table not found, id: %d", captured_id);
+                    return;
+                }
+                handler = iter->second;
+                ctrl->response_handler_table_.erase(iter);
+                RpcLogDebug("[rpc][client] response handler table erase success, id: %d, table size: %zu", captured_id, ctrl->response_handler_table_.size());
             }
-            iter->second.local_error(CoroRpc::Errc::ERR_TIMEOUT);
-            int ret = control_->response_handler_table_.erase(id);
-            if(ret == 0)
-            {
-                RpcLogError("[rpc][client] response handler table erase failed, id: %d, table size: %zu", id, control_->response_handler_table_.size());
-                return;
-            }
-            RpcLogDebug("[rpc][client] response handler table erase success, id: %d, table size: %zu", id, control_->response_handler_table_.size());
+            handler->local_error(CoroRpc::Errc::ERR_TIMEOUT);
         }, (int32_t)std::chrono::duration_cast<std::chrono::milliseconds>(time_out_duration).count(), 1, __FILE__, __LINE__);
 
-        auto result = co_await SendRequestForImpl_<func>(time_out_duration, id, std::move(timer), request_attachment, std::forward<Args>(args)...);
-        // RpcLogDebug("[rpc][client] SendRequestForWithAttachment end, result:%d", result);
+        auto handler = std::make_shared<typename control_t::handler_t>(std::move(timer), std::move(promise), std::move(promise_callback));
         auto& control = *control_;
-        if (result == CoroRpc::Errc::SUCCESS) 
         {
-            std::promise<async_rpc_raw_result> promise;
-            auto future = promise.get_future();
-            // bool is_empty = control.response_handler_table_.empty();
-            auto &&[_, is_ok] = control.response_handler_table_.try_emplace(id, std::move(timer), std::move(promise), std::move(promise_callback));
+            std::lock_guard<mutex_type> lock(control.handler_table_mutex_);
+            auto &&[_, is_ok] = control.response_handler_table_.try_emplace(id, handler);
             if (!is_ok) [[unlikely]]
             {
                 RpcLogError("[rpc][client] response handler table insert failed, id: {}", id);
                 co_return BuildFailedRpcResult_<rpc_value_type>(CoroRpc::Errc::ERR_SERIAL_NUMBER_CONFLICT);
-            }else{
-                guard.release();
-                co_return DeserializeRpcResult_<rpc_value_type>(std::move(future), std::move(future_callback), std::weak_ptr<control_t>{control_});
             }
-        }else {
-            co_return BuildFailedRpcResult_<rpc_value_type>(std::move(result));
         }
+
+        // 先注册 response handler，再发送请求，避免同步回环时响应先到被丢弃
+        send_callback_(std::move(send_buffer));
+        guard.release();
+        co_return DeserializeRpcResult_<rpc_value_type>(std::move(future), std::move(future_callback), std::weak_ptr<control_t>{control_});
   }
 
     auto Timeout_(auto duration, std::string error_msg)
@@ -563,22 +686,23 @@ private:
             // 分配缓冲区
             buffer.resize(rpc_protocol::REQ_HEAD_LEN + body_length + attachment_size);
             
-            // 初始化请求头
+            // 初始化请求头（使用 memcpy 写入，避免对齐/别名 UB）
             uint8_t msg_type = is_stream ? static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamStart) : 0;
-            new (buffer.data()) rpc_protocol::ReqHeader{
-                .magic = rpc_protocol::kMagicNumber,
-                .version = rpc_protocol::kVersionNumber,
-                .serialize_type = adapter::get_serialize_type(),
-                .msg_type = msg_type,
-                .seq_num = ++request_id_,
-                .func_id = key,
-                .length = body_length,
-                .client_id = config_.client_id,
-                .attach_length = static_cast<uint32_t>(attachment_size)
-            };
+            typename rpc_protocol::ReqHeader req_header{};
+            req_header.magic = rpc_protocol::kMagicNumber;
+            req_header.version = rpc_protocol::kVersionNumber;
+            req_header.serialize_type = adapter::get_serialize_type();
+            req_header.msg_type = msg_type;
+            uint32_t seq_num = ++request_id_;
+            req_header.seq_num = seq_num;
+            req_header.func_id = key;
+            req_header.length = body_length;
+            req_header.client_id = config_.client_id;
+            req_header.attach_length = static_cast<uint32_t>(attachment_size);
+            std::memcpy(buffer.data(), &req_header, sizeof(req_header));
             
-            // 保存序列号
-            id = request_id_;
+            // 保存与报文头一致的序列号
+            id = seq_num;
             
             // 执行序列化
             return adapter::serialize_to_buffer(
@@ -612,69 +736,96 @@ private:
                                    header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError));
         
         if (is_stream_response) {
-            // 处理流式响应
-            auto stream_iter = control_->stream_handler_table_.find(header.seq_num);
-            if (stream_iter != control_->stream_handler_table_.end()) {
-                auto& stream_handler = stream_iter->second;
-                if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamEnd)) {
-                    // 流结束
-                    stream_handler.reader->Finish();
-                    // 清理超时定时器
-                    if (stream_handler.timeout_timer != 0) {
-                        ToolBox::TimerMgr->KillTimer(stream_handler.timeout_timer);
-                    }
-                    control_->stream_handler_table_.erase(stream_iter);
-                } else if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError)) {
-                    // 流错误
-                    stream_handler.reader->SetError(static_cast<Errc>(header.err_code));
-                    // 清理超时定时器
-                    if (stream_handler.timeout_timer != 0) {
-                        ToolBox::TimerMgr->KillTimer(stream_handler.timeout_timer);
-                    }
-                    control_->stream_handler_table_.erase(stream_iter);
-                } else {
-                    // 流数据
-                    std::string body_str(body.data(), body.size());
-                    bool pushed = stream_handler.reader->PushValue(std::move(body_str));
-                    if (!pushed) {
-                        // 缓冲区满，背压已经在PushValue中处理
-                        RpcLogWarn("[rpc][client] OnRecvResp_: stream buffer full, backpressure triggered, stream_id: %u", header.seq_num);
+            // 处理流式响应：只在锁内查表/摘表，reader 回调统一放到锁外执行
+            std::shared_ptr<stream_reader_type> stream_reader;
+            uint64_t timeout_timer = 0;
+            bool should_finish = false;
+            bool should_set_error = false;
+            Errc stream_error = Errc::SUCCESS;
+            {
+                std::lock_guard<mutex_type> lock(control_->handler_table_mutex_);
+                auto stream_iter = control_->stream_handler_table_.find(header.seq_num);
+                if (stream_iter != control_->stream_handler_table_.end()) {
+                    stream_reader = stream_iter->second.reader;
+                    if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamEnd)) {
+                        should_finish = true;
+                        timeout_timer = stream_iter->second.timeout_timer;
+                        control_->stream_handler_table_.erase(stream_iter);
+                    } else if (header.msg_type == static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamError)) {
+                        should_set_error = true;
+                        stream_error = static_cast<Errc>(header.err_code);
+                        timeout_timer = stream_iter->second.timeout_timer;
+                        control_->stream_handler_table_.erase(stream_iter);
                     }
                 }
-            } else {
+            }
+            if (!stream_reader) {
                 RpcLogWarn("[rpc][client] OnRecvResp_: stream handler not found for stream_id: %u", header.seq_num);
+                return CoroRpc::Errc::SUCCESS;
+            }
+            if (should_finish) {
+                if (timeout_timer != 0) {
+                    ToolBox::TimerMgr->KillTimer(timeout_timer);
+                }
+                stream_reader->Finish();
+            } else if (should_set_error) {
+                if (timeout_timer != 0) {
+                    ToolBox::TimerMgr->KillTimer(timeout_timer);
+                }
+                stream_reader->SetError(stream_error);
+            } else {
+                // 流数据 — 拷贝为 owned string，避免引用外部 buffer
+                std::string body_str(body.data(), body.size());
+                bool within_soft_limit = stream_reader->PushValue(std::move(body_str));
+                if (!within_soft_limit) {
+                    // 当前 chunk 已保留，仅表示本地缓存达到/超过软上限，背压已经在 PushValue 中处理。
+                    RpcLogWarn("[rpc][client] OnRecvResp_: stream buffer soft limit reached, backpressure triggered, stream_id: %u", header.seq_num);
+                }
             }
             return CoroRpc::Errc::SUCCESS;
         }
         
-        // 普通RPC响应
-        if(auto iter = control_->response_handler_table_.find(header.seq_num); iter != control_->response_handler_table_.end())
+        // 普通RPC响应：锁内摘表，锁外执行回调，避免 promise 回调同步重入客户端
+        typename control_t::handler_ptr handler;
         {
-            iter->second(resp_body(header.serialize_type, std::move(body), std::move(attachment)), header.err_code);
+            std::lock_guard<mutex_type> lock(control_->handler_table_mutex_);
+            if(auto iter = control_->response_handler_table_.find(header.seq_num); iter != control_->response_handler_table_.end())
+            {
+                handler = iter->second;
+                control_->response_handler_table_.erase(iter);
+            }
+        }
+        if (handler) {
+            (*handler)(resp_body(header.serialize_type, std::string(body), std::string(attachment)), header.err_code);
         }
         return CoroRpc::Errc::SUCCESS;
     }
     
     // 取消流（私有函数）
     bool CancelStream_(uint32_t stream_id) {
-        auto iter = control_->stream_handler_table_.find(stream_id);
-        if (iter != control_->stream_handler_table_.end()) {
-            // 取消StreamReader
-            iter->second.reader->Cancel();
-            
-            // 清理超时定时器
-            if (iter->second.timeout_timer != 0) {
-                ToolBox::TimerMgr->KillTimer(iter->second.timeout_timer);
+        std::shared_ptr<stream_reader_type> stream_reader;
+        uint64_t timeout_timer = 0;
+        {
+            std::lock_guard<mutex_type> lock(control_->handler_table_mutex_);
+            auto iter = control_->stream_handler_table_.find(stream_id);
+            if (iter == control_->stream_handler_table_.end()) {
+                return false;
             }
-            
-            // 发送取消消息到服务器
-            SendStreamControlMessage_(stream_id, static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamCancel));
-            
-            // 从表中移除
+            stream_reader = iter->second.reader;
+            timeout_timer = iter->second.timeout_timer;
             control_->stream_handler_table_.erase(iter);
-            return true;
         }
-        return false;
+
+        if (stream_reader) {
+            stream_reader->Cancel();
+        }
+        if (timeout_timer != 0) {
+            ToolBox::TimerMgr->KillTimer(timeout_timer);
+        }
+
+        // 发送取消消息到服务器
+        SendStreamControlMessage_(stream_id, static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamCancel));
+        return true;
     }
     
     // 发送流控制消息（暂停/恢复/取消）
@@ -688,7 +839,8 @@ private:
         std::string control_buf;
         control_buf.resize(rpc_protocol::REQ_HEAD_LEN);
         
-        auto& req_header = *reinterpret_cast<rpc_protocol::ReqHeader*>(control_buf.data());
+        // 使用 memcpy 写入协议头，避免对齐/别名 UB
+        typename rpc_protocol::ReqHeader req_header{};
         req_header.magic = rpc_protocol::kMagicNumber;
         req_header.version = rpc_protocol::kVersionNumber;
         req_header.serialize_type = static_cast<uint8_t>(rpc_protocol::SerializeType::kSerializeTypeStruct);
@@ -698,6 +850,7 @@ private:
         req_header.length = 0;  // 没有body
         req_header.attach_length = 0;
         req_header.client_id = config_.client_id;
+        std::memcpy(control_buf.data(), &req_header, sizeof(req_header));
         
         send_callback_(std::move(control_buf));
     }

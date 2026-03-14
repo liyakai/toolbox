@@ -12,6 +12,8 @@
 #include <cstring>
 #include <cassert>
 #include <memory>
+#include <mutex>
+#include <unordered_set>
 
 FIXTURE_BEGIN(CoroRpcStream)
 
@@ -42,6 +44,20 @@ StreamGenerator<int> empty_stream() {
 StreamGenerator<int> single_value(int value) {
     co_yield value;
     co_return;
+}
+
+// 流式RPC服务函数：慢速生成整数序列，用于验证取消/公平性等时序场景
+StreamGenerator<int> slow_generate_numbers(int start, int count, int delay_us) {
+    for (int i = 0; i < count; ++i) {
+        if (delay_us > 0) {
+            std::this_thread::sleep_for(std::chrono::microseconds(delay_us));
+        }
+        co_yield start + i;
+    }
+}
+
+int stream_add(int a, int b) {
+    return a + b;
 }
 
 // 测试类：成员函数流式RPC
@@ -210,27 +226,36 @@ CASE(TestStreamReader_Finish)
     reader.PushValue(2);
     reader.Finish();
     
+    // IsFinished 表示不会再有新数据到达，而不是缓冲区已经读空
     if (!reader.IsFinished()) {
         SetError("应该标记为已完成");
         return;
     }
     
-    // 应该还能读取剩余的值
+    if (!reader.HasValue()) {
+        SetError("完成后仍应能读取已缓冲的值");
+        return;
+    }
+    
     auto value1 = reader.PopValue();
     if (!value1.has_value() || value1.value() != 1) {
-        SetError("完成前应该还能读取值");
+        SetError("完成后应该还能读取值");
         return;
     }
     
     auto value2 = reader.PopValue();
     if (!value2.has_value() || value2.value() != 2) {
-        SetError("完成前应该还能读取第二个值");
+        SetError("完成后应该还能读取第二个值");
         return;
     }
     
-    // 现在应该真正完成了
     if (!reader.IsFinished()) {
-        SetError("读取完所有值后应该完成");
+        SetError("读取完所有值后应该仍保持完成状态");
+        return;
+    }
+    
+    if (reader.HasValue()) {
+        SetError("读取完所有值后不应该还有缓冲数据");
         return;
     }
     
@@ -311,6 +336,10 @@ CASE(TestStreamReader_Backpressure)
     bool resume_called = false;
     
     reader.SetBackpressureCallback([&](uint32_t stream_id, bool pause) {
+        if (stream_id != 123) {
+            SetError("背压回调收到的 stream_id 不正确");
+            return;
+        }
         if (pause) {
             pause_called = true;
         } else {
@@ -320,40 +349,214 @@ CASE(TestStreamReader_Backpressure)
     
     reader.SetStreamId(123);
     
-    // 填满缓冲区
     reader.PushValue(1);
     reader.PushValue(2);
-    reader.PushValue(3);
-    
-    // 尝试推送第四个值（应该触发背压）
-    bool pushed = reader.PushValue(4);
-    
-    if (pushed) {
-        SetError("缓冲区满时不应该能推送");
+    bool within_soft_limit = reader.PushValue(3);
+    if (!within_soft_limit) {
+        SetError("达到软上限的首个值仍应被视为成功保存");
         return;
     }
-    
     if (!pause_called) {
-        SetError("应该触发暂停回调");
+        SetError("缓冲区达到上限时应该立即触发暂停回调");
         return;
     }
-    
-    if (reader.IsPaused()) {
-        SetError("应该处于暂停状态");
+    if (!reader.IsPaused()) {
+        SetError("达到上限后应该处于暂停状态");
         return;
     }
-    
-    // 读取一个值，应该触发恢复
-    reader.PopValue();
-    
+
+    // 第四个值也必须保留，不能因为触发背压而永久丢包。
+    bool pushed_over_limit = reader.PushValue(4);
+    if (pushed_over_limit) {
+        SetError("超过软上限后返回值应提示背压状态");
+        return;
+    }
+    if (reader.GetBufferSize() != 4) {
+        SetError("触发背压时当前值仍应保存在缓冲区中");
+        return;
+    }
+
+    auto first = reader.PopValue();
+    auto second = reader.PopValue();
+    auto third = reader.PopValue();
+    auto fourth = reader.PopValue();
+    if (!first.has_value() || !second.has_value() || !third.has_value() || !fourth.has_value()) {
+        SetError("背压后应仍能读出全部已缓存的数据");
+        return;
+    }
+    if (*fourth != 4) {
+        SetError("超过软上限时保存的值应可被正常读取");
+        return;
+    }
     if (!resume_called) {
-        SetError("缓冲区有空间后应该触发恢复回调");
+        SetError("缓冲区降到恢复阈值后应该触发恢复回调");
         return;
     }
-    
     if (reader.IsPaused()) {
-        SetError("不应该再处于暂停状态");
+        SetError("恢复后不应该仍处于暂停状态");
         return;
+    }
+}
+
+CASE(TestStreamReader_BackpressureResumeThreshold)
+{
+    StreamReader<int> reader(6);
+
+    int pause_count = 0;
+    int resume_count = 0;
+    reader.SetStreamId(456);
+    reader.SetBackpressureCallback([&](uint32_t stream_id, bool pause) {
+        if (stream_id != 456) {
+            SetError("恢复阈值测试收到错误的 stream_id");
+            return;
+        }
+        if (pause) {
+            ++pause_count;
+        } else {
+            ++resume_count;
+        }
+    });
+
+    for (int i = 1; i <= 6; ++i) {
+        bool pushed = reader.PushValue(i);
+        if (!pushed) {
+            SetError("达到软上限前的值都应视为成功保存");
+            return;
+        }
+    }
+    if (pause_count != 1 || !reader.IsPaused()) {
+        SetError("达到软上限时应只触发一次暂停，并进入暂停状态");
+        return;
+    }
+
+    reader.PopValue();
+    reader.PopValue();
+    reader.PopValue();
+    if (resume_count != 0) {
+        SetError("缓冲区仅降到一半时还不应触发恢复");
+        return;
+    }
+    if (!reader.IsPaused()) {
+        SetError("未低于恢复阈值前应保持暂停状态");
+        return;
+    }
+
+    auto fourth = reader.PopValue();
+    if (!fourth.has_value() || *fourth != 4) {
+        SetError("恢复阈值测试读取到的值不正确");
+        return;
+    }
+    if (resume_count != 1) {
+        SetError("缓冲区低于一半后应触发一次恢复");
+        return;
+    }
+    if (reader.IsPaused()) {
+        SetError("恢复后不应继续处于暂停状态");
+        return;
+    }
+}
+
+CASE(TestStreamReader_BackpressureMultipleCycles)
+{
+    StreamReader<int> reader(4);
+
+    int pause_count = 0;
+    int resume_count = 0;
+    std::vector<int> drained_values;
+    reader.SetStreamId(789);
+    reader.SetBackpressureCallback([&](uint32_t stream_id, bool pause) {
+        if (stream_id != 789) {
+            SetError("多轮背压测试收到错误的 stream_id");
+            return;
+        }
+        if (pause) {
+            ++pause_count;
+        } else {
+            ++resume_count;
+        }
+    });
+
+    for (int i = 1; i <= 5; ++i) {
+        bool pushed = reader.PushValue(i);
+        if (i <= 4 && !pushed) {
+            SetError("第一次达到软上限前的值都应视为成功保存");
+            return;
+        }
+        if (i == 5 && pushed) {
+            SetError("第一次超过软上限后应返回背压提示");
+            return;
+        }
+    }
+    if (pause_count != 1 || !reader.IsPaused()) {
+        SetError("第一次填满缓冲区后应进入暂停状态");
+        return;
+    }
+
+    for (int expected = 1; expected <= 3; ++expected) {
+        auto value = reader.PopValue();
+        if (!value.has_value() || *value != expected) {
+            SetError("第一次恢复前读取到的值顺序不正确");
+            return;
+        }
+        drained_values.push_back(*value);
+    }
+    if (resume_count != 0 || !reader.IsPaused()) {
+        SetError("缓冲区尚未低于恢复阈值前不应提前恢复");
+        return;
+    }
+
+    auto fourth = reader.PopValue();
+    if (!fourth.has_value() || *fourth != 4) {
+        SetError("第一次恢复触发点读取到的值不正确");
+        return;
+    }
+    drained_values.push_back(*fourth);
+    if (resume_count != 1 || reader.IsPaused()) {
+        SetError("第一次低于恢复阈值后应恢复发送");
+        return;
+    }
+
+    for (int i = 6; i <= 9; ++i) {
+        bool pushed = reader.PushValue(i);
+        if (i <= 8 && !pushed) {
+            SetError("第二次达到软上限前的值都应视为成功保存");
+            return;
+        }
+        if (i == 9 && pushed) {
+            SetError("第二次超过软上限后应返回背压提示");
+            return;
+        }
+    }
+    if (pause_count != 2 || !reader.IsPaused()) {
+        SetError("第二轮填满缓冲区后应再次进入暂停状态");
+        return;
+    }
+
+    while (true) {
+        auto value = reader.PopValue();
+        if (!value.has_value()) {
+            break;
+        }
+        drained_values.push_back(*value);
+    }
+
+    if (resume_count != 2) {
+        SetError("多轮背压测试应触发两次恢复");
+        return;
+    }
+    if (reader.IsPaused()) {
+        SetError("多轮背压恢复后不应继续处于暂停状态");
+        return;
+    }
+    if (drained_values.size() != 9) {
+        SetError("多轮背压测试应完整读出全部缓存值");
+        return;
+    }
+    for (int i = 0; i < 9; ++i) {
+        if (drained_values[i] != i + 1) {
+            SetError("多轮背压测试读取顺序不正确");
+            return;
+        }
     }
 }
 
@@ -533,20 +736,27 @@ CASE(TestStreamRpcBoundary_StreamReaderFullBuffer)
     reader.PushValue(2);
     reader.PushValue(3);
     
-    // 尝试推送第四个值
+    // 第四个值会触发背压，但仍然必须被保存。
     bool pushed = reader.PushValue(4);
     
     if (pushed) {
-        SetError("缓冲区满时不应该能推送");
+        SetError("超过软上限后返回值应提示背压状态");
+        return;
+    }
+    if (reader.GetBufferSize() != 4) {
+        SetError("超过软上限时当前值仍应保存在缓冲区中");
         return;
     }
     
-    // 读取一个值后应该能推送
+    // 只有降到低水位以下后，后续推送才会重新回到正常状态。
     reader.PopValue();
-    pushed = reader.PushValue(4);
+    reader.PopValue();
+    reader.PopValue();
+    reader.PopValue();
+    pushed = reader.PushValue(5);
     
     if (!pushed) {
-        SetError("缓冲区有空间后应该能推送");
+        SetError("恢复到低水位后应该重新允许正常推送");
         return;
     }
 }
@@ -557,8 +767,13 @@ CASE(TestStreamRpcBoundary_StreamReaderEmptyAfterFinish)
     
     reader.Finish();
     
-    if (reader.IsFinished()) {
+    if (!reader.IsFinished()) {
         SetError("空流完成时应该标记为已完成");
+        return;
+    }
+    
+    if (reader.HasValue()) {
+        SetError("空流完成后不应该有缓冲值");
         return;
     }
     
@@ -650,9 +865,8 @@ CASE(TestStreamRpcConcurrency_StreamReaderThreadSafety)
     // 生产者线程
     std::thread producer([&]() {
         for (int i = 0; i < 1000; ++i) {
-            if (reader.PushValue(i)) {
-                push_count++;
-            }
+            reader.PushValue(i);
+            push_count++;
             std::this_thread::sleep_for(std::chrono::microseconds(10));
         }
         reader.Finish();
@@ -727,6 +941,801 @@ CASE(TestStreamRpcPerformance_StreamReaderSpeed)
     // 验证性能在合理范围内
     if (duration.count() > iterations * 10) {
         SetError("流读取器性能过慢");
+        return;
+    }
+}
+
+// ========== ThreadSafe 策略下的流式 RPC 深度测试 ==========
+
+// ThreadSafe Server 注册流式服务
+CASE(TestThreadSafe_StreamRpcServer_RegisterStreamFunction)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    
+    server.RegisterService<generate_numbers>();
+    server.RegisterService<generate_strings>();
+    
+    auto keys = server.GetAllServiceHandlerKeys();
+    
+    if (keys.size() < 2) {
+        SetError("ThreadSafe 策略下流式服务注册数量不正确");
+        return;
+    }
+}
+
+// ThreadSafe Server 注册成员函数流式服务
+CASE(TestThreadSafe_StreamRpcServer_RegisterMemberStream)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    StreamService service;
+    
+    server.RegisterService<&StreamService::generate_member_numbers>(&service);
+    server.RegisterService<&StreamService::generate_member_strings>(&service);
+    
+    auto keys = server.GetAllServiceHandlerKeys();
+    
+    if (keys.size() < 2) {
+        SetError("ThreadSafe 策略下成员流式服务注册数量不正确");
+        return;
+    }
+}
+
+// ThreadSafe Client 流式操作
+CASE(TestThreadSafe_StreamRpcClient_Operations)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    
+    // 测试客户端可以正常创建
+    uint64_t client_id = client.get_client_id();
+    if (client_id == 0) {
+        // client_id 可能从 0 开始，这里只是验证创建成功
+    }
+    
+    // 测试取消不存在的流
+    bool result = client.CancelStream(99999);
+    
+    if (result) {
+        SetError("ThreadSafe 策略下取消不存在的流应该返回 false");
+        return;
+    }
+}
+
+// ThreadSafe：失败的流式调用不应把请求附件泄露到下一次调用
+CASE(TestThreadSafe_StreamFailedCallClearsReqAttachment)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+
+    client.SetReqAttachment("stale-stream-attachment");
+    auto failed_reader = client.CallStream<generate_numbers>(10, 1).get_result();
+    if (failed_reader != nullptr) {
+        SetError("未设置 send callback 的流式调用应返回空 StreamReader");
+        return;
+    }
+
+    bool saw_request = false;
+    bool invalid_packet = false;
+    CoroRpcProtocol::ReqHeader req_header{};
+    client.SetSendCallback([&](std::string &&buffer) {
+        saw_request = true;
+        if (buffer.size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            invalid_packet = true;
+            return;
+        }
+        std::memcpy(&req_header, buffer.data(), sizeof(req_header));
+    });
+
+    auto reader = client.CallStream<generate_numbers>(20, 1).get_result();
+    if (!reader) {
+        SetError("后续流式调用应成功返回有效的 StreamReader");
+        return;
+    }
+    if (!saw_request || invalid_packet) {
+        SetError("应捕获到完整的后续流式请求包");
+        return;
+    }
+    if (req_header.attach_length != 0) {
+        SetError("失败流式调用中的请求附件不应泄露到下一次调用");
+        return;
+    }
+    if (req_header.msg_type != static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart)) {
+        SetError("后续流式请求首帧应保持 StreamStart 类型");
+        return;
+    }
+}
+
+// ThreadSafe 集成：流式 Client-Server 真实端到端调用
+CASE(TestThreadSafe_StreamRpcIntegration_BasicStream)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    
+    server.RegisterService<generate_numbers>();
+
+    std::mutex messages_mutex;
+    std::vector<std::string> server_sent_messages;
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        {
+            std::lock_guard<std::mutex> lock(messages_mutex);
+            server_sent_messages.push_back(buffer);
+        }
+        client.OnRecvResp(std::string_view(buffer));
+    });
+    
+    std::vector<std::string> client_sent_messages;
+    client.SetSendCallback([&](std::string &&buffer) {
+        {
+            std::lock_guard<std::mutex> lock(messages_mutex);
+            client_sent_messages.push_back(buffer);
+        }
+        server.OnRecvReq(1, std::string_view(buffer));
+    });
+
+    auto reader = client.CallStream<generate_numbers>(10, 5).get_result();
+    if (!reader) {
+        SetError("ThreadSafe 流式调用应返回有效的 StreamReader");
+        return;
+    }
+
+    bool saw_stream_end = false;
+    std::vector<int> values;
+    for (int spin = 0; spin < 100; ++spin) {
+        while (true) {
+            auto payload = reader->PopValue();
+            if (!payload.has_value()) {
+                break;
+            }
+            int value = 0;
+            if (!StructPackProtocol::Deserialize(value, std::string_view(*payload))) {
+                SetError("流式返回值反序列化失败");
+                return;
+            }
+            values.push_back(value);
+        }
+
+        std::string last_message;
+        {
+            std::lock_guard<std::mutex> lock(messages_mutex);
+            if (!server_sent_messages.empty()) {
+                last_message = server_sent_messages.back();
+            }
+        }
+        if (!last_message.empty()) {
+            CoroRpcProtocol::RespHeader last_resp_header{};
+            std::memcpy(&last_resp_header, last_message.data(), sizeof(last_resp_header));
+            if (last_resp_header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamEnd)) {
+                saw_stream_end = true;
+            }
+        }
+        if (reader->IsFinished()) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    if (!saw_stream_end) {
+        SetError("基础流式调用最终应收到 StreamEnd");
+        return;
+    }
+    if (values.size() != 5) {
+        SetError("基础流式调用应完整收到全部 5 个值");
+        return;
+    }
+    for (int i = 0; i < 5; ++i) {
+        if (values[i] != 10 + i) {
+            SetError("基础流式返回值内容不正确");
+            return;
+        }
+    }
+
+    std::string first_client_message;
+    {
+        std::lock_guard<std::mutex> lock(messages_mutex);
+        if (client_sent_messages.empty() || server_sent_messages.empty()) {
+            SetError("流式调用应产生请求消息和响应消息");
+            return;
+        }
+        first_client_message = client_sent_messages.front();
+    }
+
+    CoroRpcProtocol::ReqHeader req_header{};
+    std::memcpy(&req_header, first_client_message.data(), sizeof(req_header));
+    if (req_header.msg_type != static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart)) {
+        SetError("流式请求首帧应为 StreamStart");
+        return;
+    }
+}
+
+CASE(TestThreadSafe_StreamRpcIntegration_LargeStreamNoBackpressure)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+
+    server.RegisterService<generate_numbers>();
+
+    std::mutex messages_mutex;
+    std::vector<std::string> server_sent_messages;
+    std::vector<std::string> client_sent_messages;
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        {
+            std::lock_guard<std::mutex> lock(messages_mutex);
+            server_sent_messages.push_back(buffer);
+        }
+        client.OnRecvResp(std::string_view(buffer));
+    });
+    client.SetSendCallback([&](std::string &&buffer) {
+        {
+            std::lock_guard<std::mutex> lock(messages_mutex);
+            client_sent_messages.push_back(buffer);
+        }
+        server.OnRecvReq(1, std::string_view(buffer));
+    });
+
+    constexpr int kCount = 130;
+    auto reader = client.CallStream<generate_numbers>(0, kCount).get_result();
+    if (!reader) {
+        SetError("大流式调用应返回有效的 StreamReader");
+        return;
+    }
+
+    std::vector<int> values;
+    for (int spin = 0; spin < 200; ++spin) {
+        while (true) {
+            auto payload = reader->PopValue();
+            if (!payload.has_value()) {
+                break;
+            }
+            int value = 0;
+            if (!StructPackProtocol::Deserialize(value, std::string_view(*payload))) {
+                SetError("大流式返回值反序列化失败");
+                return;
+            }
+            values.push_back(value);
+        }
+        if (reader->IsFinished()) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    if (values.size() != static_cast<size_t>(kCount)) {
+        SetError("无背压大流应完整收到全部 chunk，而不是在 64 个后停住");
+        return;
+    }
+    for (int i = 0; i < kCount; ++i) {
+        if (values[i] != i) {
+            SetError("大流返回值内容不正确");
+            return;
+        }
+    }
+    if (!reader->IsFinished()) {
+        SetError("大流在收到全部 chunk 后应进入完成状态");
+        return;
+    }
+
+    std::string last_server_message;
+    std::vector<std::string> client_messages_snapshot;
+    {
+        std::lock_guard<std::mutex> lock(messages_mutex);
+        if (server_sent_messages.empty()) {
+            SetError("大流式调用应产生服务端响应帧");
+            return;
+        }
+        last_server_message = server_sent_messages.back();
+        client_messages_snapshot = client_sent_messages;
+    }
+
+    CoroRpcProtocol::RespHeader last_resp_header{};
+    std::memcpy(&last_resp_header, last_server_message.data(), sizeof(last_resp_header));
+    if (last_resp_header.msg_type != static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamEnd)) {
+        SetError("大流最后一帧应为 StreamEnd");
+        return;
+    }
+
+    for (size_t i = 1; i < client_messages_snapshot.size(); ++i) {
+        if (client_messages_snapshot[i].size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            SetError("客户端控制帧不完整");
+            return;
+        }
+        CoroRpcProtocol::ReqHeader control_header{};
+        std::memcpy(&control_header, client_messages_snapshot[i].data(), sizeof(control_header));
+        if (control_header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamPause) ||
+            control_header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamResume) ||
+            control_header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamCancel)) {
+            SetError("无背压大流不应额外触发控制消息");
+            return;
+        }
+    }
+}
+
+CASE(TestThreadSafe_StreamRpcIntegration_BackpressureNoDataLoss)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+
+    server.RegisterService<generate_numbers>();
+
+    std::atomic<bool> pause_seen{false};
+    std::atomic<bool> resume_seen{false};
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        client.OnRecvResp(std::string_view(buffer));
+    });
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() >= CoroRpcProtocol::REQ_HEAD_LEN) {
+            CoroRpcProtocol::ReqHeader header{};
+            std::memcpy(&header, buffer.data(), sizeof(header));
+            if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamPause)) {
+                pause_seen.store(true, std::memory_order_relaxed);
+            } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamResume)) {
+                resume_seen.store(true, std::memory_order_relaxed);
+            }
+        }
+        server.OnRecvReq(1, std::string_view(buffer));
+    });
+
+    constexpr int kCount = 1100;
+    auto reader = client.CallStream<generate_numbers>(0, kCount).get_result();
+    if (!reader) {
+        SetError("背压场景应返回有效的 StreamReader");
+        return;
+    }
+
+    bool paused_before_draining = false;
+    for (int spin = 0; spin < 200; ++spin) {
+        if (pause_seen.load(std::memory_order_relaxed) && reader->IsPaused()) {
+            paused_before_draining = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    if (!paused_before_draining) {
+        SetError("高水位大流应触发客户端背压暂停");
+        return;
+    }
+
+    std::vector<int> values;
+    for (int spin = 0; spin < 600; ++spin) {
+        while (true) {
+            auto payload = reader->PopValue();
+            if (!payload.has_value()) {
+                break;
+            }
+            int value = 0;
+            if (!StructPackProtocol::Deserialize(value, std::string_view(*payload))) {
+                SetError("背压场景返回值反序列化失败");
+                return;
+            }
+            values.push_back(value);
+        }
+        if (reader->IsFinished()) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    if (!resume_seen.load(std::memory_order_relaxed)) {
+        SetError("消费降到低水位后应向服务端发送恢复控制消息");
+        return;
+    }
+    if (values.size() != static_cast<size_t>(kCount)) {
+        SetError("背压场景也应完整收到全部数据，不能因满缓冲而丢包");
+        return;
+    }
+    for (int i = 0; i < kCount; ++i) {
+        if (values[i] != i) {
+            SetError("背压场景返回值内容不正确");
+            return;
+        }
+    }
+    if (!reader->IsFinished()) {
+        SetError("背压场景在消费完成后应进入完成状态");
+        return;
+    }
+}
+
+// ThreadSafe 集成：真实触发 pause/resume/cancel 控制消息
+CASE(TestThreadSafe_StreamRpcIntegration_ControlMessages)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+
+    server.RegisterService<slow_generate_numbers>();
+
+    std::atomic<int> pause_count{0};
+    std::atomic<int> resume_count{0};
+    std::atomic<bool> cancel_received{false};
+    std::atomic<bool> stream_end_seen{false};
+    std::atomic<uint32_t> stream_id{0};
+
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        if (buffer.size() >= CoroRpcProtocol::RESP_HEAD_LEN) {
+            CoroRpcProtocol::RespHeader header{};
+            std::memcpy(&header, buffer.data(), sizeof(header));
+            if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamEnd)) {
+                stream_end_seen.store(true, std::memory_order_relaxed);
+            }
+        }
+        client.OnRecvResp(std::string_view(buffer));
+    });
+
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() >= CoroRpcProtocol::REQ_HEAD_LEN) {
+            CoroRpcProtocol::ReqHeader header{};
+            std::memcpy(&header, buffer.data(), sizeof(header));
+            if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart) && stream_id.load(std::memory_order_relaxed) == 0) {
+                stream_id.store(header.seq_num, std::memory_order_relaxed);
+            } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamPause)) {
+                pause_count.fetch_add(1, std::memory_order_relaxed);
+            } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamResume)) {
+                resume_count.fetch_add(1, std::memory_order_relaxed);
+            } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamCancel)) {
+                cancel_received.store(true, std::memory_order_relaxed);
+            }
+        }
+        server.OnRecvReq(1, std::string_view(buffer));
+    });
+
+    auto reader = client.CallStream<slow_generate_numbers>(0, 5000, 50).get_result();
+    if (!reader) {
+        SetError("控制消息测试应返回有效的 StreamReader");
+        return;
+    }
+
+    bool paused = false;
+    for (int spin = 0; spin < 400; ++spin) {
+        if (pause_count.load(std::memory_order_relaxed) > 0 && reader->IsPaused()) {
+            paused = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (!paused) {
+        SetError("高水位流式调用应真实触发暂停控制消息");
+        return;
+    }
+
+    bool resumed = false;
+    for (int spin = 0; spin < 400 && !resumed; ++spin) {
+        while (reader->IsPaused()) {
+            auto payload = reader->PopValue();
+            if (!payload.has_value()) {
+                break;
+            }
+        }
+        if (resume_count.load(std::memory_order_relaxed) > 0 && !reader->IsPaused()) {
+            resumed = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (!resumed) {
+        SetError("消费降到低水位后应真实触发恢复控制消息");
+        return;
+    }
+
+    uint32_t captured_stream_id = stream_id.load(std::memory_order_relaxed);
+    if (captured_stream_id == 0) {
+        SetError("控制消息测试应捕获到有效的 stream_id");
+        return;
+    }
+    if (!client.CancelStream(captured_stream_id)) {
+        SetError("控制消息测试应能成功取消活动流");
+        return;
+    }
+
+    bool cancel_seen = false;
+    for (int spin = 0; spin < 100; ++spin) {
+        if (cancel_received.load(std::memory_order_relaxed)) {
+            cancel_seen = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    if (!cancel_seen) {
+        SetError("取消活动流后应发送取消控制消息");
+        return;
+    }
+    if (!reader->IsCancelled()) {
+        SetError("取消活动流后本地 StreamReader 应进入取消状态");
+        return;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    if (stream_end_seen.load(std::memory_order_relaxed)) {
+        SetError("取消后的流不应继续发送 StreamEnd");
+        return;
+    }
+}
+
+CASE(TestThreadSafe_StreamRpcIntegration_CancelStopsFurtherStreamFrames)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+
+    server.RegisterService<slow_generate_numbers>();
+
+    std::atomic<uint32_t> stream_id{0};
+    std::atomic<int> payload_frame_count{0};
+    std::atomic<bool> cancel_received{false};
+    std::atomic<bool> stream_end_seen{false};
+
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        if (buffer.size() >= CoroRpcProtocol::RESP_HEAD_LEN) {
+            CoroRpcProtocol::RespHeader header{};
+            std::memcpy(&header, buffer.data(), sizeof(header));
+            if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart) ||
+                header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamData)) {
+                payload_frame_count.fetch_add(1, std::memory_order_relaxed);
+            } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamEnd)) {
+                stream_end_seen.store(true, std::memory_order_relaxed);
+            }
+        }
+        client.OnRecvResp(std::string_view(buffer));
+    });
+
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() >= CoroRpcProtocol::REQ_HEAD_LEN) {
+            CoroRpcProtocol::ReqHeader header{};
+            std::memcpy(&header, buffer.data(), sizeof(header));
+            if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart) && stream_id.load(std::memory_order_relaxed) == 0) {
+                stream_id.store(header.seq_num, std::memory_order_relaxed);
+            } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamCancel)) {
+                cancel_received.store(true, std::memory_order_relaxed);
+            }
+        }
+        server.OnRecvReq(1, std::string_view(buffer));
+    });
+
+    auto reader = client.CallStream<slow_generate_numbers>(0, 500, 1000).get_result();
+    if (!reader) {
+        SetError("取消停帧测试应返回有效的 StreamReader");
+        return;
+    }
+
+    bool stream_started = false;
+    for (int spin = 0; spin < 200; ++spin) {
+        if (stream_id.load(std::memory_order_relaxed) != 0 && payload_frame_count.load(std::memory_order_relaxed) >= 5) {
+            stream_started = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (!stream_started) {
+        SetError("取消停帧测试应在取消前先收到若干数据帧");
+        return;
+    }
+    if (stream_end_seen.load(std::memory_order_relaxed)) {
+        SetError("取消停帧测试不应在取消前就自然结束");
+        return;
+    }
+
+    uint32_t captured_stream_id = stream_id.load(std::memory_order_relaxed);
+    if (!client.CancelStream(captured_stream_id)) {
+        SetError("取消停帧测试应能成功取消活动流");
+        return;
+    }
+
+    bool cancel_seen = false;
+    for (int spin = 0; spin < 100; ++spin) {
+        if (cancel_received.load(std::memory_order_relaxed) && reader->IsCancelled()) {
+            cancel_seen = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    if (!cancel_seen) {
+        SetError("取消停帧测试应观察到取消控制消息和本地取消状态");
+        return;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    int stable_frame_count = payload_frame_count.load(std::memory_order_relaxed);
+    std::this_thread::sleep_for(std::chrono::milliseconds(40));
+    if (payload_frame_count.load(std::memory_order_relaxed) != stable_frame_count) {
+        SetError("取消后的流不应继续发送新的数据帧");
+        return;
+    }
+    if (stream_end_seen.load(std::memory_order_relaxed)) {
+        SetError("取消停帧测试中取消后的流不应发送 StreamEnd");
+        return;
+    }
+}
+
+CASE(TestThreadSafe_StreamRpcIntegration_StreamDoesNotBlockUnaryCall)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+
+    server.RegisterService<slow_generate_numbers>();
+    server.RegisterService<stream_add>();
+
+    std::atomic<int> stream_message_count{0};
+    std::atomic<bool> stream_end_seen{false};
+    server.SetSendCallback([&](uint64_t opaque, std::string &&buffer) {
+        (void)opaque;
+        if (buffer.size() >= CoroRpcProtocol::RESP_HEAD_LEN) {
+            CoroRpcProtocol::RespHeader header{};
+            std::memcpy(&header, buffer.data(), sizeof(header));
+            if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart) ||
+                header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamData)) {
+                stream_message_count.fetch_add(1, std::memory_order_relaxed);
+            } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamEnd)) {
+                stream_end_seen.store(true, std::memory_order_relaxed);
+            }
+        }
+        client.OnRecvResp(std::string_view(buffer));
+    });
+    client.SetSendCallback([&](std::string &&buffer) {
+        server.OnRecvReq(1, std::string_view(buffer));
+    });
+
+    auto reader = client.CallStream<slow_generate_numbers>(100, 120, 1000).get_result();
+    if (!reader) {
+        SetError("公平性测试应返回有效的 StreamReader");
+        return;
+    }
+
+    bool stream_started = false;
+    for (int spin = 0; spin < 50; ++spin) {
+        if (stream_message_count.load(std::memory_order_relaxed) > 0) {
+            stream_started = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (!stream_started) {
+        SetError("公平性测试中大流应先开始发送");
+        return;
+    }
+    if (stream_end_seen.load(std::memory_order_relaxed)) {
+        SetError("公平性测试中大流不应在普通 RPC 发起前就结束");
+        return;
+    }
+
+    auto add_result = client.Call<stream_add>(7, 8).get_result();
+    if (!add_result || add_result.value() != 15) {
+        SetError("大流发送期间普通 RPC 仍应正常返回");
+        return;
+    }
+    if (reader->IsFinished() || stream_end_seen.load(std::memory_order_relaxed)) {
+        SetError("普通 RPC 不应被阻塞到必须等大流结束后才能返回");
+        return;
+    }
+
+    std::vector<int> values;
+    for (int spin = 0; spin < 400; ++spin) {
+        while (true) {
+            auto payload = reader->PopValue();
+            if (!payload.has_value()) {
+                break;
+            }
+            int value = 0;
+            if (!StructPackProtocol::Deserialize(value, std::string_view(*payload))) {
+                SetError("公平性测试中的流式返回值反序列化失败");
+                return;
+            }
+            values.push_back(value);
+        }
+        if (reader->IsFinished()) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    if (values.size() != 120) {
+        SetError("公平性测试中的大流应完整返回全部数据");
+        return;
+    }
+    for (int i = 0; i < 120; ++i) {
+        if (values[i] != 100 + i) {
+            SetError("公平性测试中的流式返回值内容不正确");
+            return;
+        }
+    }
+}
+
+// ThreadSafe Server 处理流控制消息（Cancel/Pause/Resume）
+CASE(TestThreadSafe_StreamStateManagement)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    
+    server.RegisterService<generate_numbers>();
+    
+    // 构造并发送流取消消息
+    CoroRpcProtocol::ReqHeader cancel_header{};
+    cancel_header.magic = CoroRpcProtocol::kMagicNumber;
+    cancel_header.version = CoroRpcProtocol::kVersionNumber;
+    cancel_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeStruct);
+    cancel_header.msg_type = static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamCancel);
+    cancel_header.seq_num = 12345;
+    cancel_header.func_id = 0;
+    cancel_header.length = 0;
+    cancel_header.attach_length = 0;
+    cancel_header.client_id = 1;
+    
+    std::string buffer;
+    buffer.resize(CoroRpcProtocol::REQ_HEAD_LEN);
+    std::memcpy(buffer.data(), &cancel_header, sizeof(cancel_header));
+    
+    server.SetSendCallback([](uint64_t, std::string &&) {});
+    
+    Errc err = server.OnRecvReq(1, buffer);
+    if (err != Errc::SUCCESS) {
+        SetError("ThreadSafe Server 应成功处理流取消控制消息");
+        return;
+    }
+    
+    // 构造并发送流暂停消息
+    cancel_header.msg_type = static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamPause);
+    std::memcpy(buffer.data(), &cancel_header, sizeof(cancel_header));
+    err = server.OnRecvReq(1, buffer);
+    if (err != Errc::SUCCESS) {
+        SetError("ThreadSafe Server 应成功处理流暂停控制消息");
+        return;
+    }
+    
+    // 构造并发送流恢复消息
+    cancel_header.msg_type = static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamResume);
+    std::memcpy(buffer.data(), &cancel_header, sizeof(cancel_header));
+    err = server.OnRecvReq(1, buffer);
+    if (err != Errc::SUCCESS) {
+        SetError("ThreadSafe Server 应成功处理流恢复控制消息");
+        return;
+    }
+}
+
+// ThreadSafe 和 ThreadUnsafe 流式服务的 key 一致性
+CASE(TestStreamKeyConsistency_AcrossPolicies)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> ts_server;
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadUnsafe> tu_server;
+    
+    ts_server.RegisterService<generate_numbers>();
+    tu_server.RegisterService<generate_numbers>();
+    
+    auto ts_keys = ts_server.GetAllServiceHandlerKeys();
+    auto tu_keys = tu_server.GetAllServiceHandlerKeys();
+    
+    if (ts_keys.empty() || tu_keys.empty()) {
+        SetError("两种策略下流式服务注册失败");
+        return;
+    }
+    
+    if (ts_keys[0] != tu_keys[0]) {
+        SetError("相同函数在不同策略下的流式 key 应一致");
+        return;
+    }
+}
+
+// ThreadSafe Server 混合注册普通+协程+流式服务
+CASE(TestThreadSafe_StreamMixedServiceRegistration)
+{
+    CoroRpcServer<CoroRpcProtocol, std::unordered_map, ThreadSafe> server;
+    StreamService service;
+    
+    // 注册非成员流式函数
+    server.RegisterService<generate_numbers>();
+    server.RegisterService<generate_strings>();
+    
+    // 注册成员流式函数
+    server.RegisterService<&StreamService::generate_member_numbers>(&service);
+    server.RegisterService<&StreamService::generate_member_strings>(&service);
+    
+    auto keys = server.GetAllServiceHandlerKeys();
+    
+    if (keys.size() < 4) {
+        SetError("ThreadSafe 策略下混合流式服务注册数量不正确，期望 >= 4，实际: " + std::to_string(keys.size()));
+        return;
+    }
+    
+    // 验证 key 唯一性
+    std::unordered_set<uint32_t> key_set(keys.begin(), keys.end());
+    if (key_set.size() != keys.size()) {
+        SetError("ThreadSafe 策略下流式服务 key 存在重复");
         return;
     }
 }

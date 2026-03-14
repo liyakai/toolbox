@@ -95,7 +95,11 @@ public:
     template<typename T>
     static std::string Serialize(const T &t)
     {
-        return StructPackTools::Serialize<std::string>(t);
+        if constexpr (is_tuple_like_v<T>) {
+            return SerializeTuple_(t, std::make_index_sequence<std::tuple_size_v<T>>{});
+        } else {
+            return StructPackTools::Serialize<std::string>(t);
+        }
     }
     static std::string Serialize()
     {
@@ -104,26 +108,30 @@ public:
     template<typename T>
     static Errc SerializeToBuffer(void* data, int size, const T &t)
     {
-        constexpr size_t required_size = sizeof(T);
-        if(static_cast<size_t>(size) < required_size)
-        {
-            return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
-        }
-        
-        // 只对 trivially copyable 类型直接使用 memcpy，避免复制虚函数表指针
-        if constexpr (std::is_trivially_copyable_v<T>) {
-            // 直接写入目标缓冲区，避免中间拷贝
-            std::memcpy(data, &t, required_size);
+        if constexpr (is_tuple_like_v<T>) {
+            return SerializeTupleToBuffer_(data, size, t, std::make_index_sequence<std::tuple_size_v<T>>{});
         } else {
-            // 对于非 trivially copyable 类型（如有虚函数表的类），使用原来的序列化方式
-            std::string buffer = StructPackTools::Serialize<std::string>(t);
-            if(buffer.size() > static_cast<size_t>(size))
+            constexpr size_t required_size = sizeof(T);
+            if(static_cast<size_t>(size) < required_size)
             {
                 return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
             }
-            std::memcpy(data, buffer.data(), buffer.size());
+            
+            // 只对 trivially copyable 类型直接使用 memcpy，避免复制虚函数表指针
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                // 直接写入目标缓冲区，避免中间拷贝
+                std::memcpy(data, &t, required_size);
+            } else {
+                // 对于非 trivially copyable 类型（如有虚函数表的类），使用原来的序列化方式
+                std::string buffer = StructPackTools::Serialize<std::string>(t);
+                if(buffer.size() > static_cast<size_t>(size))
+                {
+                    return CoroRpc::Errc::ERR_BUFFER_TOO_SMALL;
+                }
+                std::memcpy(data, buffer.data(), buffer.size());
+            }
+            return CoroRpc::Errc::SUCCESS;
         }
-        return CoroRpc::Errc::SUCCESS;
     }
     
     // 可变参数版本：支持多个参数
@@ -161,7 +169,11 @@ public:
     template<typename T>
     static size_t SerializeSize(const T &t)
     {
-        return StructPackTools::SerializeSize(t);
+        if constexpr (is_tuple_like_v<T>) {
+            return SerializeTupleSize_(t, std::make_index_sequence<std::tuple_size_v<T>>{});
+        } else {
+            return StructPackTools::SerializeSize(t);
+        }
     }
     
     // 可变参数版本：支持多个参数
@@ -175,15 +187,59 @@ public:
     {
         if constexpr( is_tuple_like_v<T>)
         {
-            if constexpr(std::tuple_size_v<T> == 1)
-            {
-                return StructPackTools::Deserialize(std::get<0>(t), buffer);
-            }else {
-                return StructPackTools::Deserialize(t, buffer);
-            }
+            return DeserializeTuple_(t, buffer, std::make_index_sequence<std::tuple_size_v<T>>{});
         }else {
             return StructPackTools::Deserialize(t, buffer);
         }
+    }
+
+private:
+    // 将 tuple_like 按元素展开后逐个序列化，与客户端/服务端的平铺编解码契约保持一致。
+    template<typename Tuple, std::size_t... Is>
+    static std::string SerializeTuple_(const Tuple& t, std::index_sequence<Is...>)
+    {
+        if constexpr (sizeof...(Is) == 0) {
+            return {};
+        } else {
+            return StructPackTools::Serialize<std::string>(std::get<Is>(t)...);
+        }
+    }
+
+    template<typename Tuple, std::size_t... Is>
+    static Errc SerializeTupleToBuffer_(void* data, int size, const Tuple& t, std::index_sequence<Is...>)
+    {
+        if constexpr (sizeof...(Is) == 0) {
+            return size < 0 ? CoroRpc::Errc::ERR_BUFFER_TOO_SMALL : CoroRpc::Errc::SUCCESS;
+        } else {
+            return SerializeToBuffer(data, size, std::get<Is>(t)...);
+        }
+    }
+
+    template<typename Tuple, std::size_t... Is>
+    static size_t SerializeTupleSize_(const Tuple& t, std::index_sequence<Is...>)
+    {
+        if constexpr (sizeof...(Is) == 0) {
+            return 0;
+        } else {
+            return StructPackTools::SerializeSize(std::get<Is>(t)...);
+        }
+    }
+
+    // 将 tuple 按元素展开后逐个反序列化，与客户端的平铺序列化契约保持一致。
+    // 对 tuple_size==1 等价于旧逻辑 Deserialize(std::get<0>(t), buffer)；
+    // 对 tuple_size>=2 展开成 Deserialize(std::get<0>(t), buffer, std::get<1>(t), ...)，
+    //   逐元素走 StructPackTools 的 trivially_copyable 路径。
+    template<typename Tuple, std::size_t I0, std::size_t... Is>
+    static bool DeserializeTuple_(Tuple& t, std::string_view buffer, std::index_sequence<I0, Is...>)
+    {
+        return StructPackTools::Deserialize(std::get<I0>(t), buffer, std::get<Is>(t)...);
+    }
+
+    // 空 tuple 特化：只有空 body 才视为成功，避免把脏 payload 误判为无参请求
+    template<typename Tuple>
+    static bool DeserializeTuple_(Tuple& /*t*/, std::string_view buffer, std::index_sequence<>)
+    {
+        return buffer.empty();
     }
 };
 }   // namespace ToolBox::CoroRpc
