@@ -306,12 +306,15 @@ namespace ToolBox
             recv_ring_buffer_.Copy((char*)&len, sizeof(uint32_t));
             if (len > static_cast<uint32_t>(recv_buff_len_))
             {
-                int readable_size = recv_ring_buffer_.ReadableSize();
-                int continue_read_size = recv_ring_buffer_.ContinuouslyReadableSize();
-                std::size_t read_pos = recv_ring_buffer_.ReadPos();
-                NetworkLogError("[Network][TcpSocket] Packet size is invaliable. socket id:%d, conn_id:%llu, capa:%d, len:%u, readable_size:%d, continue_read_size:%d, read_pos:%zu, buffer:%s, buffer2:%s."
-                        , GetSocketID(), GetConnID(), recv_ring_buffer_.GetBufferSize(), len, readable_size, continue_read_size, read_pos, ToolBox::MemoryToStr(recv_ring_buffer_.GetReadPtr(), 45).c_str()
-                        , ToolBox::MemoryToStr(recv_ring_buffer_.GetReadPtr()-90, 180).c_str());
+                const int readable_size = static_cast<int>(recv_ring_buffer_.ReadableSize());
+                const int continue_read_size = static_cast<int>(recv_ring_buffer_.ContinuouslyReadableSize());
+                const std::size_t read_pos = recv_ring_buffer_.ReadPos();
+                // 只 dump 连续可读段,禁止负偏移越界
+                const uint32_t dump_n = static_cast<uint32_t>(
+                    continue_read_size < 64 ? continue_read_size : 64);
+                NetworkLogError("[Network][TcpSocket] Packet size is invaliable. socket id:%d, conn_id:%llu, capa:%zu, len:%u, readable_size:%d, continue_read_size:%d, read_pos:%zu, buffer:%s."
+                        , GetSocketID(), GetConnID(), recv_ring_buffer_.GetBufferSize(), len, readable_size, continue_read_size, read_pos
+                        , ToolBox::MemoryToStr(recv_ring_buffer_.GetReadPtr(), dump_n).c_str());
                 Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
                 return ErrCode::ERR_INVALID_PACKET_SIZE;
             }
@@ -321,11 +324,19 @@ namespace ToolBox
                 break;
             }
             recv_ring_buffer_.AdjustReadPos(sizeof(uint32_t));
-            char* buff_block = MemPoolLockFreeMgr->GetMemory(len);
+            char* buff_block = GET_NET_MEMORY(len);
+            if (nullptr == buff_block)
+            {
+                NetworkLogError("[Network][TcpSocket] alloc recv buffer failed. socket id:%d, conn_id:%llu, len:%u",
+                                GetSocketID(), GetConnID(), len);
+                Close(ENetErrCode::NET_ALLOC_FAILED);
+                return ErrCode::ERR_INVALID_PACKET_SIZE;
+            }
             uint32_t readed_len = recv_ring_buffer_.Read(buff_block, len);
             if (readed_len != len)
             {
                 NetworkLogError("[Network][TcpSocket] recv_ring_buffer_ data is not enough to read. socket id:%d, conn_id:%llu, len:%u, readed_len:%u", GetSocketID(), GetConnID(), len, readed_len);
+                GIVE_BACK_MEMORY(buff_block);
                 Close(ENetErrCode::NET_INVALID_PACKET_SIZE);
                 return ErrCode::ERR_INVALID_PACKET_SIZE;
             }
@@ -338,25 +349,25 @@ namespace ToolBox
 
     void TcpSocket::UpdateConnect()
     {
+        // 可写只表示 connect 完成,须验 SO_ERROR;失败与 UpdateError(CONNECTING) 同构
+        const int32_t sys_err = GetSocketError();
+        if (0 != sys_err)
+        {
+            NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, sys_err:%d",
+                            GetSocketID(), GetConnID(), sys_err);
+            p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_CONNECT_FAILED, sys_err);
+            Close(ENetErrCode::NET_CONNECT_FAILED, sys_err);
+            return;
+        }
+
         // 完成主动连接后增加可处理"接收"能力.
         event_type_ |= SOCKET_EVENT_RECV;
         socket_state_ = SocketState::SOCK_STATE_ESTABLISHED;
 
-        // TODO delete. 三者形式是统一的,不过先注释掉,没有问题的话就都删掉.
-        // #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        //         ReAddSocketToIocp(SOCKET_EVENT_RECV);
-        // #elif defined(__linux__)
-        //         auto p_epoll_network = dynamic_cast<TcpEpollNetwork*>(p_network_);
-        //         p_epoll_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
-        // #elif defined(__APPLE__)
-        //         auto p_kqueue_network = dynamic_cast<TcpKqueueNetwork*>(p_network_);
-        //         p_kqueue_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
-        // #endif
-
         auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
         if (nullptr == p_iocp_network)
         {
-            return ;
+            return;
         }
         p_iocp_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, SOCKET_EVENT_RECV);
 

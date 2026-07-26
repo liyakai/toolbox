@@ -147,16 +147,15 @@ namespace ToolBox
         }
         auto send_length = length;
         auto success = SocketSend(GetSocketID(), buffer, length);
-        if (success && length)
-        {
-            if (length < send_length)
-            {
-                send_list_.emplace_back(GET_NET_OBJECT(Buffer, buffer + length, send_length - length));
-            }
-        }
-        else
+        if (!success)
         {
             Close(ENetErrCode::NET_SYS_ERROR, errno);
+            return;
+        }
+        // WOULDBLOCK 或半包:剩余入队,与 UpdateSend 一致,勿关
+        if (length < send_length)
+        {
+            send_list_.emplace_back(GET_NET_OBJECT(Buffer, buffer + length, send_length - length));
         }
     }
 
@@ -307,34 +306,43 @@ namespace ToolBox
         while (true)
         {
             auto success = SocketRecv(socket_id_, array.data(), size, address);
-            if (success && size)
+            if (!success)
             {
-                auto* p_udp_epoll_network = dynamic_cast<UdpEpollNetwork*>(p_network_);
-                auto* udp_socket = p_udp_epoll_network->GetSocketByUdpAddress(address);
-                if (nullptr == udp_socket)
-                {
-                    udp_socket = UpdateAccept(address);
-                }
-                if (nullptr == kcp_)    // 原始 udp 模式
-                {
-                    char* buff_block = GET_NET_MEMORY(size);
-                    memcpy(buff_block, array.data(), size);
-                    NetworkLogTrace("[Network][UdpSocket] Receive udp data. socket id:%d, conn_id:%llu, len.%zu", GetSocketID(), GetConnID(), size);
-                    p_network_->OnReceived(GetOpaque(), UdpAddress(address).GetID(), buff_block, size);
-                }
-                else                    // 开启了kcp
-                {
-                    if (nullptr != udp_socket)
-                    {
-                        NetworkLogTrace("[Network][UdpSocket] Receive kcp data. socket id:%d, conn_id:%llu, len.%zu", GetSocketID(), GetConnID(), size);
-                        udp_socket->KcpRecv(array.data(), size, UdpAddress(address));
-                    }
-
-                }
+                // 不可恢复错误,与 TCP UpdateRecv 对齐:Close→OnClosed,不再单独 OnErrored
+                Close(ENetErrCode::NET_SYS_ERROR, errno);
+                return;
             }
-            else
+            if (0 == size)
             {
-                break;
+                break;  // EWOULDBLOCK
+            }
+            auto* p_udp_epoll_network = dynamic_cast<UdpEpollNetwork*>(p_network_);
+            if (nullptr == p_udp_epoll_network)
+            {
+                NetworkLogError("[Network][UdpSocket] UpdateRecv failed, network is not UdpEpollNetwork. conn_id:%llu",
+                                GetConnID());
+                return;
+            }
+            auto* udp_socket = p_udp_epoll_network->GetSocketByUdpAddress(address);
+            if (nullptr == udp_socket)
+            {
+                udp_socket = UpdateAccept(address);
+            }
+            if (nullptr == kcp_)    // 原始 udp 模式
+            {
+                char* buff_block = GET_NET_MEMORY(size);
+                memcpy(buff_block, array.data(), size);
+                NetworkLogTrace("[Network][UdpSocket] Receive udp data. socket id:%d, conn_id:%llu, len.%zu", GetSocketID(), GetConnID(), size);
+                p_network_->OnReceived(GetOpaque(), UdpAddress(address).GetID(), buff_block, size);
+            }
+            else                    // 开启了kcp
+            {
+                if (nullptr != udp_socket)
+                {
+                    NetworkLogTrace("[Network][UdpSocket] Receive kcp data. socket id:%d, conn_id:%llu, len.%zu", GetSocketID(), GetConnID(), size);
+                    udp_socket->KcpRecv(array.data(), size, UdpAddress(address));
+                }
+
             }
         }
     }
@@ -346,22 +354,24 @@ namespace ToolBox
             auto buffer = *iter;
             size_t size = buffer->size_;
             auto success = SocketSend(socket_id_, buffer->data_, size);
-            if (success && size)
+            if (!success)
             {
-                if (size == buffer->size_)
-                {
-                    GIVE_BACK_OBJECT(buffer);
-                    iter = send_list_.erase(iter);
-                }
-                else
-                {
-                    buffer->size_ -= size;
-                    buffer->data_ += size;
-                    break;
-                }
+                Close(ENetErrCode::NET_SYS_ERROR, errno);
+                return;
+            }
+            if (0 == size)
+            {
+                break;  // EWOULDBLOCK
+            }
+            if (size == buffer->size_)
+            {
+                GIVE_BACK_OBJECT(buffer);
+                iter = send_list_.erase(iter);
             }
             else
             {
+                buffer->size_ -= size;
+                buffer->data_ += size;
                 break;
             }
         }
@@ -418,11 +428,9 @@ namespace ToolBox
             {
                 return true;
             }
-            else
-            {
-                p_network_->OnErrored(GetOpaque(), GetLocalAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
-                return false;
-            }
+            NetworkLogError("[Network][UdpSocket] recvfrom failed. socket id:%d, conn_id:%llu, errno:%d",
+                            GetSocketID(), GetConnID(), errno);
+            return false;
         }
         size = bytes;
         return true;
@@ -439,11 +447,9 @@ namespace ToolBox
             {
                 return true;
             }
-            else
-            {
-                p_network_->OnErrored(GetOpaque(), GetRemoteAddressID(), ENetErrCode::NET_SYS_ERROR, errno);
-                return false;
-            }
+            NetworkLogError("[Network][UdpSocket] sendto failed. socket id:%d, conn_id:%llu, errno:%d",
+                            GetSocketID(), GetConnID(), errno);
+            return false;
         }
         size = bytes;
         return true;
