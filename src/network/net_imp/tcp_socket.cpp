@@ -171,6 +171,7 @@ namespace ToolBox
 
     bool TcpSocket::InitAccpetSocket(uint64_t opaque, int32_t socket_fd, std::string ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
+        ClearInitError();
         SetOpaque(opaque);
         Init(send_buff_size, recv_buff_size);
         SetSocketID(socket_fd);
@@ -182,8 +183,7 @@ namespace ToolBox
         // 建立 socket 与 iocp 的关联
         if (!AssociateSocketToIocp())
         {
-            p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_ACCEPT_FAILED,
-                                  GetIOMultiplexingError());
+            SetInitError(ENetErrCode::NET_ACCEPT_FAILED, GetIOMultiplexingError());
             return false;
         }
 #elif defined(__linux__) || defined(__APPLE__)
@@ -466,14 +466,14 @@ namespace ToolBox
         }
         if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
         {
-            // 必须 Close 摘除多路复用并归还池,否则 ERR/HUP 每轮反复唤醒刷屏
+            // ConnectFailed 后 Close 静默回收(不 OnClosed);须摘复用防 ERR 刷屏
             NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, sys_err:%d",
                             GetSocketID(), GetConnID(), sys_err);
             p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_CONNECT_FAILED, sys_err);
             Close(ENetErrCode::NET_CONNECT_FAILED, sys_err);
             return;
         }
-        // LISTENING 等:勿误报 ConnectFailed
+        // LISTENING:Errored 后 Close 静默(不 OnClosed);业务主动关监听用 NET_SUCCESS 仍发 Closed
         NetworkLogError("[Network][TcpSocket] listen/socket error. socket id:%d, conn_id:%llu, state:%d sys_err:%d",
                         GetSocketID(), GetConnID(), static_cast<int32_t>(socket_state_), sys_err);
         p_network_->OnErrored(GetOpaque(), GetConnID(), ENetErrCode::NET_LISTEN_FAILED, sys_err);
@@ -506,7 +506,15 @@ namespace ToolBox
     {
         if (IsSocketValid())
         {
-            NetworkLogDebug("[Network] socket id:%d, conn_id:%llu, Ready to be free.net_err:%d, sys_err:%d", GetSocketID(), GetConnID(), net_err, sys_err);
+            // 先失效令牌,同轮后续 epoll/kqueue/iocp 事件解析失败跳过
+            InvalidateDispatchToken();
+            // A1:从未成功建立(CONNECTING)或监听出错关闭不发 Closed;已建立或主动关监听仍发
+            const bool notify_closed =
+                (SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
+                || (SocketState::SOCK_STATE_LISTENING == socket_state_
+                    && ENetErrCode::NET_SUCCESS == net_err);
+            NetworkLogDebug("[Network] socket id:%d, conn_id:%llu, Ready to be free.net_err:%d, sys_err:%d notify_closed:%d",
+                            GetSocketID(), GetConnID(), net_err, sys_err, notify_closed ? 1 : 0);
             // 必须在关 fd 之前摘除监听,否则拿到的是已置无效的 fd
             p_network_->CloseListenInMultiplexing(GetSocketID());
 #if defined(__linux__)
@@ -514,8 +522,10 @@ namespace ToolBox
             SetCtrlAdd(false);
 #endif
             BaseSocket::Close(net_err, sys_err);
-            // 通知主线程 socket 关闭
-            p_network_->OnClosed(GetOpaque(), (uint64_t)GetConnID(), net_err, sys_err);
+            if (notify_closed)
+            {
+                p_network_->OnClosed(GetOpaque(), (uint64_t)GetConnID(), net_err, sys_err);
+            }
             socket_state_ = SocketState::SOCK_STATE_INVALIED;
             p_sock_pool_->Free(this);
         }
@@ -733,9 +743,10 @@ namespace ToolBox
 
     bool TcpSocket::InitNewAccepter(uint64_t opaque, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
+        ClearInitError();
         if (SocketState::SOCK_STATE_LISTENING == socket_state_)
         {
-            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, 0);
+            SetInitError(ENetErrCode::NET_LISTEN_FAILED, 0);
             return false;
         }
         SetOpaque(opaque);
@@ -748,7 +759,7 @@ namespace ToolBox
         if (socket_id_ < 0)
 #endif
         {
-            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+            SetInitError(ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
             return false;
         }
 
@@ -779,21 +790,20 @@ namespace ToolBox
         int32_t error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
         if (error < 0)
         {
-            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+            SetInitError(ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
             return false;
         }
         error = listen(socket_id_, DEFAULT_BACKLOG_SIZE);
         if (error < 0)
         {
-            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
+            SetInitError(ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
             return false;
         }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         // 建立 socket 与 iocp 的关联
         if (!AssociateSocketToIocp())
         {
-            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED,
-                                  GetIOMultiplexingError());
+            SetInitError(ENetErrCode::NET_LISTEN_FAILED, GetIOMultiplexingError());
             return false;
         }
         socket_state_ = SocketState::SOCK_STATE_LISTENING;
@@ -807,9 +817,10 @@ namespace ToolBox
 
     bool TcpSocket::InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
+        ClearInitError();
         if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
         {
-            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_CONNECT_FAILED, 0);
+            SetInitError(ENetErrCode::NET_CONNECT_FAILED, 0);
             return false;
         }
         SetOpaque(opaque);
@@ -818,14 +829,10 @@ namespace ToolBox
         socket_id_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (socket_id_ < 0)
         {
-            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_CONNECT_FAILED, errno);
+            SetInitError(ENetErrCode::NET_CONNECT_FAILED, errno);
             return false;
         }
 
-        // // 设置对端地址
-        // ip_ = ip;
-        // // 设置对端端口
-        // port_ = port;
         SocketAddress sa;
         memset(&sa, 0, sizeof(sa));
         sa.sin_family = AF_INET;
@@ -854,17 +861,17 @@ namespace ToolBox
         if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != errno)
 #endif
         {
-            NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d", GetSocketID(), GetConnID(), GetSocketError());
-            // Init 失败契约:只上报,不 Close/Free;由 OnNewConnecter 统一 Free(Reset 关 fd)
-            p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
+            NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d",
+                            GetSocketID(), GetConnID(), GetSocketError());
+            // Init 失败不上报,由 OnNewConnecter 读错码后 OnConnectedFailed
+            SetInitError(ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
             return false;
         }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         // 建立 socket 与 iocp 的关联
         if (!AssociateSocketToIocp())
         {
-            p_network_->OnConnectedFailed(opaque, ENetErrCode::NET_CONNECT_FAILED,
-                                          GetIOMultiplexingError());
+            SetInitError(ENetErrCode::NET_CONNECT_FAILED, GetIOMultiplexingError());
             return false;
         }
 #elif defined(__linux__) || defined(__APPLE__)

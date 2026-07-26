@@ -23,6 +23,7 @@ namespace ToolBox
         opaque_ = 0;
         conn_id_ = INVALID_CONN_ID;
         ++dispatch_generation_;  // 池复用同 index 时令牌必须失效
+        ClearInitError();
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
         is_ctrl_add_ = false;

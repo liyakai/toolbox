@@ -110,8 +110,9 @@ namespace ToolBox
 
     bool UdpSocket::InitNewAccepter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
+        ClearInitError();
         SetOpaque(opaque);
-        // Bind 内部已上报错误,失败必须向上传播,否则会生成一个收不到数据的监听器
+        // Bind 失败只填错码,由 OnNewAccepter 上报
         if (!Bind(ip, port))
         {
             return false;
@@ -123,8 +124,9 @@ namespace ToolBox
     }
     bool UdpSocket::InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
+        ClearInitError();
         SetOpaque(opaque);
-        // Bind 内部已上报错误,失败必须向上传播
+        // Bind 失败只填错码,由 OnNewConnecter 上报
         if (!Bind())
         {
             return false;
@@ -221,7 +223,7 @@ namespace ToolBox
         socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket_id_ < 0)
         {
-            p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_LISTEN_FAILED, errno);
+            SetInitError(ENetErrCode::NET_LISTEN_FAILED, errno);
             return false;
         }
 
@@ -234,7 +236,7 @@ namespace ToolBox
         int32_t error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
         if (error < 0)
         {
-            p_network_->OnErrored(GetOpaque(), socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
+            SetInitError(ENetErrCode::NET_LISTEN_FAILED, errno);
             return false;
         }
         return true;
@@ -245,7 +247,7 @@ namespace ToolBox
         socket_id_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket_id_ < 0)
         {
-            p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_CONNECT_FAILED, errno);
+            SetInitError(ENetErrCode::NET_CONNECT_FAILED, errno);
             return false;
         }
 
@@ -258,7 +260,7 @@ namespace ToolBox
         int32_t error = bind(socket_id_, (struct sockaddr*)&sa, sizeof(SocketAddress));
         if (error < 0)
         {
-            p_network_->OnErrored(GetOpaque(), socket_id_, ENetErrCode::NET_LISTEN_FAILED, errno);
+            SetInitError(ENetErrCode::NET_CONNECT_FAILED, errno);
             return false;
         }
         return true;

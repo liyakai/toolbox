@@ -122,6 +122,27 @@ namespace ToolBox
         */
         void OnErrored(ENetErrCode err_code, int32_t err_no);
         /*
+        * Init* 失败错码(Init 内不上报,由 OnNew* Caller 读取后统一回调)
+        */
+        void ClearInitError()
+        {
+            last_init_net_err_ = ENetErrCode::NET_SUCCESS;
+            last_init_sys_err_ = 0;
+        }
+        void SetInitError(ENetErrCode net_err, int32_t sys_err)
+        {
+            last_init_net_err_ = net_err;
+            last_init_sys_err_ = sys_err;
+        }
+        ENetErrCode GetInitNetErr() const
+        {
+            return last_init_net_err_;
+        }
+        int32_t GetInitSysErr() const
+        {
+            return last_init_sys_err_;
+        }
+        /*
         * 重置接收 AsyncSocket
         */
         virtual void ResetRecvAsyncSocket() {};
@@ -262,6 +283,8 @@ namespace ToolBox
         uint64_t opaque_ = 0;   // 信道标记
         uint32_t conn_id_ = INVALID_CONN_ID;
         uint32_t dispatch_generation_ = 0;  // 派发世代,Reset/Close 递增
+        ENetErrCode last_init_net_err_ = ENetErrCode::NET_SUCCESS;
+        int32_t last_init_sys_err_ = 0;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         SOCKET socket_id_ = INVALID_SOCKET;
 #elif defined(__linux__)

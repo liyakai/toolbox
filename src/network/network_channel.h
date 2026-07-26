@@ -157,8 +157,8 @@ namespace ToolBox
         */
         virtual void OnConnected(NetworkType type, uint64_t opaque, uint64_t conn_id) {};
         /*
-        * 逻辑线程内处理主动连接事件
-        * @param conn_id 连接ID
+        * 逻辑线程内处理主动连接失败(含 Init/OperEvent/异步 CONNECTING 失败).
+        * 此类失败不会再回调 OnClose/Closed.
         */
         virtual void OnConnectedFailed(NetworkType type, uint64_t opaque, ENetErrCode err_code, int32_t err_no) {};
         /*
@@ -168,7 +168,8 @@ namespace ToolBox
         */
         virtual void OnErrored(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode err_code, int32_t err_no) {};
         /*
-        * 逻辑线程内处理连接关闭事件
+        * 逻辑线程内处理连接关闭事件.
+        * 已建立连接的关闭、以及业务主动关闭监听会回调;CONNECTING 失败与监听错误关闭不回调.
         * @param conn_id 连接ID
         */
         virtual void OnClose(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode net_err, int32_t sys_err) {};

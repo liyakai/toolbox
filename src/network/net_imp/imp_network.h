@@ -221,9 +221,15 @@ namespace ToolBox
         }
         new_socket->SetSocketMgr(&sock_mgr_);
         new_socket->SetNetwork(this);
-        // Init* 失败契约:只上报错误并 return false,不 Close/Free;此处统一 Free(Reset 关 fd)
+        // Init* 失败契约:Init 只填错码不上报;此处统一上报并 Free(Reset 关 fd)
         if (false == new_socket->InitNewAccepter(opaque, ip, port, send_buff_size, recv_buff_size))
         {
+            ENetErrCode err = new_socket->GetInitNetErr();
+            if (ENetErrCode::NET_SUCCESS == err)
+            {
+                err = ENetErrCode::NET_LISTEN_FAILED;
+            }
+            OnErrored(opaque, 0, err, new_socket->GetInitSysErr());
             sock_mgr_.Free(new_socket);
             return INVALID_CONN_ID;
         }
@@ -253,6 +259,12 @@ namespace ToolBox
 
         if (false == new_socket->InitAccpetSocket(opaque, fd, ip, port, send_buff_size, recv_buff_size))
         {
+            ENetErrCode err = new_socket->GetInitNetErr();
+            if (ENetErrCode::NET_SUCCESS == err)
+            {
+                err = ENetErrCode::NET_ACCEPT_FAILED;
+            }
+            OnErrored(opaque, 0, err, new_socket->GetInitSysErr());
             sock_mgr_.Free(new_socket);
             return INVALID_CONN_ID;
         }
@@ -281,6 +293,12 @@ namespace ToolBox
         new_socket->SetNetwork(this);
         if (false == new_socket->InitNewConnecter(opaque, ip, port, send_buff_size, recv_buff_size))
         {
+            ENetErrCode err = new_socket->GetInitNetErr();
+            if (ENetErrCode::NET_SUCCESS == err)
+            {
+                err = ENetErrCode::NET_CONNECT_FAILED;
+            }
+            OnConnectedFailed(opaque, err, new_socket->GetInitSysErr());
             sock_mgr_.Free(new_socket);
             return INVALID_CONN_ID;
         }

@@ -1284,12 +1284,10 @@ CASE(tcp_connect_failed_no_storm)
     const uint32_t failed_at = probe.Count(ProbeEvent::ConnectFailed);
     const uint32_t errored_at = probe.Count(ProbeEvent::Errored);
     NET_ASSERT(failed_at >= 1, "expect ConnectFailed");
-    // Close 后应有 Closed(池内 conn 回收)
-    RequireWait(probe, [&]()
-    {
-        return probe.Count(ProbeEvent::Closed) >= 1;
-    }, "failed connect must Close/recycle", 2000);
-    const uint32_t closed_at = probe.Count(ProbeEvent::Closed);
+    // A1:CONNECTING 失败只 ConnectFailed,Close 静默回收,不应再有 Closed
+    probe.PumpIdle(120);
+    NET_ASSERT(0 == probe.Count(ProbeEvent::Closed),
+               "connect fail must not Closed, closed:%u", probe.Count(ProbeEvent::Closed));
 
     // 空转:计数不得持续暴涨(允许迟到 1 次抖动)
     probe.PumpIdle(120);
@@ -1299,9 +1297,7 @@ CASE(tcp_connect_failed_no_storm)
     NET_ASSERT(probe.Count(ProbeEvent::Errored) <= errored_at + 2,
                "Errored storm: before:%u after:%u",
                errored_at, probe.Count(ProbeEvent::Errored));
-    NET_ASSERT(probe.Count(ProbeEvent::Closed) <= closed_at + 1,
-               "Closed storm: before:%u after:%u",
-               closed_at, probe.Count(ProbeEvent::Closed));
+    NET_ASSERT(0 == probe.Count(ProbeEvent::Closed), "Closed must stay 0");
     NET_ASSERT(0 == probe.Count(ProbeEvent::Connected), "must stay disconnected");
 }
 
