@@ -504,31 +504,37 @@ namespace ToolBox
 
     void TcpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     {
+        // 生命周期门闩:非 ALIVE 说明重入或已回收,直接返回
+        if (!EnterClosing())
+        {
+            NetworkLogDebug("[Network] skip duplicated close. socket id:%d, conn_id:%llu, net_err:%d",
+                            GetSocketID(), GetConnID(), net_err);
+            return;
+        }
+        // 先失效令牌,同轮后续 epoll/kqueue/iocp 事件解析失败跳过
+        InvalidateDispatchToken();
+        // A1:从未成功建立(CONNECTING)或监听出错关闭不发 Closed;已建立或主动关监听仍发
+        const bool notify_closed =
+            (SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
+            || (SocketState::SOCK_STATE_LISTENING == socket_state_
+                && ENetErrCode::NET_SUCCESS == net_err);
+        NetworkLogDebug("[Network] socket id:%d, conn_id:%llu, Ready to be free.net_err:%d, sys_err:%d notify_closed:%d",
+                        GetSocketID(), GetConnID(), net_err, sys_err, notify_closed ? 1 : 0);
         if (IsSocketValid())
         {
-            // 先失效令牌,同轮后续 epoll/kqueue/iocp 事件解析失败跳过
-            InvalidateDispatchToken();
-            // A1:从未成功建立(CONNECTING)或监听出错关闭不发 Closed;已建立或主动关监听仍发
-            const bool notify_closed =
-                (SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
-                || (SocketState::SOCK_STATE_LISTENING == socket_state_
-                    && ENetErrCode::NET_SUCCESS == net_err);
-            NetworkLogDebug("[Network] socket id:%d, conn_id:%llu, Ready to be free.net_err:%d, sys_err:%d notify_closed:%d",
-                            GetSocketID(), GetConnID(), net_err, sys_err, notify_closed ? 1 : 0);
             // 必须在关 fd 之前摘除监听,否则拿到的是已置无效的 fd
             p_network_->CloseListenInMultiplexing(GetSocketID());
 #if defined(__linux__)
-            // fd 已从 epoll 摘除,清注册标记,避免归还池前再次 OperEvent 误走 MOD
             SetCtrlAdd(false);
 #endif
-            BaseSocket::Close(net_err, sys_err);
-            if (notify_closed)
-            {
-                p_network_->OnClosed(GetOpaque(), (uint64_t)GetConnID(), net_err, sys_err);
-            }
-            socket_state_ = SocketState::SOCK_STATE_INVALIED;
-            p_sock_pool_->Free(this);
         }
+        BaseSocket::Close(net_err, sys_err);
+        if (notify_closed)
+        {
+            p_network_->OnClosed(GetOpaque(), (uint64_t)GetConnID(), net_err, sys_err);
+        }
+        socket_state_ = SocketState::SOCK_STATE_INVALIED;
+        p_sock_pool_->Free(this);
     }
 
     void TcpSocket::Update(std::time_t time_stamp)
@@ -548,19 +554,6 @@ namespace ToolBox
     }
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    bool TcpSocket::IsSocketValid()
-    {
-        if (BaseSocket::IsSocketValid())
-        {
-            return true;
-        }
-        if (nullptr != per_socket_.accept_ex
-                && INVALID_SOCKET != per_socket_.accept_ex->socket_fd)
-        {
-            return true;
-        }
-        return false;
-    }
     sockaddr_in* TcpSocket::GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex_buffer, int32_t buff_len)
     {
         DWORD bytes = 0;

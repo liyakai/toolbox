@@ -242,9 +242,35 @@ namespace ToolBox
         */
         virtual void Close(ENetErrCode net_err, int32_t sys_err);
         /*
-        * socket 是否有效
+        * fd 是否有效
         */
-        virtual bool IsSocketValid();
+        bool IsSocketValid();
+        /*
+        * 标记为活跃(池 Alloc 后调用),使其可以进入 Close 流程
+        */
+        void MarkAlive()
+        {
+            life_ = SockLife::ALIVE;
+        }
+        /*
+        * 进入关闭流程.非 ALIVE 时返回 false,以此保证 Close 幂等(重入/已回收都会被拦住)
+        */
+        bool EnterClosing()
+        {
+            if (SockLife::ALIVE != life_)
+            {
+                return false;
+            }
+            life_ = SockLife::CLOSING;
+            return true;
+        }
+        /*
+        * 设置 fd 所有权.BORROW 时关闭只放弃引用,不 close
+        */
+        void SetFdOwnership(FdOwnership ownership)
+        {
+            fd_ownership_ = ownership;
+        }
         /*
         * 派发令牌(池 index + generation),供多路复用注册
         */
@@ -285,6 +311,8 @@ namespace ToolBox
         uint32_t dispatch_generation_ = 0;  // 派发世代,Reset/Close 递增
         ENetErrCode last_init_net_err_ = ENetErrCode::NET_SUCCESS;
         int32_t last_init_sys_err_ = 0;
+        SockLife life_ = SockLife::IDLE;                    // 生命周期状态
+        FdOwnership fd_ownership_ = FdOwnership::OWN;       // fd 所有权
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         SOCKET socket_id_ = INVALID_SOCKET;
 #elif defined(__linux__)

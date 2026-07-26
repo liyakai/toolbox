@@ -130,6 +130,7 @@ namespace ToolBox
                 socket = new SocketType;
             }
             socket->SetConnID(conn_id);
+            socket->MarkAlive();    // 出池即进入活跃态,Close 门闩以此判定
             uint16_t index = GetLoWord(conn_id);
             socket_vector_[index] = socket;
             alloced_socketes_.emplace_back(socket);

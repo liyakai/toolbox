@@ -68,12 +68,14 @@ namespace ToolBox
         address_to_connect_.erase(udp_address.GetID());
     }
 
-    void UdpEpollNetwork::OnSocketClosing(UdpSocket* socket, ENetErrCode net_err, int32_t sys_err)
+    void UdpEpollNetwork::OnSocketClosing(BaseSocket* base_socket, ENetErrCode net_err, int32_t sys_err)
     {
-        if (nullptr == socket)
+        if (nullptr == base_socket)
         {
             return;
         }
+        // 本网络只管理 UdpSocket,来源可控,无需 dynamic_cast
+        UdpSocket* socket = static_cast<UdpSocket*>(base_socket);
         if (UdpType::ACCEPTOR != socket->GetType())
         {
             address_to_connect_.erase(socket->GetRemoteAddressID());

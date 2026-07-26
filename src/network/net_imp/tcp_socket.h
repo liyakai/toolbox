@@ -69,10 +69,6 @@ namespace ToolBox
             return &per_socket_;
         }
         /*
-        * socket 是否有效
-        */
-        virtual bool IsSocketValid();
-        /*
         * 获取远端地址信息
         */
         sockaddr_in* GetRemoteAddress(SOCKET&& listen_socket, char* accept_ex_buffer, int32_t buff_len);

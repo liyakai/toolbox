@@ -15,6 +15,7 @@ namespace ToolBox
     class EventDispatcher;
     class NetEventWorker;
     class Event;
+    class BaseSocket;
     /// 事件队列
     using Event2Worker = RingBufferSPSC<NetEventWorker*, NETWORK_EVENT_QUEUE_MAX_COUNT>;
     /// 事件处理函数
@@ -50,6 +51,11 @@ namespace ToolBox
         * @param socket 的文件描述符
         */
         virtual void CloseListenInMultiplexing(int32_t socket_id) {};
+        /*
+        * @brief socket 关闭前的清理钩子,此时 fd 仍有效.默认无操作
+        *   当前 UDP 用于清理地址映射并级联关闭共享同一 fd 的 REMOTE
+        */
+        virtual void OnSocketClosing(BaseSocket* socket, ENetErrCode net_err, int32_t sys_err) {};
         /*
         * 加入事件
         */

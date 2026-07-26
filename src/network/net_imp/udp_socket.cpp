@@ -63,12 +63,7 @@ namespace ToolBox
 
     void UdpSocket::Reset()
     {
-        // REMOTE 借用 ACCEPTOR 的 fd(见 InitAccpetSocket),不持有所有权.
-        // 回收前先放弃借用,否则会关掉监听 fd,并与 ACCEPTOR 回收时形成双关
-        if (UdpType::REMOTE == type_)
-        {
-            SetSocketID(-1);
-        }
+        // fd 的归属由 fd_ownership_ 表达(REMOTE 为 BORROW),基类据此决定是否真关 fd
         BaseSocket::Reset();
         for (const auto& buffer : send_list_)
         {
@@ -177,43 +172,41 @@ namespace ToolBox
 
     void UdpSocket::Close(ENetErrCode net_err, int32_t sys_err)
     {
-        if (IsSocketValid())
+        // 生命周期门闩:非 ALIVE 说明重入或已回收,直接返回
+        if (!EnterClosing())
         {
-            auto* udp_network = dynamic_cast<UdpEpollNetwork*>(p_network_);
-            if (nullptr != udp_network)
-            {
-                udp_network->OnSocketClosing(this, net_err, sys_err);
-            }
-            // 必须在关 fd 之前摘除监听,否则拿到的是已置无效的 fd
-            if (nullptr != p_network_
-                && (UdpType::ACCEPTOR == type_ || UdpType::CONNECTOR == type_))
+            NetworkLogDebug("[Network][UdpSocket] skip duplicated close. socket id:%d, conn_id:%llu, net_err:%d",
+                            GetSocketID(), GetConnID(), net_err);
+            return;
+        }
+        InvalidateDispatchToken();
+        // 通知 ID:ACCEPTOR 报本地地址,CONNECTOR/REMOTE 报远端地址
+        const uint64_t notify_id = (UdpType::ACCEPTOR == type_) ? GetLocalAddressID() : GetRemoteAddressID();
+        if (nullptr != p_network_)
+        {
+            // 清理地址映射并级联关闭共享本 fd 的 REMOTE,此时 fd 仍有效
+            p_network_->OnSocketClosing(this, net_err, sys_err);
+            // 必须在关 fd 之前摘除监听,否则拿到的是已置无效的 fd.REMOTE 共享 fd 不摘
+            if (IsSocketValid() && (UdpType::ACCEPTOR == type_ || UdpType::CONNECTOR == type_))
             {
                 p_network_->CloseListenInMultiplexing(GetSocketID());
                 // fd 已从 epoll 摘除,清注册标记,避免归还池前再次 OperEvent 误走 MOD
                 SetCtrlAdd(false);
             }
-            if (UdpType::REMOTE == type_)
-            {
-                // 借用的 fd 只放弃引用,真正关闭由 ACCEPTOR 负责
-                SetSocketID(-1);
-            }
-            else
-            {
-                BaseSocket::Close(net_err, sys_err);
-            }
-            if (p_network_)
-            {
-                // 通知主线程 socket 关闭
-                if (UdpType::ACCEPTOR == type_)
-                {
-                    p_network_->OnClosed(GetOpaque(), GetLocalAddressID(), net_err, sys_err);
-                }
-                else
-                {
-                    p_network_->OnClosed(GetOpaque(), GetRemoteAddressID(), net_err, sys_err);
-                }
-                p_sock_pool_->Free(this);
-            }
+        }
+        // REMOTE 的 fd 标记为 BORROW,这里只放弃引用,真正关闭由 ACCEPTOR 负责
+        BaseSocket::Close(net_err, sys_err);
+        if (nullptr != p_network_)
+        {
+            p_network_->OnClosed(GetOpaque(), notify_id, net_err, sys_err);
+        }
+        if (nullptr != p_sock_pool_)
+        {
+            p_sock_pool_->Free(this);
+        }
+        else
+        {
+            NetworkLogWarn("[Network][UdpSocket] close without pool, slot leaked. conn_id:%llu", GetConnID());
         }
     }
 
@@ -382,8 +375,14 @@ namespace ToolBox
             p_network_->OnErrored(GetOpaque(), GetLocalAddressID(), ENetErrCode::NET_ALLOC_FAILED, 0);
             return nullptr;
         }
-        InitAccpetSocket(new_socket, address);
         auto* p_udp_epoll_network = dynamic_cast<UdpEpollNetwork*>(p_network_);
+        if (nullptr == p_udp_epoll_network)
+        {
+            NetworkLogError("[Network][UdpSocket] accept failed, network is not UdpEpollNetwork. conn_id:%llu", GetConnID());
+            p_sock_pool_->Free(new_socket);
+            return nullptr;
+        }
+        InitAccpetSocket(new_socket, address);
         if (p_udp_epoll_network->IsKcpModeOpen())
         {
             new_socket->OpenKcpMode();
@@ -398,6 +397,8 @@ namespace ToolBox
     void UdpSocket::InitAccpetSocket(UdpSocket* socket, const SocketAddress& address)
     {
         socket->SetSocketID(socket_id_);
+        // REMOTE 与 ACCEPTOR 共享同一个 fd,只借用不持有,避免双关
+        socket->SetFdOwnership(FdOwnership::BORROW);
         socket->SetOpaque(GetOpaque());
         socket->SetRemoteAddress(UdpAddress(address));
         socket->SetSocketMgr(p_sock_pool_);

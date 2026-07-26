@@ -24,6 +24,9 @@ namespace ToolBox
         conn_id_ = INVALID_CONN_ID;
         ++dispatch_generation_;  // 池复用同 index 时令牌必须失效
         ClearInitError();
+        // 状态与所有权复位必须在 CloseSocketFd 之后:后者依赖 fd_ownership_ 决定是否真关 fd
+        life_ = SockLife::IDLE;
+        fd_ownership_ = FdOwnership::OWN;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
         is_ctrl_add_ = false;
@@ -46,23 +49,34 @@ namespace ToolBox
 
     void BaseSocket::CloseSocketFd()
     {
+        // 先置无效再收尾,借用的 fd 只放弃引用,避免与所有者形成双关
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        if (INVALID_SOCKET == socket_id_)
+        const SOCKET fd = socket_id_;
+        if (INVALID_SOCKET == fd)
         {
             return;
         }
-        CancelIo((HANDLE)socket_id_);
-        shutdown(socket_id_, 2);
-        closesocket(socket_id_);
         socket_id_ = INVALID_SOCKET;
-#else
-        if (socket_id_ < 0)
+        if (FdOwnership::BORROW == fd_ownership_)
         {
             return;
         }
-        shutdown(socket_id_, SHUT_RDWR);
-        close(socket_id_);
+        CancelIo((HANDLE)fd);
+        shutdown(fd, 2);
+        closesocket(fd);
+#else
+        const int32_t fd = socket_id_;
+        if (fd < 0)
+        {
+            return;
+        }
         socket_id_ = -1;
+        if (FdOwnership::BORROW == fd_ownership_)
+        {
+            return;
+        }
+        shutdown(fd, SHUT_RDWR);
+        close(fd);
 #endif
     }
 

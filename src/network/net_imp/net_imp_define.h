@@ -112,6 +112,25 @@ namespace ToolBox
         REMOTE = 3,
     };
 
+    /*
+    * socket 生命周期状态,作为 Close 的幂等门闩
+    */
+    enum class SockLife : uint8_t
+    {
+        IDLE = 0,       // 池内空闲:未分配或已回收
+        ALIVE = 1,      // 已从池中分配,可参与收发与关闭
+        CLOSING = 2,    // Close 执行中,禁止重入
+    };
+
+    /*
+    * fd 所有权.借用者关闭时只放弃引用,真正 close 由所有者负责
+    */
+    enum class FdOwnership : uint8_t
+    {
+        OWN = 0,        // 自己创建的 fd,负责关闭
+        BORROW = 1,     // 借用他人 fd(如 UDP REMOTE 共享 ACCEPTOR 的 fd)
+    };
+
 };  // ToolBox
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
