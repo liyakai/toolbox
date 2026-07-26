@@ -99,6 +99,17 @@ namespace ToolBox
             return nullptr;
         }
         /*
+        * 按池下标取 socket(派发令牌解析用)
+        */
+        SocketType* GetSocketByIndex(uint16_t index)
+        {
+            if (index < max_socket_count_)
+            {
+                return socket_vector_[index];
+            }
+            return nullptr;
+        }
+        /*
         * 分配新的 Socket
         */
         SocketType* Alloc()

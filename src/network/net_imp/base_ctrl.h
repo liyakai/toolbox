@@ -1,9 +1,13 @@
 #pragma once
 #include "net_imp_define.h"
 #include "base_socket.h"
+#include <cstdint>
+#include <functional>
 
 namespace ToolBox
 {
+
+    using SockDispatchResolver = std::function<BaseSocket*(uint16_t pool_index, uint32_t generation)>;
 
     /*
     * @brief IOMultiplexingInterface 是io多路复用的接口.

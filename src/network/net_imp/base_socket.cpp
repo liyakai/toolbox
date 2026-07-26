@@ -22,6 +22,7 @@ namespace ToolBox
         CloseSocketFd();
         opaque_ = 0;
         conn_id_ = INVALID_CONN_ID;
+        ++dispatch_generation_;  // 池复用同 index 时令牌必须失效
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
         is_ctrl_add_ = false;
@@ -67,13 +68,13 @@ namespace ToolBox
     int32_t BaseSocket::GetSocketError()
     {
         int32_t error = 0;
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         socklen_t len = sizeof(error);
         if (getsockopt(socket_id_, SOL_SOCKET, SO_ERROR, &error, &len) == -1)
         {
             return 0;
         }
-#endif // __linux__
+#endif
         return error;
     }
 

@@ -1,5 +1,6 @@
 #include "kqueue_ctrl.h"
 #include <cerrno>
+#include <cstdint>
 
 #if defined(__APPLE__)
 
@@ -47,22 +48,24 @@ namespace ToolBox
         {
             if (EventOperType::EVENT_OPER_ADD == op_type)
             {
-                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, &socket);
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0,
+                       reinterpret_cast<void*>(static_cast<uintptr_t>(socket.GetDispatchToken())));
             }
             else if (EventOperType::EVENT_OPER_RDC == op_type)
             {
-                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_READ, EV_DELETE | EV_DISABLE, 0, 0, &socket);
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_READ, EV_DELETE | EV_DISABLE, 0, 0, nullptr);
             }
         }
         if (event_type & SOCKET_EVENT_SEND)
         {
             if (EventOperType::EVENT_OPER_ADD == op_type)
             {
-                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, &socket);
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0,
+                       reinterpret_cast<void*>(static_cast<uintptr_t>(socket.GetDispatchToken())));
             }
             else if (EventOperType::EVENT_OPER_RDC == op_type)
             {
-                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_WRITE, EV_DELETE | EV_DISABLE, 0, 0, &socket);
+                EV_SET(&changes[change_num++], socket.GetSocketID(), EVFILT_WRITE, EV_DELETE | EV_DISABLE, 0, 0, nullptr);
             }
         }
 
@@ -116,7 +119,8 @@ namespace ToolBox
         for (int32_t i = 0; i < count; i++)
         {
             auto& event = events_[i];
-            auto* socket = static_cast<BaseSocket*>(event.udata);
+            const uint64_t token = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(event.udata));
+            BaseSocket* socket = ResolveSockDispatchToken(token);
             if (nullptr == socket)
             {
                 continue;
@@ -132,6 +136,11 @@ namespace ToolBox
             }
             else if (event.filter == EVFILT_WRITE)
             {
+                socket = ResolveSockDispatchToken(token);
+                if (nullptr == socket)
+                {
+                    continue;
+                }
                 socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
             }
         }

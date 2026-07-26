@@ -148,13 +148,26 @@ namespace ToolBox
     NetEventMain::NetEventMain(EventID event_id, uint64_t opaque/* = 0 */)
         : Event(event_id, opaque)
     {
+        if (EID_WorkerToMainAccepting == event_id)
+        {
+            net_evt_.accepting_.fd_ = -1;
+        }
+        else if (EID_WorkerToMainRecv == event_id)
+        {
+            net_evt_.recv_.data_ = nullptr;
+        }
     }
     NetEventMain::~NetEventMain()
     {
         switch (GetID())
         {
-            case EID_WorkerToMainRecv: 
+            case EID_WorkerToMainRecv:
                 GIVE_BACK_MEMORY_RAW((char*)net_evt_.recv_.data_);
+                break;
+            case EID_WorkerToMainAccepting:
+                // 与 Worker Join 对称:直接 GIVE_BACK 时兜底关未 Join 的 fd
+                CloseRawFd(net_evt_.accepting_.fd_, "~NetEventMain accepting");
+                net_evt_.accepting_.fd_ = -1;
                 break;
             default:
                 break;

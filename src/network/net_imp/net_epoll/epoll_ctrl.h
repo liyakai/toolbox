@@ -43,7 +43,7 @@ namespace ToolBox
             epoll_event event;
             memset(&event, 0, sizeof(event));
             const auto now_event = socket.GetEventType();
-            event.data.ptr = &socket;
+            event.data.u64 = socket.GetDispatchToken();
             event.events |= EPOLLET;
             if (event_type & SOCKET_EVENT_RECV)
             {
@@ -114,7 +114,7 @@ namespace ToolBox
             for (int32_t i = 0; i < count; i++)
             {
                 epoll_event& event = events_[i];
-                BaseSocket* socket = static_cast<BaseSocket*>(event.data.ptr);
+                BaseSocket* socket = ResolveSockDispatchToken(event.data.u64);
                 if (nullptr == socket)
                 {
                     continue;
@@ -128,8 +128,14 @@ namespace ToolBox
                 {
                     socket->UpdateEvent(SOCKET_EVENT_RECV, time_stamp);
                 }
+                // ERR/RECV 可能已 Close 令牌失效,SEND 前再解析
                 if (event.events & EPOLLOUT)
                 {
+                    socket = ResolveSockDispatchToken(event.data.u64);
+                    if (nullptr == socket)
+                    {
+                        continue;
+                    }
                     socket->UpdateEvent(SOCKET_EVENT_SEND, time_stamp);
                 }
             }

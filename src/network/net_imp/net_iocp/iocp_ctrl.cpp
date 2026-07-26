@@ -186,9 +186,9 @@ namespace ToolBox
     bool IocpCtrl::RunOnce(std::time_t time_stamp)
     {
         DWORD       bytes = 0;
-        BaseSocket* socket = nullptr;
+        ULONG_PTR   completion_key = 0;
         PerIOContext* per_io = nullptr;
-        bool error = GetQueuedCompletionStatus(iocp_fd_, &bytes, (PULONG_PTR)&socket, (LPOVERLAPPED*)&per_io, 2);
+        bool error = GetQueuedCompletionStatus(iocp_fd_, &bytes, &completion_key, (LPOVERLAPPED*)&per_io, 2);
         auto last_error = GetLastError();
         if (false == error)
         {
@@ -197,6 +197,7 @@ namespace ToolBox
                 return true;
             }
             SetLastSystemError(static_cast<int32_t>(last_error));
+            BaseSocket* socket = ResolveSockDispatchToken(static_cast<uint64_t>(completion_key));
             if (nullptr != socket)
             {
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
@@ -204,15 +205,16 @@ namespace ToolBox
             }
             return false;
         }
-        //if ((0 == bytes) && (IOCP_RECV == per_io->io_type || IOCP_SEND == per_io->io_type))
-        //{
-        //    socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-        //    return false;
-        //}
-        if (nullptr == socket || nullptr == per_io)
+        if (0 == completion_key || nullptr == per_io)
         {
             SetLastSystemError(ERROR_INVALID_DATA);
             return false;
+        }
+        BaseSocket* socket = ResolveSockDispatchToken(static_cast<uint64_t>(completion_key));
+        if (nullptr == socket)
+        {
+            // 令牌过期:连接已 Close,丢弃迟到完成包
+            return true;
         }
         per_io->wsa_buf.len = bytes;
         if ((per_io->io_type & SocketState::SOCK_STATE_RECV) || (per_io->io_type & SocketState::SOCK_STATE_LISTENING))

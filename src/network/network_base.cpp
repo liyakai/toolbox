@@ -69,12 +69,17 @@ namespace ToolBox
 #else
         close(fd);
 #endif
-        NetworkLogWarn("[Network] close raw fd:%d reason:%s", fd, reason ? reason : "-");
+        // 批量 Drain 场景多,默认 Debug 避免刷屏;异常路径由调用方补 Warn
+        NetworkLogDebug("[Network] close raw fd:%d reason:%s", fd, reason ? reason : "-");
     }
 
     void INetwork::CloseUnownedFd(int32_t fd)
     {
-        // Join Alloc 失败:fd 尚未交给 socket,统一走 CloseRawFd
+        if (fd < 0)
+        {
+            return;
+        }
+        NetworkLogWarn("[Network] close unowned fd:%d. network_type_:%u", fd, GetNetworkType());
         CloseRawFd(fd, "unowned join-alloc-failed");
     }
 

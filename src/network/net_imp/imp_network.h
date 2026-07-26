@@ -118,6 +118,19 @@ namespace ToolBox
             NetworkLogError("[Network] CreateIOMultiplexing failed. network_type:%d", network_type);
             return false;
         }
+        // 派发令牌 → 池查询,过期 generation 丢弃(防同轮 Free 后 UAF)
+        base_ctrl_->SetSockDispatchResolver(
+            [this](uint16_t pool_index, uint32_t generation) -> BaseSocket*
+        {
+            SocketType* socket = sock_mgr_.GetSocketByIndex(pool_index);
+            if (nullptr == socket || socket->GetDispatchGeneration() != generation)
+            {
+                NetworkLogTrace("[Network] stale dispatch token. index:%u gen:%u type:%u",
+                                pool_index, generation, GetNetworkType());
+                return nullptr;
+            }
+            return socket;
+        });
         return true;
     }
 

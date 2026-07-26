@@ -224,6 +224,28 @@ namespace ToolBox
         * socket 是否有效
         */
         virtual bool IsSocketValid();
+        /*
+        * 派发令牌(池 index + generation),供多路复用注册
+        */
+        uint64_t GetDispatchToken() const
+        {
+            return PackSockDispatchToken(GetPoolIndex(), dispatch_generation_);
+        }
+        uint32_t GetDispatchGeneration() const
+        {
+            return dispatch_generation_;
+        }
+        uint16_t GetPoolIndex() const
+        {
+            return static_cast<uint16_t>(conn_id_ & 0xFFFFu);
+        }
+        /*
+        * 使已注册的派发令牌失效(Close 开头调用,防同轮残留事件打到本对象)
+        */
+        void InvalidateDispatchToken()
+        {
+            ++dispatch_generation_;
+        }
     protected:
         /*
         * 获取 socket 错误
@@ -239,6 +261,7 @@ namespace ToolBox
     protected:
         uint64_t opaque_ = 0;   // 信道标记
         uint32_t conn_id_ = INVALID_CONN_ID;
+        uint32_t dispatch_generation_ = 0;  // 派发世代,Reset/Close 递增
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         SOCKET socket_id_ = INVALID_SOCKET;
 #elif defined(__linux__)

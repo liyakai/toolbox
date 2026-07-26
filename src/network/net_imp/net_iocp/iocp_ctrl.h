@@ -40,7 +40,8 @@ namespace ToolBox
             SetLastSystemError(0);
             // 建立 socket 与 iocp 的关联
             auto socket_id = socket.GetSocketID();
-            HANDLE iocp = CreateIoCompletionPort((HANDLE)socket_id, iocp_fd_, (ULONG_PTR)&socket, 0);
+            HANDLE iocp = CreateIoCompletionPort((HANDLE)socket_id, iocp_fd_,
+                                                 static_cast<ULONG_PTR>(socket.GetDispatchToken()), 0);
             if (nullptr == iocp)
             {
                 DWORD last_error = GetLastError();

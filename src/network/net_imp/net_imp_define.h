@@ -36,6 +36,23 @@ namespace ToolBox
     constexpr int32_t KCP_TRANSPORT_MTU = 1000;
     constexpr uint32_t KCP_CONV = 0x01020304;          //  kcp会话ID, must equal in two endpoint from the same connection
 
+    /*
+    * 多路复用派发令牌:高 32 位 generation,低 16 位池 index(低 32 低位).
+    * 禁止把裸 BaseSocket* 存进 epoll/kqueue,避免同轮 Close→Free 后 UAF.
+    */
+    inline uint64_t PackSockDispatchToken(uint16_t pool_index, uint32_t generation)
+    {
+        return (static_cast<uint64_t>(generation) << 32) | static_cast<uint64_t>(pool_index);
+    }
+    inline uint16_t UnpackSockDispatchIndex(uint64_t token)
+    {
+        return static_cast<uint16_t>(token & 0xFFFFu);
+    }
+    inline uint32_t UnpackSockDispatchGeneration(uint64_t token)
+    {
+        return static_cast<uint32_t>(token >> 32);
+    }
+
     using SocketAddress = sockaddr_in;
     /*
     * 错误码
