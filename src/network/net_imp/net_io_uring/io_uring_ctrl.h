@@ -19,7 +19,9 @@ namespace ToolBox
     };
 
     /*
-    * io_uring 控制类
+    * [实验后端·禁止生产] io_uring 控制类.
+    * 已知缺口:Close→Free 后未决 CQE 仍可能持有旧指针/令牌未统一校验;
+    * DelEvent 未做 ASYNC_CANCEL 闭环.默认构建不启用(见 CMAKE_USE_LIBIOURING).
     */
     class IOUringCtrl : public IOMultiplexingInterface
     {
@@ -46,8 +48,8 @@ namespace ToolBox
         * 按 fd 删除事件.
         * io_uring 是提交式异步模型,已投递的 SQE 无法仅凭 fd 撤销:需要投递
         * IORING_OP_ASYNC_CANCEL 并等待对应 CQE 回收后才能安全归还 socket.
-        * 当前未实现该闭环,故仅做一次性告警并返回 true,避免上层误报删除失败.
-        * [已知未闭环] 关闭连接后仍可能收到该 fd 的完成通知,该后端暂不可用于生产.
+        * [冻结] 当前不做 ASYNC_CANCEL(C1-b 另议),仅一次性告警并返回 true,
+        * 避免上层误报删除失败;生产请勿启用本后端.
         * @param socket_fd 文件描述符
         */
         bool DelEvent(int socket_fd) override;

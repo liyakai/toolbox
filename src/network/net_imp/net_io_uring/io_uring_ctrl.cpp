@@ -112,12 +112,13 @@ namespace ToolBox
     bool IOUringCtrl::DelEvent(int socket_fd)
     {
         SetLastSystemError(0);
-        // 未决 SQE 需要 ASYNC_CANCEL + 等 CQE 才能撤销,此处尚未闭环,仅告警一次
+        // 未决 SQE 需 ASYNC_CANCEL+等 CQE 才能撤销,此处冻结不做(C1-b 另议).
+        // 实验后端:CQE 仍可能在 Free 后到达,生产请勿启用 LINUX_IO_URING.
         if (!del_event_unsupported_warned_)
         {
             del_event_unsupported_warned_ = true;
-            NetworkLogWarn("[Network] io_uring can not cancel pending requests by fd, "
-                           "closed socket may still get completion. fd:%d", socket_fd);
+            NetworkLogWarn("[Network] io_uring DelEvent not closed-loop (experimental). "
+                           "pending CQE may UAF after Free. fd:%d", socket_fd);
         }
         return true;
     }

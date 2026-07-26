@@ -48,6 +48,11 @@ namespace ToolBox
         SetLastSystemError(0);
         if (EventOperType::EVENT_OPER_ADD == op_type)
         {
+            // Init 只配 fd;关联放在这里.已关联时 CreateIoCompletionPort 忽略 CompletionKey,可重复调
+            if (!AssociateSocketToIocp(socket))
+            {
+                return false;
+            }
             if (SOCKET_EVENT_RECV & event_type)
             {
                 return OnRecv(socket);
@@ -69,6 +74,24 @@ namespace ToolBox
                 now_event_type &= ~SOCKET_EVENT_SEND;
             }
             socket.SetSockEventType(now_event_type);
+        }
+        return true;
+    }
+
+    bool IocpCtrl::AssociateSocketToIocp(BaseSocket& socket)
+    {
+        SetLastSystemError(0);
+        auto socket_id = socket.GetSocketID();
+        HANDLE iocp = CreateIoCompletionPort((HANDLE)socket_id, iocp_fd_,
+                                             static_cast<ULONG_PTR>(socket.GetDispatchToken()), 0);
+        if (nullptr == iocp)
+        {
+            DWORD last_error = GetLastError();
+            if (ERROR_IO_PENDING != last_error)
+            {
+                SetLastSystemError(static_cast<int32_t>(last_error));
+                return false;
+            }
         }
         return true;
     }

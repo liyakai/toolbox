@@ -27,8 +27,7 @@ namespace ToolBox
         // 状态与所有权复位必须在 CloseSocketFd 之后:后者依赖 fd_ownership_ 决定是否真关 fd
         life_ = SockLife::IDLE;
         fd_ownership_ = FdOwnership::OWN;
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#elif defined(__linux__)
+#if defined(__linux__)
         is_ctrl_add_ = false;
 #endif
         event_type_ = SOCKET_EVENT_INVALID;

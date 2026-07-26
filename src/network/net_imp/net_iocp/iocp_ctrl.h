@@ -29,33 +29,9 @@ namespace ToolBox
         */
         void DestroyIOMultiplexing();
         /*
-        * 处理事件
+        * 处理事件.ADD:先 Associate 再投递 AcceptEx/WSARecv/WSASend
         */
         bool OperEvent(BaseSocket& socket, EventOperType op_type, int32_t event_type) override;
-        /*
-        * @brief 建立 socket 与 iocp 的关联
-        */
-        bool AssociateSocketToIocp(BaseSocket& socket)
-        {
-            SetLastSystemError(0);
-            // 建立 socket 与 iocp 的关联
-            auto socket_id = socket.GetSocketID();
-            HANDLE iocp = CreateIoCompletionPort((HANDLE)socket_id, iocp_fd_,
-                                                 static_cast<ULONG_PTR>(socket.GetDispatchToken()), 0);
-            if (nullptr == iocp)
-            {
-                DWORD last_error = GetLastError();
-                // MSDN:  If WSAGetLastError returns ERROR_IO_PENDING,
-                // then the operation was successfully initiated and is still in progress.
-                if (ERROR_IO_PENDING != last_error)
-                {
-                    SetLastSystemError(static_cast<int32_t>(last_error));
-                    return false;
-                }
-
-            }
-            return true;
-        }
         /*
         * @brief 处理接收消息
         */
@@ -69,6 +45,10 @@ namespace ToolBox
         */
         bool RunOnce(std::time_t time_stamp) override;
     private:
+        /*
+        * 建立 socket 与 iocp 的关联(已关联时可重复调)
+        */
+        bool AssociateSocketToIocp(BaseSocket& socket);
         HANDLE iocp_fd_ = nullptr;  // iocp 文件描述符
     };
 

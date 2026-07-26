@@ -85,17 +85,9 @@ namespace ToolBox
         */
         void ResetSendAsyncSocket() override;
         /*
-        * 将 socket 建立与 iocp 的关联,只调用一次.
+        * 再投递 IOCP 读写.失败时可选写出最近系统错码
         */
-        bool AssociateSocketToIocp();
-        /*
-        * 获取 IOCP 最近一次控制错误
-        */
-        int32_t GetIOMultiplexingError();
-        /*
-        * 将 socket 重新监听读写事件
-        */
-        bool ReAddSocketToIocp(SockEventType event_type);
+        bool ReAddSocketToIocp(SockEventType event_type, int32_t* out_err = nullptr);
 #elif defined(LINUX_IO_URING)
         /*
         * 获取 uringsocket

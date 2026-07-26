@@ -14,11 +14,11 @@
  *
  * 覆盖本轮改动: Start/Stop 幂等与 resume、Start 前缓存 flush、Accepting fd 交割、
  * 回调内 StopWait(Accepting/Accepted/Connected/Received)、Update 重入、多线程路由、
- * TCP 收发/关闭/空包/Nagle(包数刷出+超时刷出)/端口冲突、ConnectFailed(含失败后不风暴)、
+ * TCP 收发/关闭/空包/Nagle(包数刷出+超时刷出)/端口冲突、ConnectFailed(失败无 Closed、不风暴)、
  * UDP 收发/空包整帧投递/多线程(Start2)路由/级联关闭/关 REMOTE 保 ACCEPTOR/CONNECTOR 关闭、
  * KCP 可靠 echo(整帧精确匹配,见 MakeFramed).
  * 未覆盖: event2main_ overflow 全局 FIFO、Start flush 中途失败补 NET_NOT_STARTED
- * (cache 上限远小于 worker 队列,公开 API 难构)、io_uring 未决请求取消.
+ * (cache 上限远小于 worker 队列,公开 API 难构).io_uring 为实验后端,默认不编.
  */
 #include "network/network_api.h"
 #include "tools/time_util.h"

@@ -150,9 +150,9 @@ namespace ToolBox
             p_network_->OnAccepting(GetOpaque(), client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            if (!ReAddSocketToIocp(SOCKET_EVENT_RECV))
+            int32_t error = 0;
+            if (!ReAddSocketToIocp(SOCKET_EVENT_RECV, &error))
             {
-                const int32_t error = GetIOMultiplexingError();
                 NetworkLogError("[Network] rearm AcceptEx failed. fd:%llu error:%d",
                                 static_cast<uint64_t>(GetSocketID()), error);
                 p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_ACCEPT_FAILED, error);
@@ -178,17 +178,8 @@ namespace ToolBox
         // SetIP(ip);
         // SetAddressPort(port);
         SetSockEventType(SOCKET_EVENT_RECV | SOCKET_EVENT_SEND);
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        // IOCP 关联交给 OnJoin→OperEvent(ADD),Init 只配 fd 与状态
         SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
-        // 建立 socket 与 iocp 的关联
-        if (!AssociateSocketToIocp())
-        {
-            SetInitError(ENetErrCode::NET_ACCEPT_FAILED, GetIOMultiplexingError());
-            return false;
-        }
-#elif defined(__linux__) || defined(__APPLE__)
-        SetSocketState(SocketState::SOCK_STATE_ESTABLISHED);
-#endif
 
         SetNonBlocking(socket_fd);
         SetKeepaliveOff(socket_fd);
@@ -602,36 +593,27 @@ namespace ToolBox
         per_socket_.io_send.wsa_buf.len = send_ring_buffer_.ContinuouslyReadableSize();
     }
 
-    bool TcpSocket::AssociateSocketToIocp()
+    bool TcpSocket::ReAddSocketToIocp(SockEventType event_type, int32_t* out_err)
     {
-        auto tcp_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-        // 建立 socket 与 iocp 的关联
-        if (nullptr == tcp_iocp_network)
+        auto* p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        if (nullptr == p_iocp_network || nullptr == p_iocp_network->GetBaseCtrl())
         {
+            if (nullptr != out_err)
+            {
+                *out_err = 0;
+            }
             return false;
         }
-        return tcp_iocp_network->GetBaseCtrl()->AssociateSocketToIocp(*this);
-    }
-
-    int32_t TcpSocket::GetIOMultiplexingError()
-    {
-        auto* tcp_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-        if (nullptr == tcp_iocp_network || nullptr == tcp_iocp_network->GetBaseCtrl())
+        auto* ctrl = p_iocp_network->GetBaseCtrl();
+        if (!ctrl->OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type))
         {
-            return 0;
-        }
-        return tcp_iocp_network->GetBaseCtrl()->GetLastSystemError();
-    }
-
-    bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
-    {
-        auto p_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
-        if (nullptr == p_iocp_network)
-        {
+            if (nullptr != out_err)
+            {
+                *out_err = ctrl->GetLastSystemError();
+            }
             return false;
         }
-        // 将监听socket重新加入iocp
-        return p_iocp_network->GetBaseCtrl()->OperEvent(*this, EventOperType::EVENT_OPER_ADD, event_type);
+        return true;
     }
 #elif defined(__linux__) || defined(__APPLE__)
 
@@ -792,17 +774,8 @@ namespace ToolBox
             SetInitError(ENetErrCode::NET_LISTEN_FAILED, GetSysErrNo());
             return false;
         }
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        // 建立 socket 与 iocp 的关联
-        if (!AssociateSocketToIocp())
-        {
-            SetInitError(ENetErrCode::NET_LISTEN_FAILED, GetIOMultiplexingError());
-            return false;
-        }
+        // IOCP 关联交给 OnNewAccepter→OperEvent(ADD),Init 只配 fd 与状态
         socket_state_ = SocketState::SOCK_STATE_LISTENING;
-#elif defined(__linux__) || defined(__APPLE__)
-        socket_state_ = SocketState::SOCK_STATE_LISTENING;
-#endif
         // 用于监听的 socket 只能接受"接收","错误"事件.
         event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_ERR;
         return true;
@@ -860,15 +833,7 @@ namespace ToolBox
             SetInitError(ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
             return false;
         }
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        // 建立 socket 与 iocp 的关联
-        if (!AssociateSocketToIocp())
-        {
-            SetInitError(ENetErrCode::NET_CONNECT_FAILED, GetIOMultiplexingError());
-            return false;
-        }
-#elif defined(__linux__) || defined(__APPLE__)
-#endif
+        // IOCP 关联交给 OnNewConnecter→OperEvent(ADD),Init 只配 fd 与状态
         socket_state_ = SocketState::SOCK_STATE_CONNECTING;
         // 用于主动连接的 socket 可接受 "发送","接收","错误" 事件.
         // 在获取正确连接前只接受 "发送","错误"事件.

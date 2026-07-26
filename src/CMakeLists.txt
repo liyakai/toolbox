@@ -75,9 +75,11 @@ ADD_LIBRARY(toolbox ${DIR_SRCS})
 # 编译选项
 
 #第三方库 libiouring
-option(CMAKE_USE_LIBIOURING "Use thirdparty libiouring" OFF)
+# [实验] CMAKE_USE_LIBIOURING 默认 OFF.开启后 TCP 走 io_uring,但 DelEvent/CQE 生命周期未闭环,
+# 关闭连接后可能 UAF,禁止用于生产.ASYNC_CANCEL 闭环另议(C1-b).
+option(CMAKE_USE_LIBIOURING "Use experimental io_uring backend (NOT for production)" OFF)
 if(CMAKE_USE_LIBIOURING)
-    message(STATUS "Use thirdparty libiouring")
-    add_definitions(-DLINUX_IO_URING)           # linux 下使用 io_uring
+    message(WARNING "CMAKE_USE_LIBIOURING=ON: experimental backend, DelEvent/CQE UAF not closed-loop; do NOT use in production")
+    add_definitions(-DLINUX_IO_URING)           # linux 下使用 io_uring(实验)
 endif()
 

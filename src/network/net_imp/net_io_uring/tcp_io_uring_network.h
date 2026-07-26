@@ -7,7 +7,7 @@ namespace ToolBox
 {
 
     /*
-    * 定义基于 TCP 和 io_uring 的网络
+    * 基于 TCP 和 io_uring 的网络(实验后端,见 IOUringCtrl / CMAKE_USE_LIBIOURING)
     */
     class TcpIOUringNetwork : public ImpNetwork<TcpSocket>
     {

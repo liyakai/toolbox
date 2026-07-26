@@ -50,23 +50,34 @@ namespace ToolBox
         {
             return last_system_error_;
         }
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         /*
-        * @brief 建立 socket 与 iocp 的关联
+        * 设置派发令牌解析(由 ImpNetwork 注入池查询)
         */
-        virtual bool AssociateSocketToIocp(BaseSocket& socket)
+        void SetSockDispatchResolver(SockDispatchResolver resolver)
         {
-            return true;
-        };
-#endif
+            sock_dispatch_resolver_ = std::move(resolver);
+        }
     protected:
         void SetLastSystemError(int32_t error)
         {
             last_system_error_ = error;
         }
+        /*
+        * 按令牌解析存活 socket;过期/已 Free 返回 nullptr
+        */
+        BaseSocket* ResolveSockDispatchToken(uint64_t token) const
+        {
+            if (!sock_dispatch_resolver_)
+            {
+                return nullptr;
+            }
+            return sock_dispatch_resolver_(UnpackSockDispatchIndex(token),
+                                           UnpackSockDispatchGeneration(token));
+        }
 
     private:
         int32_t last_system_error_ = 0;
+        SockDispatchResolver sock_dispatch_resolver_;
     };
 
 };  // ToolBox

@@ -172,13 +172,6 @@ namespace ToolBox
         {
             return nullptr;
         }
-        /*
-        * 将 socket 建立与 iocp 的关联,只调用一次.
-        */
-        virtual bool AssociateSocketToIocp()
-        {
-            return true;
-        };
 #elif defined(__linux__)
         /*
         * 获取 socket id
