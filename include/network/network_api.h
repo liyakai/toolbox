@@ -14,6 +14,7 @@ namespace ToolBox
     using AcceptedMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id)>;
     using ConnectedMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id)>;
     using ConnectFailedMethod = std::function<void(NetworkType type, uint64_t opaque, ENetErrCode err_code, int32_t err_no)>;
+    // 注意:部分错误由 Send/Close 等接口同步回调,回调内不得再发起网络操作,否则可能递归
     using ErroredMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode err_code, int32_t err_no)>;
     using CloseMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode net_err, int32_t sys_err)>;
     using ReceivedMethod = std::function<void(NetworkType type, uint64_t opaque, uint64_t conn_id, const char* data, size_t size)>;

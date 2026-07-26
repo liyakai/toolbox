@@ -48,6 +48,10 @@ namespace ToolBox
         */
         void DeleteUdpAddress(const UdpAddress& udp_address);
         /*
+        * socket 关闭前清理地址映射及共享 fd 的 REMOTE
+        */
+        void OnSocketClosing(UdpSocket* socket, ENetErrCode net_err, int32_t sys_err);
+        /*
         * @brief 开启Kcp模式
         */
         void OpenKcpMode();

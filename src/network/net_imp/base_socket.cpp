@@ -17,7 +17,10 @@ namespace ToolBox
     }
     void BaseSocket::Reset()
     {
-        Close(ENetErrCode::NET_SUCCESS, 0);
+        // 这里必须用非虚的 CloseSocketFd:Reset 会在 Free 与析构中执行,
+        // 若派发到子类 Close 会再次通知主线程并 Free(this)
+        CloseSocketFd();
+        opaque_ = 0;
         conn_id_ = INVALID_CONN_ID;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #elif defined(__linux__)
@@ -27,23 +30,38 @@ namespace ToolBox
     }
     bool BaseSocket::IsSocketValid()
     {
-        return socket_id_ > 0;
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        return INVALID_SOCKET != socket_id_;
+#else
+        return socket_id_ >= 0;
+#endif
     }
 
     void BaseSocket::Close(ENetErrCode net_err, int32_t sys_err)
     {
-        if (IsSocketValid())
-        {
+        CloseSocketFd();
+    }
+
+    void BaseSocket::CloseSocketFd()
+    {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            CancelIo((HANDLE)socket_id_);
-            shutdown(socket_id_, 2);
-            closesocket(socket_id_);
-#elif defined(__linux__)
-            shutdown(socket_id_, SHUT_RDWR);
-            close(socket_id_);
-#endif // __linux__
-            socket_id_ = -1;
+        if (INVALID_SOCKET == socket_id_)
+        {
+            return;
         }
+        CancelIo((HANDLE)socket_id_);
+        shutdown(socket_id_, 2);
+        closesocket(socket_id_);
+        socket_id_ = INVALID_SOCKET;
+#else
+        if (socket_id_ < 0)
+        {
+            return;
+        }
+        shutdown(socket_id_, SHUT_RDWR);
+        close(socket_id_);
+        socket_id_ = -1;
+#endif
     }
 
     int32_t BaseSocket::GetSocketError()

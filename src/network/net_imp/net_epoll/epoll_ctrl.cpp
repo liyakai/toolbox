@@ -16,9 +16,11 @@ EpollCtrl::EpollCtrl(uint max_events)
 
 bool EpollCtrl::CreateIOMultiplexing()
 {
+    SetLastSystemError(0);
     epoll_fd_ = epoll_create(max_events_);
     if (epoll_fd_ < 0)
     {
+        SetLastSystemError(errno);
         return false;
     }
     events_ = new epoll_event[max_events_];
@@ -41,8 +43,14 @@ void EpollCtrl::DestroyIOMultiplexing()
 
 bool EpollCtrl::DelEvent(int socket_fd)
 {
+    SetLastSystemError(0);
     epoll_event evt;
-    return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
+    if (epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0)
+    {
+        return true;
+    }
+    SetLastSystemError(errno);
+    return false;
 }
 
 int EpollCtrl::EpollWait(int msec)

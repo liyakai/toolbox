@@ -73,6 +73,7 @@ namespace ToolBox
 #endif  // NetworkLogFatal
 
 #define NUM_OF_CACHED_EVENT_TO_WORKER 1024  // 逻辑线程缓存的即将发向网络线程的事件个数
+#define OVERFLOW_EVENT_TO_MAIN_HIGH_WATER 4096  // 溢出控制事件积压水位,仅告警不丢弃
 
     /************************************************************
     **********     网络库获取对象的三种方法       ****************

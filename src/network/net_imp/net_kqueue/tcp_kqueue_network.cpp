@@ -19,11 +19,10 @@ namespace ToolBox
 
     void TcpKqueueNetwork::CloseListenInMultiplexing(int32_t socket_id)
     {
-        auto* socket = sock_mgr_.GetSocket(socket_id);
-        if (nullptr != socket)
+        if (!base_ctrl_->DelEvent(socket_id))
         {
-            socket->SetSockEventType(0);
-            base_ctrl_->OperEvent(*socket, EventOperType::EVENT_OPER_RDC, socket->GetEventType());
+            NetworkLogWarn("[Network] remove kqueue socket failed. fd:%d error:%d",
+                           socket_id, base_ctrl_->GetLastSystemError());
         }
     }
 

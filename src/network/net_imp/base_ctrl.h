@@ -39,6 +39,13 @@ namespace ToolBox
         * 执行一次. e.g. epollwait;GetQueuedCompletionStatus;kevent.
         */
         virtual bool RunOnce(std::time_t time_stamp) = 0;
+        /*
+        * 最近一次控制操作的系统错误码
+        */
+        int32_t GetLastSystemError() const
+        {
+            return last_system_error_;
+        }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         /*
         * @brief 建立 socket 与 iocp 的关联
@@ -48,6 +55,14 @@ namespace ToolBox
             return true;
         };
 #endif
+    protected:
+        void SetLastSystemError(int32_t error)
+        {
+            last_system_error_ = error;
+        }
+
+    private:
+        int32_t last_system_error_ = 0;
     };
 
 };  // ToolBox

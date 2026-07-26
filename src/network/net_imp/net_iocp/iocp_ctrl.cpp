@@ -14,24 +14,38 @@ namespace ToolBox
 
     bool IocpCtrl::CreateIOMultiplexing()
     {
+        SetLastSystemError(0);
         iocp_fd_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
         if (!iocp_fd_)
         {
+            SetLastSystemError(static_cast<int32_t>(GetLastError()));
             return false;
         }
         WSADATA wsa;
-        WSAStartup(MAKEWORD(2, 2), &wsa);
+        int32_t result = WSAStartup(MAKEWORD(2, 2), &wsa);
+        if (0 != result)
+        {
+            SetLastSystemError(result);
+            CloseHandle(iocp_fd_);
+            iocp_fd_ = nullptr;
+            return false;
+        }
         return true;
     }
 
     void IocpCtrl::DestroyIOMultiplexing()
     {
-        CloseHandle(iocp_fd_);
-        WSACleanup();
+        if (nullptr != iocp_fd_)
+        {
+            CloseHandle(iocp_fd_);
+            iocp_fd_ = nullptr;
+            WSACleanup();
+        }
     }
 
     bool IocpCtrl::OperEvent(BaseSocket& socket, EventOperType op_type, int32_t event_type)
     {
+        SetLastSystemError(0);
         if (EventOperType::EVENT_OPER_ADD == op_type)
         {
             if (SOCKET_EVENT_RECV & event_type)
@@ -79,6 +93,7 @@ namespace ToolBox
                                               &accept_ex->accept_ex_fn, sizeof(ACCEPTEX), &bytes, nullptr, nullptr);
                 if (error_code || nullptr == accept_ex->accept_ex_fn)
                 {
+                    SetLastSystemError(WSAGetLastError());
                     return false;
                 }
             }
@@ -86,6 +101,7 @@ namespace ToolBox
             accept_ex->socket_fd = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
             if (INVALID_SOCKET == accept_ex->socket_fd)
             {
+                SetLastSystemError(WSAGetLastError());
                 return false;
             }
             // MSDN: https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-acceptex
@@ -95,15 +111,18 @@ namespace ToolBox
                                                   ACCEPTEX_ADDR_SIZE, ACCEPTEX_ADDR_SIZE, 0, &per_socket->io_recv.over_lapped);
             if (false == result)
             {
-                DWORD last_error = GetLastError();
+                DWORD last_error = WSAGetLastError();
                 // MSDN:  If WSAGetLastError returns ERROR_IO_PENDING,
                 // then the operation was successfully initiated and is still in progress.
                 if (ERROR_IO_PENDING != last_error)
                 {
-                    socket.OnErrored(ENetErrCode::NET_SYS_ERROR, last_error);
+                    SetLastSystemError(static_cast<int32_t>(last_error));
+                    closesocket(accept_ex->socket_fd);
+                    accept_ex->socket_fd = INVALID_SOCKET;
+                    return false;
                 }
             }
-
+            return true;
         }
         else if (SocketState::SOCK_STATE_ESTABLISHED == socket.GetSocketState())
         {
@@ -113,17 +132,22 @@ namespace ToolBox
             auto& io_recv = per_socket->io_recv;
             per_socket->io_recv.io_type = SocketState::SOCK_STATE_RECV;
             int32_t result = WSARecv(socket.GetSocketID(), &io_recv.wsa_buf, 1, &bytes, &flags, &io_recv.over_lapped, 0);
-            if (result != 0)
+            // result 为 0 表示立即完成,同样会投递完成通知,与 IO_PENDING 一样视为成功
+            if (0 != result)
             {
-                uint64_t error = GetLastError();
+                uint64_t error = WSAGetLastError();
                 if ((ERROR_IO_PENDING != error) && (WSAENOTCONN != error))
                 {
+                    NetworkLogError("[Network] WSARecv failed. fd:%llu, error:%llu",
+                                    (uint64_t)socket.GetSocketID(), error);
+                    SetLastSystemError(static_cast<int32_t>(error));
                     return false;
                 }
-                return true;
             }
+            return true;
         }
-        return false;
+        // 其余状态无需在此投递接收请求,不算失败
+        return true;
     }
     /*
     * @brief  处理发送消息
@@ -144,16 +168,19 @@ namespace ToolBox
         DWORD bytes = 0;
         DWORD flags = 0;
         int32_t result = WSASend(socket.GetSocketID(), &io_send.wsa_buf, 1, &bytes, flags, &io_send.over_lapped, 0);
-        if (result != 0)
+        // result 为 0 表示立即完成,同样会投递完成通知,与 IO_PENDING 一样视为成功
+        if (0 != result)
         {
-            uint64_t error = GetLastError();
+            uint64_t error = WSAGetLastError();
             if ((ERROR_IO_PENDING != error) && (WSAENOTCONN != error))
             {
+                NetworkLogError("[Network] WSASend failed. fd:%llu, error:%llu",
+                                (uint64_t)socket.GetSocketID(), error);
+                SetLastSystemError(static_cast<int32_t>(error));
                 return false;
             }
-            return true;
         }
-        return false;
+        return true;
     }
 
     bool IocpCtrl::RunOnce(std::time_t time_stamp)
@@ -169,11 +196,13 @@ namespace ToolBox
             {
                 return true;
             }
-            else
+            SetLastSystemError(static_cast<int32_t>(last_error));
+            if (nullptr != socket)
             {
                 socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-                return false;
+                return true;
             }
+            return false;
         }
         //if ((0 == bytes) && (IOCP_RECV == per_io->io_type || IOCP_SEND == per_io->io_type))
         //{
@@ -182,6 +211,7 @@ namespace ToolBox
         //}
         if (nullptr == socket || nullptr == per_io)
         {
+            SetLastSystemError(ERROR_INVALID_DATA);
             return false;
         }
         per_io->wsa_buf.len = bytes;

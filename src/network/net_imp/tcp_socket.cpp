@@ -49,6 +49,8 @@ namespace ToolBox
 
     TcpSocket::~TcpSocket()
     {
+        // 与 UdpSocket 对称:释放 fd 与 accept_ex 等自有资源
+        Reset();
     }
     bool TcpSocket::Init(int32_t send_buff_len, int32_t recv_buff_len)
     {
@@ -76,6 +78,13 @@ namespace ToolBox
         if (nullptr != per_socket_.accept_ex)
         {
             per_socket_.accept_ex->accept_ex_fn = nullptr;
+            // 兜底:关闭 AcceptEx 预创建但尚未转交出去的客户端 fd,否则泄漏
+            if (INVALID_SOCKET != per_socket_.accept_ex->socket_fd)
+            {
+                NetworkLogWarn("[Network] close pending acceptex fd:%llu", (uint64_t)per_socket_.accept_ex->socket_fd);
+                closesocket(per_socket_.accept_ex->socket_fd);
+                per_socket_.accept_ex->socket_fd = INVALID_SOCKET;
+            }
         }
         delete per_socket_.accept_ex;
         per_socket_.accept_ex = nullptr;
@@ -98,7 +107,6 @@ namespace ToolBox
 
         while (true)
         {
-
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
             client_fd = per_socket_.accept_ex->socket_fd;
             SOCKET accept_socket_id = GetSocketID();
@@ -111,31 +119,48 @@ namespace ToolBox
                 addr = *remote_address;
             }
             if (INVALID_SOCKET == client_fd)
-#elif defined(__linux__) || defined(__APPLE__)
-#if defined (LINUX_IO_URING)
-            client_fd = uring_socket_.accept_ex->socket_fd;
-#else
-            socklen_t addr_len = sizeof(SocketAddress);
-            memset(&addr, 0, addr_len);
-            // 接受客户端连接
-            client_fd = accept(socket_id_, (sockaddr*)&addr, &addr_len);
-#endif
-
-            if (client_fd < 0 && errno != EINTR)
-#endif
             {
                 break;
             }
-            // 通知主线程有新的客户端连接进来
+            // fd 即将转交给主线程,清空未决字段,避免 Reset 兜底时误关已转交的 fd
+            per_socket_.accept_ex->socket_fd = INVALID_SOCKET;
+#elif defined(__linux__) || defined(__APPLE__)
+#if defined (LINUX_IO_URING)
+            client_fd = uring_socket_.accept_ex->socket_fd;
+            addr = uring_socket_.accept_address;
+            if (client_fd < 0)
+            {
+                break;
+            }
+#else
+            socklen_t addr_len = sizeof(SocketAddress);
+            memset(&addr, 0, addr_len);
+            client_fd = accept(socket_id_, (sockaddr*)&addr, &addr_len);
+            if (client_fd < 0)
+            {
+                // EINTR 重试;其余错误结束本轮,禁止把 -1 投递给 Accepting
+                if (EINTR == errno)
+                {
+                    continue;
+                }
+                break;
+            }
+#endif
+#endif
             p_network_->OnAccepting(GetOpaque(), client_fd, inet_ntoa(addr.sin_addr), addr.sin_port, send_buff_len_, recv_buff_len_);
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-            // 将监听socket重新加入iocp
-            ReAddSocketToIocp(SOCKET_EVENT_RECV);
+            if (!ReAddSocketToIocp(SOCKET_EVENT_RECV))
+            {
+                const int32_t error = GetIOMultiplexingError();
+                NetworkLogError("[Network] rearm AcceptEx failed. fd:%llu error:%d",
+                                static_cast<uint64_t>(GetSocketID()), error);
+                p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_ACCEPT_FAILED, error);
+                Close(ENetErrCode::NET_ACCEPT_FAILED, error);
+            }
             break;
 #elif defined(__linux__)
 #if defined (LINUX_IO_URING)
-            // 将监听socket重新加入iocp
             ReAddSocketToUring(SOCKET_EVENT_RECV);
             break;
 #endif
@@ -157,6 +182,8 @@ namespace ToolBox
         // 建立 socket 与 iocp 的关联
         if (!AssociateSocketToIocp())
         {
+            p_network_->OnErrored(GetOpaque(), 0, ENetErrCode::NET_ACCEPT_FAILED,
+                                  GetIOMultiplexingError());
             return false;
         }
 #elif defined(__linux__) || defined(__APPLE__)
@@ -167,39 +194,38 @@ namespace ToolBox
         SetKeepaliveOff(socket_fd);
         SetLingerOff(socket_fd);
         SetNagleOff(socket_fd);
+        SetNoSigPipe(socket_fd);
         SetTcpBuffSize(socket_fd);
         return true;
     }
 
-    void TcpSocket::UpdateRecv()
+    bool TcpSocket::UpdateRecv()
     {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         recv_ring_buffer_.AdjustWritePos(per_socket_.io_recv.wsa_buf.len);
-        // 处理数据
+        // 处理数据(失败路径可能已 Close→Free)
         if (ErrCode::ERR_SUCCESS != ProcessRecvData())
         {
-            return;
+            return false;
         }
 
         // 检查接收 buffer 是否超限
         if (!CheckRecvRingBufferSize())
         {
-            return;
+            return false;
         }
         ReAddSocketToIocp(SOCKET_EVENT_RECV);
 #elif defined(__linux__) || defined(__APPLE__)
 #if defined (LINUX_IO_URING)
         recv_ring_buffer_.AdjustWritePos(uring_socket_.io_recv.len);
-        // 处理数据
         if (ErrCode::ERR_SUCCESS != ProcessRecvData())
         {
-            return;
+            return false;
         }
 
-        // 检查接收 buffer 是否超限
         if (!CheckRecvRingBufferSize())
         {
-            return;
+            return false;
         }
         ReAddSocketToUring(SOCKET_EVENT_RECV);
 #else
@@ -210,7 +236,7 @@ namespace ToolBox
             {
                 NetworkLogError("[network] tcp socket UpdateRecv. SocketRecv failed. errno:%d.", errno);
                 Close(ENetErrCode::NET_RECV_FAILED);
-                return;
+                return false;
             }
             else if (0 == bytes)
             {
@@ -222,24 +248,23 @@ namespace ToolBox
                 recv_ring_buffer_.AdjustWritePos(bytes);
             }
 
-            // 处理数据
             ErrCode err_code = ProcessRecvData();
             if (ErrCode::ERR_SUCCESS != err_code)
             {
+                // 已 Close→Free
                 NetworkLogWarn("[Network] ProcessRecvData.err_code:%d", err_code);
-                return;
+                return false;
             }
 
-            // 检查接收 buffer 是否超限
             if (!CheckRecvRingBufferSize())
             {
-                return;
+                return false;
             }
         }
 #endif
 
 #endif
-        return;
+        return true;
     }
 
     int32_t TcpSocket::SocketRecv(int32_t socket_fd, char* data, size_t size)
@@ -247,7 +272,7 @@ namespace ToolBox
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, 0);
 #elif defined(__linux__) || defined(__APPLE__)
-        int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
+        int32_t recv_bytes = recv(socket_fd, data, (int32_t)size, 0);
 #endif
         if (recv_bytes > 0)
         {
@@ -347,7 +372,7 @@ namespace ToolBox
         p_network_->OnConnected(GetOpaque(), GetConnID());
     }
 
-    void TcpSocket::UpdateSend()
+    bool TcpSocket::UpdateSend()
     {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         send_ring_buffer_.AdjustReadPos(per_socket_.io_send.wsa_buf.len);
@@ -370,8 +395,9 @@ namespace ToolBox
             int32_t bytes = SocketSend(socket_id_, send_ring_buffer_.GetReadPtr(), size);
             if (bytes < 0)
             {
-                // 发送失败
+                // Close 会 Free(this),此后禁止再碰成员
                 Close(ENetErrCode::NET_SEND_FAILED);
+                return false;
             }
             send_ring_buffer_.AdjustReadPos(bytes);
             if (bytes < static_cast<int32_t>(size))
@@ -387,6 +413,7 @@ namespace ToolBox
         {
             sim_nagle_.num_of_unsent_packets = 0;       //  模拟nagle 计数置为 0
         }
+        return true;
     }
 
     int32_t TcpSocket::SocketSend(int32_t socket_fd, const char* data, size_t size)
@@ -394,14 +421,15 @@ namespace ToolBox
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         int32_t send_bytes = 0; //send(socket_fd, data, (int32_t)size, 0);
         return send_bytes;
-#elif defined(__linux__) || defined(__APPLE__)
+#elif defined(__linux__)
 #if defined (LINUX_IO_URING)
         int32_t send_bytes = 0;
         return send_bytes;
 #else
         int32_t send_bytes = send(socket_fd, data, (int32_t)size, MSG_NOSIGNAL);
 #endif
-
+#elif defined(__APPLE__)
+        int32_t send_bytes = send(socket_fd, data, (int32_t)size, 0);
 #endif
         if (send_bytes < 0)
         {
@@ -428,16 +456,28 @@ namespace ToolBox
 
     void TcpSocket::UpdateError()
     {
+        const int32_t sys_err = GetSocketError();
         if (SocketState::SOCK_STATE_ESTABLISHED == socket_state_)
         {
-            NetworkLogError("[Network][TcpSocket] socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d", GetSocketID(), GetConnID(), GetSocketError());
-            Close(ENetErrCode::NET_SYS_ERROR, GetSocketError());
+            NetworkLogError("[Network][TcpSocket] socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d",
+                            GetSocketID(), GetConnID(), sys_err);
+            Close(ENetErrCode::NET_SYS_ERROR, sys_err);
+            return;
         }
-        else
+        if (SocketState::SOCK_STATE_CONNECTING == socket_state_)
         {
-            NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d", GetSocketID(), GetConnID(), GetSocketError());
-            p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_CONNECT_FAILED, GetSocketError());
+            // 必须 Close 摘除多路复用并归还池,否则 ERR/HUP 每轮反复唤醒刷屏
+            NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, sys_err:%d",
+                            GetSocketID(), GetConnID(), sys_err);
+            p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_CONNECT_FAILED, sys_err);
+            Close(ENetErrCode::NET_CONNECT_FAILED, sys_err);
+            return;
         }
+        // LISTENING 等:勿误报 ConnectFailed
+        NetworkLogError("[Network][TcpSocket] listen/socket error. socket id:%d, conn_id:%llu, state:%d sys_err:%d",
+                        GetSocketID(), GetConnID(), static_cast<int32_t>(socket_state_), sys_err);
+        p_network_->OnErrored(GetOpaque(), GetConnID(), ENetErrCode::NET_LISTEN_FAILED, sys_err);
+        Close(ENetErrCode::NET_LISTEN_FAILED, sys_err);
     }
 
     bool TcpSocket::CheckRecvRingBufferSize()
@@ -467,8 +507,13 @@ namespace ToolBox
         if (IsSocketValid())
         {
             NetworkLogDebug("[Network] socket id:%d, conn_id:%llu, Ready to be free.net_err:%d, sys_err:%d", GetSocketID(), GetConnID(), net_err, sys_err);
-            BaseSocket::Close(net_err, sys_err);
+            // 必须在关 fd 之前摘除监听,否则拿到的是已置无效的 fd
             p_network_->CloseListenInMultiplexing(GetSocketID());
+#if defined(__linux__)
+            // fd 已从 epoll 摘除,清注册标记,避免归还池前再次 OperEvent 误走 MOD
+            SetCtrlAdd(false);
+#endif
+            BaseSocket::Close(net_err, sys_err);
             // 通知主线程 socket 关闭
             p_network_->OnClosed(GetOpaque(), (uint64_t)GetConnID(), net_err, sys_err);
             socket_state_ = SocketState::SOCK_STATE_INVALIED;
@@ -480,7 +525,11 @@ namespace ToolBox
     {
         if (sim_nagle_.flag_can_sent)
         {
-            UpdateSend();
+            // Send 失败已 Free(this),禁止再碰成员(含 Recv)
+            if (!UpdateSend())
+            {
+                return;
+            }
         }
         if (sim_nagle_.flag_can_recv)
         {
@@ -496,7 +545,7 @@ namespace ToolBox
             return true;
         }
         if (nullptr != per_socket_.accept_ex
-                && per_socket_.accept_ex->socket_fd > 0)
+                && INVALID_SOCKET != per_socket_.accept_ex->socket_fd)
         {
             return true;
         }
@@ -559,6 +608,16 @@ namespace ToolBox
             return false;
         }
         return tcp_iocp_network->GetBaseCtrl()->AssociateSocketToIocp(*this);
+    }
+
+    int32_t TcpSocket::GetIOMultiplexingError()
+    {
+        auto* tcp_iocp_network = dynamic_cast<ImpNetwork<TcpSocket>*>(p_network_);
+        if (nullptr == tcp_iocp_network || nullptr == tcp_iocp_network->GetBaseCtrl())
+        {
+            return 0;
+        }
+        return tcp_iocp_network->GetBaseCtrl()->GetLastSystemError();
     }
 
     bool TcpSocket::ReAddSocketToIocp(SockEventType event_type)
@@ -629,7 +688,9 @@ namespace ToolBox
 
         if (event_type & SOCKET_EVENT_ERR)
         {
+            // UpdateError 内 Close→Free(this),必须立刻返回
             UpdateError();
+            return;
         }
         if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
         {
@@ -644,11 +705,10 @@ namespace ToolBox
                 {
                     sim_nagle_.flag_can_recv = true;
                 }
-                else
+                else if (!UpdateRecv())
                 {
-                    UpdateRecv();
+                    return;
                 }
-
             }
         }
         if ((event_type & SOCKET_EVENT_SEND) && (event_type_ & SOCKET_EVENT_SEND))
@@ -667,7 +727,6 @@ namespace ToolBox
                 {
                     UpdateSend();
                 }
-
             }
         }
     }
@@ -733,6 +792,8 @@ namespace ToolBox
         // 建立 socket 与 iocp 的关联
         if (!AssociateSocketToIocp())
         {
+            p_network_->OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED,
+                                  GetIOMultiplexingError());
             return false;
         }
         socket_state_ = SocketState::SOCK_STATE_LISTENING;
@@ -784,24 +845,26 @@ namespace ToolBox
 #endif
         SetNonBlocking(socket_id_); // 设置为非阻塞
         SetNagleOff(socket_id_);    // 关闭 Nagle
+        SetNoSigPipe(socket_id_);
         SetTcpBuffSize(socket_id_);
         int32_t error = connect(socket_id_, (struct sockaddr*)&sa, sizeof(struct sockaddr));
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         if (error < 0 && ((WSAEWOULDBLOCK != GetSysErrNo()) && (WSAEISCONN != GetSysErrNo())))
 #elif defined(__linux__) || defined(__APPLE__)
-        if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != error)
+        if (error < 0 && EINPROGRESS != errno && EINTR != errno && EISCONN != errno)
 #endif
         {
             NetworkLogError("[Network][TcpSocket] ConnectedFailed. socket id:%d, conn_id:%llu, NET_SYS_ERROR.%d", GetSocketID(), GetConnID(), GetSocketError());
-            // 通知 主线程连接失败
+            // Init 失败契约:只上报,不 Close/Free;由 OnNewConnecter 统一 Free(Reset 关 fd)
             p_network_->OnConnectedFailed(GetOpaque(), ENetErrCode::NET_SYS_ERROR, GetSysErrNo());
-            Close(ENetErrCode::NET_SYS_ERROR, errno);
             return false;
         }
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         // 建立 socket 与 iocp 的关联
         if (!AssociateSocketToIocp())
         {
+            p_network_->OnConnectedFailed(opaque, ENetErrCode::NET_CONNECT_FAILED,
+                                          GetIOMultiplexingError());
             return false;
         }
 #elif defined(__linux__) || defined(__APPLE__)
@@ -919,6 +982,15 @@ namespace ToolBox
     {
         int32_t nodelay = 1;
         return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char*)&nodelay, sizeof(nodelay));
+    }
+    int32_t TcpSocket::SetNoSigPipe(int32_t fd)
+    {
+#if defined(__APPLE__)
+        int32_t no_sig_pipe = 1;
+        return setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &no_sig_pipe, sizeof(no_sig_pipe));
+#else
+        return 0;
+#endif
     }
     // SOCKET在close时候不等待缓冲区发送完成
     int32_t TcpSocket::SetLingerOff(int32_t fd)

@@ -288,4 +288,10 @@ namespace ToolBox
         EventFuncArray event_func_array_; // 事件处理函数表
     };
 
+    /*
+    * 关闭尚未交给 socket 的 raw fd(Accepting/Join 失败/事件丢弃等).
+    * fd<0 为 no-op;调用方负责随后将持有处置 -1.
+    */
+    void CloseRawFd(int32_t fd, const char* reason);
+
 };  // ToolBox

@@ -26,7 +26,8 @@ struct PerIOContext
 struct AcceptEx_t
 {
     ACCEPTEX accept_ex_fn = nullptr;      // AcceptEx 函数指针
-    SOCKET   socket_fd;         //  当前未决的客户端套接字  -AcceptEx
+    // 当前未决的客户端套接字 -AcceptEx.取用后需置回 INVALID_SOCKET 以标记所有权已转交
+    SOCKET   socket_fd = INVALID_SOCKET;
     char     buffer[ACCEPTEX_BUFF_SIZE];           // 参数 AcceptEx
 };
 

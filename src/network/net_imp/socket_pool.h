@@ -71,15 +71,15 @@ namespace ToolBox
 
             }
             free_list_.clear();
-            // FIX ME. udp socket pool 在这里会崩溃,先注释掉.让进程统一回收内存.
-            // for (auto& es : socket_vector_)
-            // {
-            //     if (nullptr != es)
-            //     {
-            //         delete es;
-            //         es = nullptr;
-            //     }
-            // }
+            // 析构路径已不再回调池(Reset 改用非虚 CloseSocketFd),此处可安全回收活跃对象
+            for (auto& es : socket_vector_)
+            {
+                if (nullptr != es)
+                {
+                    delete es;
+                    es = nullptr;
+                }
+            }
             socket_vector_.clear();
             alloced_socketes_.clear();
             return true;
@@ -147,18 +147,17 @@ namespace ToolBox
         */
         void Foreach(const std::function<bool(SocketType* socket)>& func)
         {
-            for (SocketType* p_socket : alloced_socketes_)
+            // 回调内可能 Close→Free 摘链,先拷贝快照避免 list 迭代器失效
+            std::vector<SocketType*> snapshot(alloced_socketes_.begin(), alloced_socketes_.end());
+            for (SocketType* p_socket : snapshot)
             {
-                if (p_socket)
+                if (nullptr == p_socket)
                 {
-                    if (func(p_socket))
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    continue;
+                }
+                if (!func(p_socket))
+                {
+                    break;
                 }
             }
         }
@@ -192,7 +191,14 @@ namespace ToolBox
             {
                 return INVALID_CONN_ID;
             }
-            return MakeUint32(curr_cycle_, index);
+            uint32_t conn_id = MakeUint32(curr_cycle_, index);
+            // 禁止 conn_id==0,避免与业务侧“无连接”哨兵冲突;递增 cycle,禁止回拨
+            if (0 == conn_id)
+            {
+                curr_cycle_++;
+                conn_id = MakeUint32(curr_cycle_, index);
+            }
+            return conn_id;
         }
         /*
         * 工具函数 获取低16位

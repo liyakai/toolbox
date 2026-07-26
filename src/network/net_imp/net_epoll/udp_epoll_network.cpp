@@ -6,6 +6,7 @@
 #include "network/net_imp/udp_socket.h"
 #include "epoll_ctrl.h"
 #include "network/net_imp/socket_pool.h"
+#include <vector>
 
 namespace ToolBox
 {
@@ -26,10 +27,16 @@ namespace ToolBox
         ImpNetwork<UdpSocket>::Update(time_stamp);
         if (is_kcp_open_)
         {
-            // 更新 kcp [TODO: 这里的update存在优化空间]
-            for (auto iter : address_to_connect_)
+            // KcpUpdate 可能触发 Close 并删除映射,先复制连接 ID 防迭代器失效
+            std::vector<uint32_t> conn_ids;
+            conn_ids.reserve(address_to_connect_.size());
+            for (const auto& address_conn : address_to_connect_)
             {
-                auto socket = sock_mgr_.GetSocket(iter.second);
+                conn_ids.emplace_back(address_conn.second);
+            }
+            for (uint32_t conn_id : conn_ids)
+            {
+                auto* socket = sock_mgr_.GetSocket(conn_id);
                 if (nullptr == socket)
                 {
                     continue;
@@ -59,6 +66,43 @@ namespace ToolBox
     void UdpEpollNetwork::DeleteUdpAddress(const UdpAddress& udp_address)
     {
         address_to_connect_.erase(udp_address.GetID());
+    }
+
+    void UdpEpollNetwork::OnSocketClosing(UdpSocket* socket, ENetErrCode net_err, int32_t sys_err)
+    {
+        if (nullptr == socket)
+        {
+            return;
+        }
+        if (UdpType::ACCEPTOR != socket->GetType())
+        {
+            address_to_connect_.erase(socket->GetRemoteAddressID());
+            return;
+        }
+
+        const int32_t shared_fd = socket->GetSocketID();
+        std::vector<uint32_t> remote_conn_ids;
+        for (const auto& address_conn : address_to_connect_)
+        {
+            UdpSocket* remote = sock_mgr_.GetSocket(address_conn.second);
+            if (nullptr != remote && remote != socket
+                && UdpType::REMOTE == remote->GetType()
+                && shared_fd == remote->GetSocketID())
+            {
+                remote_conn_ids.emplace_back(remote->GetConnID());
+            }
+        }
+        for (uint32_t conn_id : remote_conn_ids)
+        {
+            UdpSocket* remote = sock_mgr_.GetSocket(conn_id);
+            if (nullptr != remote && UdpType::REMOTE == remote->GetType())
+            {
+                remote->Close(net_err, sys_err);
+            }
+        }
+        address_to_connect_.erase(socket->GetLocalAddressID());
+        NetworkLogInfo("[Network] close UDP accepter and dependent remotes. fd:%d remote_count:%zu",
+                       shared_fd, remote_conn_ids.size());
     }
 
     void UdpEpollNetwork::OpenKcpMode()
@@ -112,8 +156,16 @@ namespace ToolBox
         {
             return;
         }
-        ImpNetwork<UdpSocket>::OnClose(iter->second);
-        address_to_connect_.erase(iter);
+        const uint32_t conn_id = iter->second;
+        UdpSocket* socket = sock_mgr_.GetSocket(conn_id);
+        if (nullptr == socket)
+        {
+            NetworkLogWarn("[Network] remove stale UDP address mapping. address_id:%llu conn_id:%u",
+                           address_id, conn_id);
+            address_to_connect_.erase(iter);
+            return;
+        }
+        ImpNetwork<UdpSocket>::OnClose(conn_id);
     }
 
     void UdpEpollNetwork::OnSend(uint64_t address_id, const char* data, uint32_t size)

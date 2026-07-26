@@ -43,10 +43,14 @@ namespace ToolBox
         */
         void DestroyIOMultiplexing() override;
         /*
-        * 删除事件
+        * 按 fd 删除事件.
+        * io_uring 是提交式异步模型,已投递的 SQE 无法仅凭 fd 撤销:需要投递
+        * IORING_OP_ASYNC_CANCEL 并等待对应 CQE 回收后才能安全归还 socket.
+        * 当前未实现该闭环,故仅做一次性告警并返回 true,避免上层误报删除失败.
+        * [已知未闭环] 关闭连接后仍可能收到该 fd 的完成通知,该后端暂不可用于生产.
         * @param socket_fd 文件描述符
         */
-        // bool DelEvent(int socket_fd);
+        bool DelEvent(int socket_fd) override;
         /*
         * 处理事件
         */
@@ -99,6 +103,8 @@ namespace ToolBox
     private:
         uint32_t max_events_ = 0; // 最大事件数
         struct io_uring* ring_;       // io_uring 全局句柄
+        bool ring_initialized_ = false;
+        bool del_event_unsupported_warned_ = false;  // DelEvent 未闭环告警是否已打
         char bufs_[BUFFERS_COUNT][MAX_MESSAGE_LEN];
         int32_t group_id_ = 1337;
     };

@@ -1,9 +1,11 @@
 #pragma once
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <stdint.h>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <functional>
 #include <mutex>
@@ -140,7 +142,8 @@ namespace ToolBox
         virtual void OnBinded(NetworkType type, uint64_t opaque, uint64_t conn_id, const std::string& ip, uint16_t port) {};
         /*
         * 逻辑线程内处理接受新连接事件[尚未加入监听]
-        * @param conn_id 连接ID
+        * 注意:返回后 fd 所有权归网络库,业务勿缓存;接入失败通过 OnErrored 感知
+        * @param fd 新连接的文件描述符
         */
         virtual void OnAccepting(NetworkType type, uint64_t opaque, int32_t fd) {};
         /*
@@ -160,6 +163,7 @@ namespace ToolBox
         virtual void OnConnectedFailed(NetworkType type, uint64_t opaque, ENetErrCode err_code, int32_t err_no) {};
         /*
         * 逻辑线程内处理错误事件
+        * 注意:部分错误由 Send/Close 等接口同步回调,回调内不得再发起网络操作,否则可能递归
         * @param conn_id 连接ID
         */
         virtual void OnErrored(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode err_code, int32_t err_no) {};
@@ -182,7 +186,7 @@ namespace ToolBox
         * @param event 事件
         * @param type 网络类型
         */
-        void NotifyWorker(NetEventWorker* event, NetworkType type, uint32_t net_thread_index);
+        ENetErrCode NotifyWorker(NetEventWorker* event, NetworkType type, uint32_t net_thread_index);
         /*
         * 网络线程通知逻辑线程,监听端口已绑定.
         */
@@ -221,6 +225,39 @@ namespace ToolBox
         */
         void DispatchMainEvent_();
         /*
+        * 补派溢出的控制事件(必晚于 event2main_ 内事件,故排在其后)
+        */
+        void DispatchOverflowEvents_();
+        /*
+        * 本轮派发是否已被 Stop 打断:回调内调 StopWait 会递增 lifecycle_generation_,
+        * 此后剩余事件只回收资源,不再产生业务回调与网络副作用
+        */
+        bool IsMainDispatchAborted_() const;
+        /*
+        * 仅归还主线程事件,不派发(Stop/析构用)
+        */
+        void DrainMainEvents_();
+        /*
+        * 归还主线程事件前回收附属资源(如 Accepting 的 fd)
+        */
+        void ReleaseMainEvent_(NetEventMain* event);
+        /*
+        * 溢出事件积压水位告警(调用方已持 lock_)
+        */
+        void CheckOverflowEventsHighWater_();
+        /*
+        * 同步错误通知:虚函数 + std::function
+        */
+        void EmitNetworkErrored_(NetworkType type, uint64_t opaque, uint64_t conn_id, ENetErrCode err, int32_t err_no);
+        /*
+        * Start 失败时回滚已创建的 networks_/workers_
+        */
+        void RollbackStart_();
+        /*
+        * 当前平台是否支持该网络类型
+        */
+        bool IsNetworkTypeSupported_(NetworkType type);
+        /*
         * 根据类型获取网络实例
         * @param type 网络类型
         */
@@ -242,9 +279,18 @@ namespace ToolBox
 
     private:
         Event2Main event2main_;     // 主线程网络事件队列
+        // 溢出后所有控制事件继续暂存,防止新事件回到 ring 发生越序
+        std::vector<NetEventMain*> overflow_events_;
+        std::array<std::unordered_set<uint64_t>, NetworkType::NT_MAX> overflow_error_conn_ids_;
+        bool overflow_events_high_water_warned_ = false;  // 溢出水位告警是否已打
+        bool dispatching_main_events_ = false;  // 是否正在派发主线程事件
+        bool dispatch_main_events_pending_ = false;  // 重入 Update 是否需要延后补派
+        uint64_t lifecycle_generation_ = 0;  // StopWait 递增,用于终止本轮派发
+        uint64_t dispatching_generation_ = 0;  // 本轮派发开始时的 lifecycle_generation_
         EventDispatcher* event_dispatcher_;  // 事件分发器
         std::mutex lock_;           // 多网络线程需要锁.
         std::atomic_bool stop_;     // 网络线程是否退出
+        std::atomic_bool workers_ready_ = false;  // Start 完成前阻止 worker 消费缓存事件
         std::vector<std::unique_ptr<std::thread>> workers_;   // 工作线程,执行网络动作.
         using NetworkArray = std::vector<std::array<std::unique_ptr<INetwork>, NetworkType::NT_MAX>>;
         NetworkArray networks_;     // 网络实现

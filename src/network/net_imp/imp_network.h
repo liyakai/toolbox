@@ -85,6 +85,7 @@ namespace ToolBox
         SocketPool<SocketType> sock_mgr_;       // socket 池
         IOMultiplexingInterface* base_ctrl_;    // io多路复用接口
         std::time_t last_update_timestamp = 0;  // 上次update时的时间戳
+        bool multiplexing_failed_reported_ = false;  // RunOnce 持续失败时只上报一次
     };
 
     template<typename SocketType>
@@ -126,6 +127,7 @@ namespace ToolBox
         if (nullptr != base_ctrl_)
         {
             base_ctrl_->DestroyIOMultiplexing();
+            delete base_ctrl_;
             base_ctrl_ = nullptr;
         }
         if (!sock_mgr_.UnInit())
@@ -147,7 +149,20 @@ namespace ToolBox
 
         // NetworkLogInfo("[Network] Update. network_type:%d,time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), time_stamp, last_update_timestamp);
         INetwork::Update(time_stamp);
-        base_ctrl_->RunOnce(time_stamp);
+        if (!base_ctrl_->RunOnce(time_stamp))
+        {
+            const int32_t error = base_ctrl_->GetLastSystemError();
+            // 持续失败时限频:日志与业务回调各报一次,恢复后清标志可再报
+            if (!multiplexing_failed_reported_)
+            {
+                multiplexing_failed_reported_ = true;
+                NetworkLogError("[Network] multiplexing RunOnce failed. network_type:%u error:%d",
+                                GetNetworkType(), error);
+                OnErrored(0, 0, ENetErrCode::NET_SYS_ERROR, error);
+            }
+            return;
+        }
+        multiplexing_failed_reported_ = false;
 
         int32_t nagle_timeout = GetSimulateNagleTimeout();
         // NetworkLogDebug("[Network] Update. network_type:%d, nagle_timeout:%d, time_stamp:%lld, last_update_timestamp:%lld", GetNetworkType(), nagle_timeout, time_stamp, last_update_timestamp);
@@ -175,7 +190,11 @@ namespace ToolBox
         {
             return;
         }
-        base_ctrl_->DelEvent(socket_id);
+        if (!base_ctrl_->DelEvent(socket_id))
+        {
+            NetworkLogWarn("[Network] remove multiplexing event failed. fd:%d error:%d",
+                           socket_id, base_ctrl_->GetLastSystemError());
+        }
     }
 
     template<typename SocketType>
@@ -189,12 +208,20 @@ namespace ToolBox
         }
         new_socket->SetSocketMgr(&sock_mgr_);
         new_socket->SetNetwork(this);
+        // Init* 失败契约:只上报错误并 return false,不 Close/Free;此处统一 Free(Reset 关 fd)
         if (false == new_socket->InitNewAccepter(opaque, ip, port, send_buff_size, recv_buff_size))
         {
-            OnErrored(opaque, 0, ENetErrCode::NET_ACCEPT_FAILED, 0);
+            sock_mgr_.Free(new_socket);
             return INVALID_CONN_ID;
         }
-        base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        if (!base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType()))
+        {
+            // 监听加入多路复用失败,语义是 Listen 失败而非 Accept
+            OnErrored(opaque, 0, ENetErrCode::NET_LISTEN_FAILED,
+                      base_ctrl_->GetLastSystemError());
+            sock_mgr_.Free(new_socket);
+            return INVALID_CONN_ID;
+        }
         return new_socket->GetConnID();
     }
     template<typename SocketType>
@@ -203,6 +230,8 @@ namespace ToolBox
         auto new_socket = sock_mgr_.Alloc();
         if (nullptr == new_socket)
         {
+            // 此路径 fd 尚未交给任何 socket,必须就地关闭,否则泄漏
+            CloseUnownedFd(fd);
             OnErrored(opaque, 0, ENetErrCode::NET_ALLOC_FAILED, 0);
             return INVALID_CONN_ID;
         }
@@ -214,8 +243,15 @@ namespace ToolBox
             sock_mgr_.Free(new_socket);
             return INVALID_CONN_ID;
         }
+        // 先加入多路复用成功后再通知 Accepted,避免半开连接
+        if (!base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType()))
+        {
+            OnErrored(opaque, 0, ENetErrCode::NET_ACCEPT_FAILED,
+                      base_ctrl_->GetLastSystemError());
+            sock_mgr_.Free(new_socket);
+            return INVALID_CONN_ID;
+        }
         OnAccepted(opaque, new_socket->GetConnID());
-        base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
         NetworkLogTrace("[Network] OnJoinIOMultiplexing. fd:%d, connid:%u", fd, new_socket->GetConnID());
         return new_socket->GetConnID();
     }
@@ -232,9 +268,17 @@ namespace ToolBox
         new_socket->SetNetwork(this);
         if (false == new_socket->InitNewConnecter(opaque, ip, port, send_buff_size, recv_buff_size))
         {
+            sock_mgr_.Free(new_socket);
             return INVALID_CONN_ID;
         }
-        base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType());
+        if (!base_ctrl_->OperEvent(*new_socket, EventOperType::EVENT_OPER_ADD, new_socket->GetEventType()))
+        {
+            // 与 Init 硬失败一致,走 ConnectedFailed,避免只订该回调的业务漏感知
+            OnConnectedFailed(opaque, ENetErrCode::NET_CONNECT_FAILED,
+                              base_ctrl_->GetLastSystemError());
+            sock_mgr_.Free(new_socket);
+            return INVALID_CONN_ID;
+        }
         return new_socket->GetConnID();
     }
     template<typename SocketType>

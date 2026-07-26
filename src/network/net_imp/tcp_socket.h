@@ -93,6 +93,10 @@ namespace ToolBox
         */
         bool AssociateSocketToIocp();
         /*
+        * 获取 IOCP 最近一次控制错误
+        */
+        int32_t GetIOMultiplexingError();
+        /*
         * 将 socket 重新监听读写事件
         */
         bool ReAddSocketToIocp(SockEventType event_type);
@@ -184,7 +188,8 @@ namespace ToolBox
         /*
         * 处理客户端数据的情况
         */
-        void UpdateRecv();
+        // 返回 false 表示已 Close→Free(this),调用方禁止再访问成员
+        bool UpdateRecv();
         /*
         * 套接字接收数据
         */
@@ -200,7 +205,8 @@ namespace ToolBox
         /*
         * 处理发送消息
         */
-        void UpdateSend();
+        // 返回 false 表示已 Close→Free(this),调用方禁止再访问成员
+        bool UpdateSend();
         /*
         * 套接字发送数据
         */
@@ -229,6 +235,10 @@ namespace ToolBox
         * 关闭延迟发送
         */
         int32_t SetNagleOff(int32_t fd);
+        /*
+        * 禁止 macOS 写关闭连接时触发 SIGPIPE
+        */
+        int32_t SetNoSigPipe(int32_t fd);
         /*
         * 关闭 TIME_WAIT
         */

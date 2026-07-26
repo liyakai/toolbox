@@ -53,7 +53,7 @@ namespace ToolBox
         /*
         * 加入事件
         */
-        void PushEvent(NetEventWorker* event);
+        bool PushEvent(NetEventWorker* event);
 
     public:
         /*
@@ -127,6 +127,10 @@ namespace ToolBox
         {
             return update_timestamp_;
         }
+        /*
+        * 关闭尚未被 socket 接管的 fd,供 OnJoinIOMultiplexing 失败路径使用
+        */
+        void CloseUnownedFd(int32_t fd);
 
     private:
         /*

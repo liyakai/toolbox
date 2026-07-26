@@ -16,11 +16,14 @@ namespace ToolBox
 
     IOUringCtrl::~IOUringCtrl()
     {
-        io_uring_queue_exit(ring_);
+        DestroyIOMultiplexing();
+        delete ring_;
+        ring_ = nullptr;
     }
 
     bool IOUringCtrl::CreateIOMultiplexing()
     {
+        SetLastSystemError(0);
         NetworkLogInfo("[Network] start CreateIOMultiplexing.");
 
         // initialize io_uring
@@ -30,13 +33,16 @@ namespace ToolBox
         int32_t ret = io_uring_queue_init_params(max_events_, ring_, &params);
         if (ret < 0)
         {
+            SetLastSystemError(-ret);
             NetworkLogError("[Network] io_uring_queue_init_params failed. ret:%d", ret);
             return false;
         }
+        ring_initialized_ = true;
 
         // check if IORING_FEAT_FAST_POLL is supported
         if (!(params.features & IORING_FEAT_FAST_POLL))
         {
+            SetLastSystemError(ENOTSUP);
             NetworkLogError("[Network] IORING_FEAT_FAST_POLL not available in the kernel.");
             return false;
         }
@@ -46,12 +52,15 @@ namespace ToolBox
         probe = io_uring_get_probe_ring(ring_);
         if (!probe)
         {
+            SetLastSystemError(ENOTSUP);
             NetworkLogError("[Network] Buffer select not supported, skipping...");
             return false;
         }
         if (!io_uring_opcode_supported(probe, IORING_OP_PROVIDE_BUFFERS))
         {
+            SetLastSystemError(ENOTSUP);
             NetworkLogError("[Network] Buffer select not supported, skipping...");
+            free(probe);
             return false;
         }
         free(probe);
@@ -61,13 +70,30 @@ namespace ToolBox
         struct io_uring_cqe* cqe;
 
         sqe = io_uring_get_sqe(ring_);
+        if (nullptr == sqe)
+        {
+            SetLastSystemError(ENOBUFS);
+            return false;
+        }
         io_uring_prep_provide_buffers(sqe, bufs_, MAX_MESSAGE_LEN, BUFFERS_COUNT, group_id_, 0);
 
-        io_uring_submit(ring_);
-        io_uring_wait_cqe(ring_, &cqe);
+        ret = io_uring_submit(ring_);
+        if (ret < 0)
+        {
+            SetLastSystemError(-ret);
+            return false;
+        }
+        ret = io_uring_wait_cqe(ring_, &cqe);
+        if (ret < 0)
+        {
+            SetLastSystemError(-ret);
+            return false;
+        }
         if (cqe->res < 0)
         {
+            SetLastSystemError(-cqe->res);
             NetworkLogError("[Network] cqe->res = %d\n", cqe->res);
+            io_uring_cqe_seen(ring_, cqe);
             return false;
         }
         io_uring_cqe_seen(ring_, cqe);
@@ -76,27 +102,29 @@ namespace ToolBox
     }
     void IOUringCtrl::DestroyIOMultiplexing()
     {
-
-        // if (events_ != nullptr)
-        // {
-        //     delete[] events_;
-        //     events_ = nullptr;
-        // }
-        // if (-1 != epoll_fd_)
-        // {
-        //     close(epoll_fd_);
-        //     epoll_fd_ = -1;
-        // }
+        if (ring_initialized_)
+        {
+            io_uring_queue_exit(ring_);
+            ring_initialized_ = false;
+        }
     }
 
-    // bool IOUringCtrl::DelEvent(int socket_fd)
-    // {
-    //     epoll_event evt;
-    //     return epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket_fd, &evt) == 0;
-    // }
+    bool IOUringCtrl::DelEvent(int socket_fd)
+    {
+        SetLastSystemError(0);
+        // 未决 SQE 需要 ASYNC_CANCEL + 等 CQE 才能撤销,此处尚未闭环,仅告警一次
+        if (!del_event_unsupported_warned_)
+        {
+            del_event_unsupported_warned_ = true;
+            NetworkLogWarn("[Network] io_uring can not cancel pending requests by fd, "
+                           "closed socket may still get completion. fd:%d", socket_fd);
+        }
+        return true;
+    }
 
     bool IOUringCtrl::OperEvent(BaseSocket& socket, EventOperType op_type, int32_t event_type)
     {
+        SetLastSystemError(0);
         if (EventOperType::EVENT_OPER_ADD == op_type)
         {
             if (SOCKET_EVENT_RECV & event_type)
@@ -134,6 +162,7 @@ namespace ToolBox
         int32_t count = URingWait(URING_WAIT_MSECONDS);
         if (count < 0)
         {
+            SetLastSystemError(-count);
             NetworkLogError("[Network] the number of SQEs submitted:%u", count);
             return false;
         }
@@ -276,11 +305,10 @@ namespace ToolBox
 
     bool IOUringCtrl::AddSocketAccept(BaseSocket* socket, uint32_t flags)
     {
-        struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
         struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         if (!sqe)
         {
+            SetLastSystemError(ENOBUFS);
             NetworkLogError("[Network] get sqe from io_uring failed.");
             return false;
         }
@@ -288,15 +316,20 @@ namespace ToolBox
         auto* uring_socket = socket->GetUringSocket();
         if (!uring_socket)
         {
+            SetLastSystemError(EINVAL);
             NetworkLogError("[Network] the socket get uring socket failed.");
             return false;
         }
         uring_socket->io_recv.base_socket = socket;
         uring_socket->io_recv.io_type = SocketState::SOCK_STATE_LISTENING;
+        memset(&uring_socket->accept_address, 0, sizeof(uring_socket->accept_address));
+        uring_socket->accept_address_len = sizeof(uring_socket->accept_address);
         sqe->user_data = reinterpret_cast<uint64_t>(&uring_socket->io_recv);
 
-
-        io_uring_prep_accept(sqe, socket->GetSocketID(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len, flags);
+        io_uring_prep_accept(
+            sqe, socket->GetSocketID(),
+            reinterpret_cast<struct sockaddr*>(&uring_socket->accept_address),
+            &uring_socket->accept_address_len, flags);
         io_uring_sqe_set_flags(sqe, flags);
         // io_uring_prep_poll_add(sqe, socket.GetSocketID(), POLLIN);
 
@@ -309,6 +342,7 @@ namespace ToolBox
         struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
         if (!sqe)
         {
+            SetLastSystemError(ENOBUFS);
             NetworkLogError("[Network] get sqe from io_uring failed.");
             return false;
         }
@@ -336,10 +370,17 @@ namespace ToolBox
         auto* uring_socket = socket.GetUringSocket();
         if (!uring_socket)
         {
+            SetLastSystemError(EINVAL);
             NetworkLogError("[Network] the socket get uring socket failed.");
             return false;
         }
         struct io_uring_sqe* sqe = io_uring_get_sqe(ring_);
+        if (nullptr == sqe)
+        {
+            SetLastSystemError(ENOBUFS);
+            NetworkLogError("[Network] get sqe from io_uring failed.");
+            return false;
+        }
 
         uring_socket->io_send.base_socket = &socket;
         uring_socket->io_send.io_type = SocketState::SOCK_STATE_SEND;

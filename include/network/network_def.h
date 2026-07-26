@@ -36,6 +36,7 @@ namespace ToolBox
         NET_RECV_PIPE_OVERFLOW,   // 接收ringbuffer满
         NET_INVALID_CONNID,       // 无效的连接ID
         NET_CACHED_EVENT_OVERFLOW,// 逻辑线程缓存的EVENT数量溢出
+        NET_NOT_STARTED,          // 网络未启动或已停止(无可用 worker)
     };
 
     // 主线程与网络线程之间的队列的最大数量

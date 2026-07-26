@@ -49,7 +49,7 @@ namespace ToolBox
         /*
         * 获取信道标记
         */
-        uint32_t GetOpaque()
+        uint64_t GetOpaque()
         {
             return opaque_;
         }
@@ -229,12 +229,18 @@ namespace ToolBox
         * 获取 socket 错误
         */
         int32_t GetSocketError();
+        /*
+        * 仅关闭 fd 并置无效,不做通知也不归还池.
+        * 供 Reset/析构等回收路径使用:这些路径不能走虚 Close,否则会派发到子类实现,
+        * 触发通知与 Free(this),导致解引用已置空的成员或在析构中把自己放回池.
+        */
+        void CloseSocketFd();
 
     protected:
         uint64_t opaque_ = 0;   // 信道标记
         uint32_t conn_id_ = INVALID_CONN_ID;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        SOCKET socket_id_ = 0;
+        SOCKET socket_id_ = INVALID_SOCKET;
 #elif defined(__linux__)
         int32_t socket_id_ = -1;                        // socket_id
         bool is_ctrl_add_ = false;                      // 是否已经执行过 EPOLL_CTL_ADD

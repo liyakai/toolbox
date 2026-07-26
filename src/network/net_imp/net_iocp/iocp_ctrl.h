@@ -37,6 +37,7 @@ namespace ToolBox
         */
         bool AssociateSocketToIocp(BaseSocket& socket)
         {
+            SetLastSystemError(0);
             // 建立 socket 与 iocp 的关联
             auto socket_id = socket.GetSocketID();
             HANDLE iocp = CreateIoCompletionPort((HANDLE)socket_id, iocp_fd_, (ULONG_PTR)&socket, 0);
@@ -47,7 +48,7 @@ namespace ToolBox
                 // then the operation was successfully initiated and is still in progress.
                 if (ERROR_IO_PENDING != last_error)
                 {
-                    socket.OnErrored(ENetErrCode::NET_SYS_ERROR, last_error);
+                    SetLastSystemError(static_cast<int32_t>(last_error));
                     return false;
                 }
 
@@ -67,7 +68,7 @@ namespace ToolBox
         */
         bool RunOnce(std::time_t time_stamp) override;
     private:
-        HANDLE iocp_fd_;            // iocp 文件描述符
+        HANDLE iocp_fd_ = nullptr;  // iocp 文件描述符
     };
 
 };  // ToolBox

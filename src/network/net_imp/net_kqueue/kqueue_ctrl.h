@@ -32,6 +32,10 @@ namespace ToolBox
         */
         bool OperEvent(BaseSocket& socket, EventOperType op_type, int32_t event_type) override;
         /*
+        * 按 fd 删除读写监听
+        */
+        bool DelEvent(int socket_fd) override;
+        /*
         * @brief kevent 获取结果
         * @param msec 等待毫秒数
         * @return 有读写通知的文件描述符的个数
@@ -43,8 +47,8 @@ namespace ToolBox
         bool RunOnce(std::time_t time_stamp)override;
     private:
         uint32_t fd_num_ = 0;       // 最大文件描述符监视数
-        int kqueue_fd_ = 0;         // kqueue 文件描述符
-        struct kevent* events_;     // kevent返回的事件列表
+        int kqueue_fd_ = -1;        // kqueue 文件描述符
+        struct kevent* events_ = nullptr;     // kevent返回的事件列表
     };
 
 };  // ToolBox

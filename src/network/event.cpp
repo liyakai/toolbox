@@ -2,7 +2,6 @@
 #include "network_def_internal.h"
 #include <string.h>
 #include <cstddef>
-#include <string.h>
 
 namespace ToolBox
 {
@@ -30,6 +29,19 @@ namespace ToolBox
     NetEventWorker::NetEventWorker(EventID event_id, uint64_t opaque/* = 0 */)
         : Event(event_id, opaque)
     {
+        // net_req_ 是 union,只有 net_feature_ 带默认初始化.析构会按事件类型读取
+        // fd_/data_ 释放资源,故这里先置安全值,不依赖调用方一定 Set 过
+        switch (event_id)
+        {
+            case EID_MainToWorkerJoinIOMultiplexing:
+                net_req_.address_.fd_ = -1;
+                break;
+            case EID_MainToWorkerSend:
+                net_req_.stream_.data_ = nullptr;
+                break;
+            default:
+                break;
+        }
     }
 
     NetEventWorker::~NetEventWorker()
@@ -38,6 +50,11 @@ namespace ToolBox
         {
             case EID_MainToWorkerSend:
                 GIVE_BACK_MEMORY_RAW(net_req_.stream_.data_, "NetEventWorker::~NetEventWorker");
+                break;
+            case EID_MainToWorkerJoinIOMultiplexing:
+                // 兜底:事件未被 worker 消化即被丢弃时关 fd(处理完的路径已 SetFd(-1))
+                CloseRawFd(net_req_.address_.fd_, "~NetEventWorker unjoined");
+                net_req_.address_.fd_ = -1;
                 break;
             default:
                 break;

@@ -63,7 +63,12 @@ namespace ToolBox
 
     void UdpSocket::Reset()
     {
-
+        // REMOTE 借用 ACCEPTOR 的 fd(见 InitAccpetSocket),不持有所有权.
+        // 回收前先放弃借用,否则会关掉监听 fd,并与 ACCEPTOR 回收时形成双关
+        if (UdpType::REMOTE == type_)
+        {
+            SetSocketID(-1);
+        }
         BaseSocket::Reset();
         for (const auto& buffer : send_list_)
         {
@@ -88,7 +93,9 @@ namespace ToolBox
     {
         if (event_type & SOCKET_EVENT_ERR)
         {
+            // UpdateError 内 Close→Free(this),必须立刻返回
             UpdateError();
+            return;
         }
         if ((event_type & SOCKET_EVENT_RECV) && (event_type_ & SOCKET_EVENT_RECV))
         {
@@ -103,16 +110,25 @@ namespace ToolBox
 
     bool UdpSocket::InitNewAccepter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        Bind(ip, port);
+        SetOpaque(opaque);
+        // Bind 内部已上报错误,失败必须向上传播,否则会生成一个收不到数据的监听器
+        if (!Bind(ip, port))
+        {
+            return false;
+        }
         type_ = UdpType::ACCEPTOR;
         local_address_.SetAddress(ip, port);
         event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_ERR;
-        SetOpaque(opaque);
         return true;
     }
     bool UdpSocket::InitNewConnecter(uint64_t opaque, const std::string& ip, uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
     {
-        Bind();
+        SetOpaque(opaque);
+        // Bind 内部已上报错误,失败必须向上传播
+        if (!Bind())
+        {
+            return false;
+        }
         type_ = UdpType::CONNECTOR;
         remote_address_.SetAddress(ip, port);
         event_type_ = SOCKET_EVENT_RECV | SOCKET_EVENT_SEND | SOCKET_EVENT_ERR;
@@ -161,26 +177,41 @@ namespace ToolBox
     {
         if (IsSocketValid())
         {
-            BaseSocket::Close(net_err, sys_err);
+            auto* udp_network = dynamic_cast<UdpEpollNetwork*>(p_network_);
+            if (nullptr != udp_network)
+            {
+                udp_network->OnSocketClosing(this, net_err, sys_err);
+            }
+            // 必须在关 fd 之前摘除监听,否则拿到的是已置无效的 fd
+            if (nullptr != p_network_
+                && (UdpType::ACCEPTOR == type_ || UdpType::CONNECTOR == type_))
+            {
+                p_network_->CloseListenInMultiplexing(GetSocketID());
+                // fd 已从 epoll 摘除,清注册标记,避免归还池前再次 OperEvent 误走 MOD
+                SetCtrlAdd(false);
+            }
+            if (UdpType::REMOTE == type_)
+            {
+                // 借用的 fd 只放弃引用,真正关闭由 ACCEPTOR 负责
+                SetSocketID(-1);
+            }
+            else
+            {
+                BaseSocket::Close(net_err, sys_err);
+            }
             if (p_network_)
             {
                 // 通知主线程 socket 关闭
                 if (UdpType::ACCEPTOR == type_)
                 {
                     p_network_->OnClosed(GetOpaque(), GetLocalAddressID(), net_err, sys_err);
-                    p_network_->CloseListenInMultiplexing(GetSocketID());
                 }
                 else
                 {
-                    if (UdpType::CONNECTOR == type_)
-                    {
-                        p_network_->CloseListenInMultiplexing(GetSocketID());
-                    }
                     p_network_->OnClosed(GetOpaque(), GetRemoteAddressID(), net_err, sys_err);
                 }
                 p_sock_pool_->Free(this);
             }
-
         }
     }
 
@@ -365,6 +396,7 @@ namespace ToolBox
     void UdpSocket::InitAccpetSocket(UdpSocket* socket, const SocketAddress& address)
     {
         socket->SetSocketID(socket_id_);
+        socket->SetOpaque(GetOpaque());
         socket->SetRemoteAddress(UdpAddress(address));
         socket->SetSocketMgr(p_sock_pool_);
         socket->SetNetwork(p_network_);

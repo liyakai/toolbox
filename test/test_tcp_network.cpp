@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "tools/time_util.h"
 #include "tools/memory_pool_lock_free.h"
+#include <cassert>
 #ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>
 #endif // USE_GPERF_TOOLS
@@ -180,6 +181,37 @@
 // };
 
 FIXTURE_BEGIN(TcpNetwork)
+
+CASE(test_network_start_resume)
+{
+    ToolBox::Network network;
+    // 线程数为 0 与重复 Start 都必须被拒绝,且不破坏后续启动能力
+    const bool zero_thread_started = network.Start(0);
+    assert(!zero_thread_started);
+    const bool first_started = network.Start(1);
+    assert(first_started);
+    const bool duplicate_started = network.Start(1);
+    assert(!duplicate_started);
+    network.StopWait();
+    // StopWait 后应可再次 Start,验证回滚与状态清理是幂等的
+    const bool resumed = network.Start(1);
+    assert(resumed);
+    network.StopWait();
+    // 停服后再次 StopWait/Update 必须安全,派发路径不得触碰已拆除的网络实例
+    network.StopWait();
+    network.Update();
+}
+
+CASE(test_network_invalid_conn_id)
+{
+    ToolBox::Network network;
+    // 未 Start 时的非法连接操作只应返回错误码,不得崩溃
+    assert(ToolBox::ENetErrCode::NET_INVALID_CONNID == network.Close(0));
+    const char* data = "ping";
+    assert(ToolBox::ENetErrCode::NET_INVALID_CONNID == network.Send(0, data, 4));
+    // 未 Start 时 Update 不应有任何事件可派发
+    network.Update();
+}
 
 CASE(test_tcp_echo)
 {

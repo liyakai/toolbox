@@ -1,4 +1,6 @@
 #include "src/network/network_channel.h"
+#include "tools/log.h"
+#include "tools/memory_pool_lock_free.h"
 #include "unit_test_frame/unittest.h"
 #ifdef USE_GPERF_TOOLS
 #include <gperftools/profiler.h>

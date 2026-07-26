@@ -3,6 +3,7 @@
 #ifdef __linux__
 #include "../base_ctrl.h"
 #include "tools/singleton.h"
+#include <cerrno>
 #include <sys/epoll.h>
 
 namespace ToolBox
@@ -38,6 +39,7 @@ namespace ToolBox
         */
         bool OperEvent(BaseSocket& socket, EventOperType op_type, int32_t event_type) override
         {
+            SetLastSystemError(0);
             epoll_event event;
             memset(&event, 0, sizeof(event));
             const auto now_event = socket.GetEventType();
@@ -65,17 +67,27 @@ namespace ToolBox
                     event.events |= EPOLLOUT;
                 }
             }
+            int32_t result = 0;
             if (socket.IsCtrlAdd())
             {
-                epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, socket.GetSocketID(), &event);
+                result = epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, socket.GetSocketID(), &event);
             }
             else
             {
-                socket.SetCtrlAdd(true);
-                epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, socket.GetSocketID(), &event);
+                result = epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, socket.GetSocketID(), &event);
+                // 仅 ADD 成功才置标记,否则下次会误走 MOD
+                if (0 == result)
+                {
+                    socket.SetCtrlAdd(true);
+                }
             }
-
-            return true;
+            if (0 != result)
+            {
+                SetLastSystemError(errno);
+                NetworkLogError("[Network] epoll_ctl failed. fd:%d, is_ctrl_add:%d, errno:%d",
+                                socket.GetSocketID(), socket.IsCtrlAdd(), errno);
+            }
+            return 0 == result;
         }
         /*
         * epoll_wait
@@ -88,10 +100,15 @@ namespace ToolBox
         */
         bool RunOnce(std::time_t time_stamp) override
         {
-            epoll_event evt;
             int32_t count = EpollWait(EPOLL_WAIT_MSECONDS);
             if (count < 0)
             {
+                // EINTR 为信号打断,非错误,本轮空转下次重试
+                if (EINTR == errno)
+                {
+                    return true;
+                }
+                SetLastSystemError(errno);
                 return false;
             }
             for (int32_t i = 0; i < count; i++)
@@ -105,7 +122,7 @@ namespace ToolBox
                 if ((event.events & EPOLLERR) || (event.events & EPOLLHUP))
                 {
                     socket->UpdateEvent(SOCKET_EVENT_ERR, time_stamp);
-                    epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, socket->GetSocketID(), &evt);
+                    continue;
                 }
                 if (event.events & EPOLLIN)
                 {
@@ -120,8 +137,8 @@ namespace ToolBox
         }
     private:
         uint32_t max_events_ = 0; // 最大事件数
-        int epoll_fd_;            // epoll 文件描述符
-        epoll_event* events_;     // epoll 事件数组
+        int epoll_fd_ = -1;            // epoll 文件描述符
+        epoll_event* events_ = nullptr;     // epoll 事件数组
     };
 
 #define EpollCtrlMgr Singleton<ToolBox::EpollCtrl>::Instance(10240)

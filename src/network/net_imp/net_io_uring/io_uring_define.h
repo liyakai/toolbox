@@ -57,6 +57,8 @@ namespace ToolBox
         AcceptEx_t*      accept_ex = nullptr;       // AcceptEx_t指针
         UringIOContext   io_recv;                   // 接收请求
         UringIOContext   io_send;                   // 发送请求
+        SocketAddress    accept_address;            // 异步 accept 地址
+        socklen_t        accept_address_len = sizeof(SocketAddress);
     };
 
 }

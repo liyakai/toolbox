@@ -1,7 +1,13 @@
 #include "network_base.h"
 #include "network_def_internal.h"
+#include "net_imp/net_imp_define.h"
 #include <functional>
 #include "event.h"
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#include <WinSock2.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace ToolBox
 {
@@ -23,7 +29,7 @@ namespace ToolBox
         while (!event2worker_.Empty())
         {
             NetEventWorker* event = event2worker_.Pop();
-            if (!event)
+            if (event)
             {
                 GIVE_BACK_OBJECT(event);
             }
@@ -52,15 +58,36 @@ namespace ToolBox
         HandleEvents_();
     }
 
-    void INetwork::PushEvent(NetEventWorker* event)
+    void CloseRawFd(int32_t fd, const char* reason)
+    {
+        if (fd < 0)
+        {
+            return;
+        }
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        closesocket(fd);
+#else
+        close(fd);
+#endif
+        NetworkLogWarn("[Network] close raw fd:%d reason:%s", fd, reason ? reason : "-");
+    }
+
+    void INetwork::CloseUnownedFd(int32_t fd)
+    {
+        // Join Alloc 失败:fd 尚未交给 socket,统一走 CloseRawFd
+        CloseRawFd(fd, "unowned join-alloc-failed");
+    }
+
+    bool INetwork::PushEvent(NetEventWorker* event)
     {
         if (event2worker_.Full())
         {
             NetworkLogError("[Network] Event queue is full. Drop event. network_type_:%u", GetNetworkType());
             GIVE_BACK_OBJECT(event);
-            return;
+            return false;
         }
         event2worker_.Push(std::move(event));
+        return true;
     }
 
     void INetwork::OnAccepting(uint64_t opaque, int32_t fd, const std::string& ip, const uint16_t port, int32_t send_buff_size, int32_t recv_buff_size)
@@ -154,6 +181,14 @@ namespace ToolBox
             return;
         }
         auto conn_id = OnNewAccepter(accepter_event->GetOpaque(), accepter_event->GetIP(), accepter_event->GetPort(), accepter_event->GetSendBuffSize(), accepter_event->GetRecvBuffSize());
+        if (conn_id == INVALID_CONN_ID)
+        {
+            NetworkLogError("[Network] Create accepter failed, opaque:%lu, endpoint:%s:%u",
+                            accepter_event->GetOpaque(),
+                            accepter_event->GetIP().c_str(),
+                            accepter_event->GetPort());
+            return;
+        }
         auto bind_tcp = GET_NET_OBJECT(NetEventMain, EID_WorkerToMainBinded, accepter_event->GetOpaque());
         bind_tcp->network_type_ = network_type_;
         bind_tcp->net_evt_.bind_.connect_id_ = conn_id;
@@ -171,7 +206,18 @@ namespace ToolBox
             return;
         }
         NetworkLogTrace("[Network] OnMainToWorkerJoinIOMultiplexing_,opaque:%d,  fd:%d", accepting_event->GetOpaque(), accepting_event->GetFd());
-        OnJoinIOMultiplexing(accepting_event->GetOpaque(), accepting_event->GetFd(), accepting_event->GetIP(), accepting_event->GetPort(), accepting_event->GetSendBuffSize(), accepting_event->GetRecvBuffSize());
+        int32_t fd = accepting_event->GetFd();
+        auto conn_id = OnJoinIOMultiplexing(accepting_event->GetOpaque(), fd,
+                                            accepting_event->GetIP(), accepting_event->GetPort(),
+                                            accepting_event->GetSendBuffSize(), accepting_event->GetRecvBuffSize());
+        // 成功则 fd 归 socket 持有;失败路径内部已关闭 fd.都需置 -1 防事件析构双关
+        accepting_event->SetFd(-1);
+        if (conn_id == INVALID_CONN_ID)
+        {
+            // OnJoin 各失败分支均已关 fd 并 OnErrored,此处仅补 worker 侧日志
+            NetworkLogError("[Network] JoinIOMultiplexing failed. opaque:%lu fd:%d",
+                            accepting_event->GetOpaque(), fd);
+        }
     }
 
     void INetwork::OnMainToWorkerNewConnecter_(Event* event)
