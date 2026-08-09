@@ -310,6 +310,56 @@ CASE(TestStreamReader_Cancel)
     }
 }
 
+// Cancel/SetError 后迟到 Push 应丢弃；Finish 后在途 Push 仍应可读
+CASE(TestStreamReader_PushValueAfterTerminalStates)
+{
+    {
+        StreamReader<int> reader(10);
+        reader.SetError(Errc::ERR_TIMEOUT);
+        size_t before = reader.GetBufferSize();
+        if (!reader.PushValue(1)) {
+            SetError("SetError 后 PushValue 丢弃应返回 true(无需背压)");
+            return;
+        }
+        if (reader.GetBufferSize() != before) {
+            SetError("SetError 后迟到 Push 不应入队");
+            return;
+        }
+        if (reader.HasValue()) {
+            SetError("SetError 后不应有可读值");
+            return;
+        }
+    }
+
+    {
+        StreamReader<int> reader(10);
+        reader.Cancel();
+        size_t before = reader.GetBufferSize();
+        if (!reader.PushValue(2)) {
+            SetError("Cancel 后 PushValue 丢弃应返回 true(无需背压)");
+            return;
+        }
+        if (reader.GetBufferSize() != before) {
+            SetError("Cancel 后迟到 Push 不应入队");
+            return;
+        }
+    }
+
+    {
+        StreamReader<int> reader(10);
+        reader.Finish();
+        if (!reader.PushValue(42)) {
+            SetError("Finish 后在途 Push 应成功且无需背压");
+            return;
+        }
+        auto value = reader.PopValue();
+        if (!value.has_value() || value.value() != 42) {
+            SetError("Finish 后在途 Push 的数据应仍可 PopValue");
+            return;
+        }
+    }
+}
+
 CASE(TestStreamReader_BufferSize)
 {
     StreamReader<int> reader(5);
@@ -1736,6 +1786,272 @@ CASE(TestThreadSafe_StreamMixedServiceRegistration)
     std::unordered_set<uint32_t> key_set(keys.begin(), keys.end());
     if (key_set.size() != keys.size()) {
         SetError("ThreadSafe 策略下流式服务 key 存在重复");
+        return;
+    }
+}
+
+// ========== FailPending 各方位测试 ==========
+
+CASE(TestFailPending_MissUnknownSeq)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    client.SetSendCallback([](std::string &&) {});
+    if (client.FailPending(99999)) {
+        SetError("对不存在的 seq FailPending 应返回 false");
+        return;
+    }
+}
+
+CASE(TestFailPending_UnaryPropagatesCanceledNotTimeout)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    std::atomic<uint32_t> cancel_frame_count{0};
+    std::atomic<bool> fail_pending_ok{false};
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            return;
+        }
+        CoroRpcProtocol::ReqHeader header{};
+        std::memcpy(&header, buffer.data(), sizeof(header));
+        if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamCancel)) {
+            cancel_frame_count.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        // 发送路径内直接 Fail，模拟本地打断在途 unary
+        fail_pending_ok.store(client.FailPending(header.seq_num), std::memory_order_relaxed);
+    });
+
+    auto result = client.Call<stream_add>(1, 2).get_result();
+    if (!fail_pending_ok.load(std::memory_order_relaxed)) {
+        SetError("在途 unary FailPending 应返回 true");
+        return;
+    }
+    if (!result.HasError()) {
+        SetError("FailPending 后 unary Call 应失败");
+        return;
+    }
+    if (result.GetError() != Errc::ERR_OPERATION_CANCELED) {
+        SetError("默认 FailPending 应透出 ERR_OPERATION_CANCELED，不能折叠成 TIMEOUT，实际: " +
+                 std::to_string(static_cast<int>(result.GetError())));
+        return;
+    }
+    if (cancel_frame_count.load(std::memory_order_relaxed) != 0) {
+        SetError("unary FailPending 不应向对端发送取消帧");
+        return;
+    }
+}
+
+CASE(TestFailPending_UnaryPropagatesCustomEc)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            return;
+        }
+        CoroRpcProtocol::ReqHeader header{};
+        std::memcpy(&header, buffer.data(), sizeof(header));
+        client.FailPending(header.seq_num, Errc::ERR_BUFFER_TOO_SMALL);
+    });
+
+    auto result = client.Call<stream_add>(3, 4).get_result();
+    if (!result.HasError() || result.GetError() != Errc::ERR_BUFFER_TOO_SMALL) {
+        SetError("FailPending 自定义 ec 应如实透出 ERR_BUFFER_TOO_SMALL");
+        return;
+    }
+}
+
+CASE(TestFailPending_UnaryDoubleFailAndLateResp)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    uint32_t seq = 0;
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            return;
+        }
+        CoroRpcProtocol::ReqHeader header{};
+        std::memcpy(&header, buffer.data(), sizeof(header));
+        seq = header.seq_num;
+        client.FailPending(seq);
+    });
+
+    auto result = client.Call<stream_add>(5, 6).get_result();
+    if (!result.HasError() || result.GetError() != Errc::ERR_OPERATION_CANCELED) {
+        SetError("首次 FailPending 后 unary 应以 CANCELED 失败");
+        return;
+    }
+    if (client.FailPending(seq)) {
+        SetError("同一 seq 二次 FailPending 应返回 false");
+        return;
+    }
+
+    // 迟到成功回包不应崩溃或改变已完成结果
+    std::string resp(CoroRpcProtocol::RESP_HEAD_LEN, '\0');
+    CoroRpcProtocol::RespHeader resp_header{};
+    resp_header.magic = CoroRpcProtocol::kMagicNumber;
+    resp_header.version = CoroRpcProtocol::kVersionNumber;
+    resp_header.serialize_type = static_cast<uint8_t>(CoroRpcProtocol::SerializeType::kSerializeTypeStruct);
+    resp_header.err_code = static_cast<uint8_t>(Errc::SUCCESS);
+    resp_header.msg_type = static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeNormal);
+    resp_header.seq_num = seq;
+    resp_header.length = 0;
+    resp_header.attach_length = 0;
+    std::memcpy(resp.data(), &resp_header, sizeof(resp_header));
+    if (client.OnRecvResp(std::string_view(resp)) != Errc::SUCCESS) {
+        SetError("FailPending 后迟到 unary 回包 OnRecvResp 仍应返回 SUCCESS");
+        return;
+    }
+}
+
+CASE(TestFailPending_StreamSetsErrorWithoutCancelFrame)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    std::atomic<uint32_t> stream_id{0};
+    std::atomic<uint32_t> cancel_frame_count{0};
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            return;
+        }
+        CoroRpcProtocol::ReqHeader header{};
+        std::memcpy(&header, buffer.data(), sizeof(header));
+        if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart)) {
+            stream_id.store(header.seq_num, std::memory_order_relaxed);
+        } else if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamCancel)) {
+            cancel_frame_count.fetch_add(1, std::memory_order_relaxed);
+        }
+        // 不转发服务端，保持在途
+    });
+
+    auto reader = client.CallStream<generate_numbers>(0, 5).get_result();
+    if (!reader) {
+        SetError("流式 FailPending 测试应返回有效 StreamReader");
+        return;
+    }
+    uint32_t seq = stream_id.load(std::memory_order_relaxed);
+    if (seq == 0) {
+        SetError("应捕获到 stream seq");
+        return;
+    }
+
+    if (!client.FailPending(seq, Errc::ERR_OPERATION_CANCELED)) {
+        SetError("在途 stream FailPending 应返回 true");
+        return;
+    }
+    if (!reader->IsFinished()) {
+        SetError("FailPending 后 StreamReader 应进入终态");
+        return;
+    }
+    if (reader->IsCancelled()) {
+        SetError("FailPending 应走 SetError，IsCancelled 应为 false");
+        return;
+    }
+    auto error = reader->GetError();
+    if (!error.has_value() || error.value() != Errc::ERR_OPERATION_CANCELED) {
+        SetError("FailPending 后 GetError 应为 ERR_OPERATION_CANCELED");
+        return;
+    }
+    if (cancel_frame_count.load(std::memory_order_relaxed) != 0) {
+        SetError("stream FailPending 不应向对端发送取消帧");
+        return;
+    }
+    if (client.FailPending(seq)) {
+        SetError("stream 二次 FailPending 应返回 false");
+        return;
+    }
+    if (client.CancelStream(seq)) {
+        SetError("FailPending 摘表后 CancelStream 应返回 false");
+        return;
+    }
+}
+
+CASE(TestFailPending_StreamCustomEcAndLateDataDropped)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    std::atomic<uint32_t> stream_id{0};
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            return;
+        }
+        CoroRpcProtocol::ReqHeader header{};
+        std::memcpy(&header, buffer.data(), sizeof(header));
+        if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart)) {
+            stream_id.store(header.seq_num, std::memory_order_relaxed);
+        }
+    });
+
+    auto reader = client.CallStream<generate_numbers>(10, 3).get_result();
+    if (!reader) {
+        SetError("自定义 ec 流式测试应返回有效 StreamReader");
+        return;
+    }
+    uint32_t seq = stream_id.load(std::memory_order_relaxed);
+    if (!client.FailPending(seq, Errc::ERR_DESERIALIZE_FAILED)) {
+        SetError("在途 stream 自定义 ec FailPending 应成功");
+        return;
+    }
+    auto error = reader->GetError();
+    if (!error.has_value() || error.value() != Errc::ERR_DESERIALIZE_FAILED) {
+        SetError("stream FailPending 自定义 ec 应透出 ERR_DESERIALIZE_FAILED");
+        return;
+    }
+
+    size_t before = reader->GetBufferSize();
+    // 模拟迟到 Data：直接 Push 到已 SetError 的 reader
+    std::string late = "late";
+    if (!reader->PushValue(std::move(late))) {
+        SetError("SetError 后迟到 Push 丢弃应返回 true");
+        return;
+    }
+    if (reader->GetBufferSize() != before) {
+        SetError("FailPending(SetError) 后迟到 Data 不应入队");
+        return;
+    }
+    if (reader->PopValue().has_value()) {
+        SetError("FailPending 后 PopValue 不应再吐出数据");
+        return;
+    }
+}
+
+CASE(TestFailPending_DoesNotAffectOtherPendingStream)
+{
+    CoroRpcClient<CoroRpcProtocol, ThreadSafe> client;
+    std::vector<uint32_t> stream_ids;
+    client.SetSendCallback([&](std::string &&buffer) {
+        if (buffer.size() < CoroRpcProtocol::REQ_HEAD_LEN) {
+            return;
+        }
+        CoroRpcProtocol::ReqHeader header{};
+        std::memcpy(&header, buffer.data(), sizeof(header));
+        if (header.msg_type == static_cast<uint8_t>(CoroRpcProtocol::MsgType::kMsgTypeStreamStart)) {
+            stream_ids.push_back(header.seq_num);
+        }
+    });
+
+    auto reader1 = client.CallStream<generate_numbers>(0, 2).get_result();
+    auto reader2 = client.CallStream<generate_numbers>(100, 2).get_result();
+    if (!reader1 || !reader2 || stream_ids.size() != 2) {
+        SetError("应成功发起两条在途流");
+        return;
+    }
+
+    if (!client.FailPending(stream_ids[0], Errc::ERR_OPERATION_CANCELED)) {
+        SetError("应对第一条流 FailPending 成功");
+        return;
+    }
+    if (!reader1->GetError().has_value()) {
+        SetError("第一条流应收到错误");
+        return;
+    }
+    if (reader2->IsFinished() || reader2->GetError().has_value()) {
+        SetError("FailPending 第一条流不应影响第二条在途流");
+        return;
+    }
+    if (!client.FailPending(stream_ids[1], Errc::ERR_TIMEOUT)) {
+        SetError("应对第二条流 FailPending 成功");
+        return;
+    }
+    auto err2 = reader2->GetError();
+    if (!err2.has_value() || err2.value() != Errc::ERR_TIMEOUT) {
+        SetError("第二条流应收到各自的 ERR_TIMEOUT");
         return;
     }
 }

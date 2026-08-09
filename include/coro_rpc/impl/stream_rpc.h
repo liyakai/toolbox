@@ -154,6 +154,7 @@ public:
     
     // 推送一个值到流中
     // 返回: true 表示未超过软上限；false 表示当前值已保存，但缓冲区已满/超限，需要背压控制。
+    // Cancel/SetError 后迟到数据直接丢弃，返回 true(无需背压)；Finish 后仍接受在途 Push，避免并发丢帧。
     bool PushValue(T value) {
         std::coroutine_handle<> h_to_resume;
         BackpressureCallback backpressure_callback;
@@ -162,6 +163,10 @@ public:
         bool buffer_was_full = false;
         {
             std::lock_guard<mutex_type> lock(mutex_);
+            // 仅异常/取消终态丢弃；Finish 不挡，保留与 StreamEnd 并发的在途 Data
+            if (cancelled_ || error_.has_value()) {
+                return true;
+            }
 
             buffer_was_full = !finished_ && values_.size() >= max_buffer_size_;
             values_.push(std::move(value));

@@ -255,6 +255,13 @@ public:
         return CancelStream_(stream_id);
     }
 
+    /// 使指定 seq 的在途普通 RPC 或流式 RPC 以 ec 失败并唤醒等待方(不向对端发取消帧)。
+    /// 流式路径走 SetError(ec)，调用方应查 GetError()，勿仅依赖 IsCancelled()。
+    bool FailPending(uint32_t seq_num,
+                     CoroRpc::Errc ec = CoroRpc::Errc::ERR_OPERATION_CANCELED) {
+        return FailPending_(seq_num, ec);
+    }
+
     bool SetReqAttachment(std::string_view attachment) {
         if (attachment.size() > UINT32_MAX) {
         RpcLogError("[rpc][client] attachment is too long, max length is UINT32_MAX");
@@ -536,15 +543,9 @@ private:
         if(result.index() == 1) [[unlikely]]
         {
             auto &ret = std::get<1>(result);
-            if(ret == CoroRpc::Errc::ERR_TIMEOUT
-                || ret == CoroRpc::Errc::ERR_OPERATION_CANCELED)
-            {
-                RpcLogError("[rpc][client] DeserializeRpcResult_ Timeout_ or canceled, rpc_errc: %d", ret);
-                co_return CoroRpc::Errc::ERR_TIMEOUT;
-            } else {
-                RpcLogError("[rpc][client] DeserializeRpcResult_ error, rpc_errc: %d", ret);
-                co_return CoroRpc::Errc(ret);
-            }
+            // 如实透出错误原因，避免把 CANCELED 等折叠成 TIMEOUT
+            RpcLogError("[rpc][client] DeserializeRpcResult_ error, rpc_errc: %d", ret);
+            co_return CoroRpc::Errc(ret);
         }
         auto &ret = std::get<0>(result);
         auto resp_result = HandleResponseBuffer_<T>(ret.buffer_.serialize_type_, ret.buffer_.body_buffer_, ret.errc_);
@@ -826,6 +827,48 @@ private:
         // 发送取消消息到服务器
         SendStreamControlMessage_(stream_id, static_cast<uint8_t>(rpc_protocol::MsgType::kMsgTypeStreamCancel));
         return true;
+    }
+
+    bool FailPending_(uint32_t seq_num, CoroRpc::Errc ec) {
+        typename control_t::handler_ptr handler;
+        std::shared_ptr<stream_reader_type> stream_reader;
+        uint64_t timeout_timer = 0;
+        {
+            std::lock_guard<mutex_type> lock(control_->handler_table_mutex_);
+            auto unary_iter = control_->response_handler_table_.find(seq_num);
+            if (unary_iter != control_->response_handler_table_.end()) {
+                handler = unary_iter->second;
+                control_->response_handler_table_.erase(unary_iter);
+            } else {
+                auto stream_iter = control_->stream_handler_table_.find(seq_num);
+                if (stream_iter != control_->stream_handler_table_.end()) {
+                    stream_reader = stream_iter->second.reader;
+                    timeout_timer = stream_iter->second.timeout_timer;
+                    control_->stream_handler_table_.erase(stream_iter);
+                }
+            }
+        }
+
+        if (handler) {
+            handler->local_error(ec);
+            RpcLogWarn("[rpc][client] FailPending_: unary seq=%u ec=%d",
+                       seq_num, static_cast<int>(ec));
+            return true;
+        }
+        if (stream_reader) {
+            if (timeout_timer != 0) {
+                ToolBox::TimerMgr->KillTimer(timeout_timer);
+            }
+            // 走 SetError 透出 ec；与 CancelStream(Cancel+发对端帧) 语义不同
+            stream_reader->SetError(ec);
+            RpcLogWarn("[rpc][client] FailPending_: stream seq=%u ec=%d",
+                       seq_num, static_cast<int>(ec));
+            return true;
+        }
+
+        RpcLogWarn("[rpc][client] FailPending_: seq not found, seq=%u ec=%d",
+                   seq_num, static_cast<int>(ec));
+        return false;
     }
     
     // 发送流控制消息（暂停/恢复/取消）
